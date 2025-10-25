@@ -48,6 +48,22 @@ const showUsers = async (req, res) => {
 				return !disDelta ? b.rating - a.rating : disDelta
 			}
 		})
+		
+		// Add images for each user with proper format
+		for (let i = 0; i < result.length; i++) {
+			const images = await userModel.getImagesByUid(result[i].user_id);
+			result[i].images = images.map(img => ({
+				...img,
+				link: img.link || null,
+				data: img.data ? `data:image/png;base64,${img.data}` : null
+			}));
+			// Add profile image for backward compatibility
+			const profileImg = images.find(img => img.profile);
+			if (profileImg) {
+				result[i].name = profileImg.data ? `data:image/png;base64,${profileImg.data}` : (profileImg.link || null);
+			}
+		}
+		
 		res.json(result)
 	} catch (err) {
 		return res.json({ msg: 'Fatal error', err })
