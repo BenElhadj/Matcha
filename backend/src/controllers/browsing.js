@@ -73,6 +73,7 @@ const showUserById = async (req, res) => {
 			delete user.google_id
 			user.images = (await userModel.getImagesByUid(user.id)).map(img => ({
 				...img,
+				link: img.link || null,
 				data: img.data ? `data:image/png;base64,${img.data}` : null
 			}));
 			await historyModel.insertHistory(req.user.id, req.params.id)
