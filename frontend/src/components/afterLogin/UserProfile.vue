@@ -424,6 +424,7 @@ const coverPhoto = computed(() => {
 })
 
 const filteredImages = computed(() => {
+  if (!user.value.images || !Array.isArray(user.value.images)) return []
   return user.value.images.filter((cur) => !cur.cover)
 })
 
