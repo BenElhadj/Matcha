@@ -58,30 +58,46 @@ const profileImage = (image) => getFullPath(image)
 
 // New function to handle image src with link/data format
 const getImageSrc = (image) => {
-  if (!image) return getFullPath(null)
+  const defaultImage = 'default/defaut_profile.png'
+  if (!image) return defaultImage
 
-  // Check if image has data (base64)
-  if (image.data && image.data !== 'false') {
-    // If data already has the prefix, return it directly
+  // Check if image has valid data (base64)
+  if (
+    image.data &&
+    image.data !== 'false' &&
+    image.data !== '' &&
+    image.data !== null &&
+    image.data !== undefined
+  ) {
     if (image.data.startsWith('data:image')) {
       return image.data
     }
-    // Otherwise add the prefix
     return `data:image/png;base64,${image.data}`
   }
 
-  // Check if image has link (URL)
-  if (image.link && image.link !== 'false') {
+  // Check if image has valid link (URL)
+  if (
+    image.link &&
+    image.link !== 'false' &&
+    image.link !== '' &&
+    image.link !== null &&
+    image.link !== undefined
+  ) {
     return image.link
   }
 
   // Fallback to old name field if exists
-  if (image.name && image.name !== 'false') {
+  if (
+    image.name &&
+    image.name !== 'false' &&
+    image.name !== '' &&
+    image.name !== null &&
+    image.name !== undefined
+  ) {
     return getFullPath(image.name)
   }
 
-  // Default image
-  return getFullPath(null)
+  return defaultImage
 }
 
 const username = ref('')

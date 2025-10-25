@@ -1,15 +1,31 @@
 <template>
   <q-page class="page-container">
     <q-page-container v-if="loaded">
-
       <div>
         <div class="profile__cover">
-          <img :src="coverPhoto" alt="Cover Photo" class="cover__img">
+          <img :src="coverPhoto" alt="Cover Photo" class="cover__img" />
         </div>
-        <input accept=".jpg, image/*" type="file" ref="fileInputCover" id="fileInputCover" style="display: none" @change="uploadImage('cover', $event)">
+        <input
+          accept=".jpg, image/*"
+          type="file"
+          ref="fileInputCover"
+          id="fileInputCover"
+          style="display: none"
+          @change="uploadImage('cover', $event)"
+        />
 
-        <q-btn @click="openImageUploadDialog('cover')" fab small outlined flat round lighten-3 class="update__img" style="top:85px;">
-          <q-icon name="mdi-image" ></q-icon>
+        <q-btn
+          @click="openImageUploadDialog('cover')"
+          fab
+          small
+          outlined
+          flat
+          round
+          lighten-3
+          class="update__img"
+          style="top: 85px"
+        >
+          <q-icon name="mdi-image"></q-icon>
           <q-tooltip left>
             <span>Changer votre photo de couverture</span>
           </q-tooltip>
@@ -18,11 +34,28 @@
 
       <div class="avatar">
         <q-avatar slot="offset" class="profile__avatar mx-auto" size="250px">
-          <img :src="profileImage">
+          <img :src="profileImage" />
         </q-avatar>
-        <input accept=".jpg, image/*" type="file" ref="fileInputProfile" id="fileInputProfile" style="display: none" @change="uploadImage('profile', $event)">
+        <input
+          accept=".jpg, image/*"
+          type="file"
+          ref="fileInputProfile"
+          id="fileInputProfile"
+          style="display: none"
+          @change="uploadImage('profile', $event)"
+        />
 
-        <q-btn @click="openImageUploadDialog('profile')" fab small outlined flat round lighten-3 class="update__img"  style="top:470px;left:190px;">
+        <q-btn
+          @click="openImageUploadDialog('profile')"
+          fab
+          small
+          outlined
+          flat
+          round
+          lighten-3
+          class="update__img"
+          style="top: 470px; left: 190px"
+        >
           <q-icon name="mdi-image"></q-icon>
 
           <q-tooltip left>
@@ -32,13 +65,17 @@
       </div>
 
       <q-separator spacing class="separator-margin"></q-separator>
-      <div class=" centered-tabs" style="max-width: 800px;">  
+      <div class="centered-tabs" style="max-width: 800px">
         <q-card>
-
-          <q-tabs v-model="activeTab" class="bg-grey-2 text-grey q-tabs__content" active-color="primary" indicator-color="bg-grey-2">
+          <q-tabs
+            v-model="activeTab"
+            class="bg-grey-2 text-grey q-tabs__content"
+            active-color="primary"
+            indicator-color="bg-grey-2"
+          >
             <q-tab name="tab-profile" label="Profile"></q-tab>
-            <q-tab  name="tab-photo" label="Photos"></q-tab>
-            <q-tab  name="tab-history" label="History"></q-tab>
+            <q-tab name="tab-photo" label="Photos"></q-tab>
+            <q-tab name="tab-history" label="History"></q-tab>
             <q-tab name="tab-setting" label="Setting"></q-tab>
           </q-tabs>
 
@@ -46,14 +83,19 @@
 
           <q-tab-panels v-model="activeTab" animated class="bg-grey-2 text-black">
             <q-tab-panel name="tab-profile">
-              <profile-form ref="form" :user="user" @sync-user="syncUser" @update-user="updateUser"></profile-form>
+              <profile-form
+                ref="form"
+                :user="user"
+                @sync-user="syncUser"
+                @update-user="updateUser"
+              ></profile-form>
             </q-tab-panel>
 
-            <q-tab-panel  name="tab-photo">
+            <q-tab-panel name="tab-photo">
               <profile-gallery :images="filteredImages"></profile-gallery>
             </q-tab-panel>
 
-            <q-tab-panel  name="tab-history">
+            <q-tab-panel name="tab-history">
               <profile-history></profile-history>
             </q-tab-panel>
 
@@ -61,7 +103,6 @@
               <profile-settings></profile-settings>
             </q-tab-panel>
           </q-tab-panels>
-
         </q-card>
       </div>
       <AlertView :alert="alert"></AlertView>
@@ -98,51 +139,54 @@ const alert = ref({
   text: ''
 })
 
-const fileInputProfile = ref('');
-const fileInputCover = ref('');
-const urlProfile = ref('');
-const urlCover = ref('');
+const fileInputProfile = ref('')
+const fileInputCover = ref('')
+const urlProfile = ref('')
+const urlCover = ref('')
 
 const openImageUploadDialog = (type) => {
   if (type === 'cover') {
-    fileInputCover.value.click();
+    fileInputCover.value.click()
     urlCover.value = `${import.meta.env.VITE_APP_API_URL}/api/users/image/cover`
   } else if (type === 'profile') {
-    fileInputProfile.value.click(); 
+    fileInputProfile.value.click()
     urlProfile.value = `${import.meta.env.VITE_APP_API_URL}/api/users/image`
   }
-};
+}
 
 const uploadImage = async (type, event) => {
   try {
     const selectedFile = event.target.files[0]
     if (!selectedFile) {
-      console.error("Aucun fichier sélectionné")
-      return;
+      console.error('Aucun fichier sélectionné')
+      return
     }
 
     const headers = { 'x-auth-token': user.value.token }
 
     if (type === 'cover') {
-      const formData = new FormData();
-      formData.append('image', selectedFile);
+      const formData = new FormData()
+      formData.append('image', selectedFile)
       const result = await axios.post(urlCover.value, formData, { headers })
 
       if (result.data.ok) {
         await store.commit('updateCoverImage', result.data)
-        coverPhoto.value = store.getters.coverPhoto;
+        coverPhoto.value = store.getters.coverPhoto
         alert.value = { state: true, color: 'green', text: 'Cover image updated successfully' }
       } else {
-        alert.value = { state: true, color: 'red', text: `This error occurred while updating the image : ${result.data.msg}` }
+        alert.value = {
+          state: true,
+          color: 'red',
+          text: `This error occurred while updating the image : ${result.data.msg}`
+        }
       }
-      
     } else if (type === 'profile') {
       const reader = new FileReader()
       reader.onload = async (e) => {
         const base64Image = e.target.result
         const imageObject = {
-          image: base64Image,
-        };
+          image: base64Image
+        }
         const result = await axios.post(urlProfile.value, imageObject, { headers })
 
         if (result.data.ok) {
@@ -150,27 +194,34 @@ const uploadImage = async (type, event) => {
           profileImage.value = store.getters.profileImage
           alert.value = { state: true, color: 'green', text: 'Profile image updated successfully' }
         } else {
-          alert.value = { state: true, color: 'red', text: `This error occurred while updating the image : ${result.data.msg}` }
+          alert.value = {
+            state: true,
+            color: 'red',
+            text: `This error occurred while updating the image : ${result.data.msg}`
+          }
         }
-      };
+      }
 
       reader.readAsDataURL(selectedFile)
     }
-
   } catch (err) {
-    console.error('Erreur lors de la mise à jour de l\'image :', err)
-    alert.value = { state: true, color: 'red', text: `Une erreur s'est produite lors de la mise à jour de l'image : ${err}` }
+    console.error("Erreur lors de la mise à jour de l'image :", err)
+    alert.value = {
+      state: true,
+      color: 'red',
+      text: `Une erreur s'est produite lors de la mise à jour de l'image : ${err}`
+    }
   }
-};
+}
 
 const props = defineProps({
   pickFile: Function,
-  ProfileEditor: Object,
+  ProfileEditor: Object
 })
 
 const filesImages = ref([])
 
-const onRejected = (rejectedEntries)  => {
+const onRejected = (rejectedEntries) => {
   notify({
     type: 'negative',
     message: `${rejectedEntries.length} file(s) did not pass validation constraints`
@@ -183,7 +234,7 @@ const changeTab = (tab) => {
 
 const filteredImages = computed(() => {
   if (!user.value.images) return []
-  return user.value.images.filter(cur => !cur.cover)
+  return user.value.images.filter((cur) => !cur.cover)
 })
 
 const updateUser = async () => {
@@ -193,10 +244,18 @@ const updateUser = async () => {
     const res = await axios.post(url, user.value, { headers })
 
     if (res && res.data && !res.data.msg) {
-      alert.value = { state: true, color: 'green', text: 'Your account has been updated successfully'}
+      alert.value = {
+        state: true,
+        color: 'green',
+        text: 'Your account has been updated successfully'
+      }
       store.dispatch('updateUser', user.value)
     } else {
-      alert.value = { state: true, color: 'red', text: res.data.msg ? res.data.msg : 'Oops... something went wrong!'}
+      alert.value = {
+        state: true,
+        color: 'red',
+        text: res.data.msg ? res.data.msg : 'Oops... something went wrong!'
+      }
     }
   } catch (err) {
     console.error('err updateUser in frontend/SettingsView.vue ===> ', err)
@@ -204,14 +263,24 @@ const updateUser = async () => {
 }
 
 onMounted(async () => {
-  const token = user.token || localStorage.getItem('token')
+  const token = user.value.token || localStorage.getItem('token')
   if (token) {
     try {
-
-      const url = `${import.meta.env.VITE_APP_API_URL}/api/auth/isloggedin`
+      // Vérifie la connexion
+      const urlAuth = `${import.meta.env.VITE_APP_API_URL}/api/auth/isloggedin`
       const headers = { 'x-auth-token': token }
-      const res = await axios.get(url, { headers })
-      if (!res.data.msg) {
+      const resAuth = await axios.get(urlAuth, { headers })
+      if (!resAuth.data.msg) {
+        // Recharge les infos utilisateur
+        const urlUser = `${import.meta.env.VITE_APP_API_URL}/api/users/show`
+        const resUser = await axios.post(urlUser, {}, { headers })
+        if (resUser.data && resUser.data.user) {
+          user.value = resUser.data.user
+          store.commit('updateUser', resUser.data.user)
+          // Recharge les images
+          coverPhoto.value = getImageSrc(user.value.images?.find((img) => img.cover))
+          profileImage.value = getImageSrc(user.value.images?.find((img) => img.profile))
+        }
         loaded.value = true
         return
       }
@@ -219,20 +288,46 @@ onMounted(async () => {
       console.error('Got error here --> ', err)
     }
   }
-
+  // Fonction robuste pour l'affichage des images
+  function getImageSrc(image) {
+    const defaultProfile = 'default/defaut_profile.png'
+    const defaultCover = 'default/defaut_couverture.jpg'
+    if (!image) return defaultProfile
+    if (
+      image.data &&
+      image.data !== 'false' &&
+      image.data !== '' &&
+      image.data !== null &&
+      image.data !== undefined
+    ) {
+      if (image.data.startsWith('data:image')) {
+        return image.data
+      }
+      return `data:image/png;base64,${image.data}`
+    }
+    if (
+      image.link &&
+      image.link !== 'false' &&
+      image.link !== '' &&
+      image.link !== null &&
+      image.link !== undefined
+    ) {
+      return image.link
+    }
+    return image.cover ? defaultCover : defaultProfile
+  }
 })
 
 const syncUser = (updatedUser) => {
   store.commit('updateUser', updatedUser)
 }
-
 </script>
 
 <style scoped>
 .q-tabs__content {
-  align: "justify";
-  align-items: "justify-center";
-  justify-content: "justify-center";
+  align: 'justify';
+  align-items: 'justify-center';
+  justify-content: 'justify-center';
   padding: 0;
 }
 .separator-margin {
