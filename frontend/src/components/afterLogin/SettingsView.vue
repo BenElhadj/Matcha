@@ -119,7 +119,7 @@ import ProfileEditor from '@/components/afterLogin/ProfileEditor.vue'
 import ProfileTabs from '@/components/afterLogin/ProfileTabs.vue'
 import ProfileForm from '@/components/afterLogin/ProfileForm.vue'
 import ProfileSettings from '@/components/afterLogin/ProfileSettings.vue'
-import ProfileGallery from '@/components/afterLogin/ProfileGallery.vue'
+import ProfileGallery, { getValidImageSrc } from '@/components/afterLogin/ProfileGallery.vue'
 import ProfileHistory from '@/components/afterLogin/ProfileHistory.vue'
 
 import axios from 'axios'
@@ -278,8 +278,14 @@ onMounted(async () => {
           user.value = resUser.data.user
           store.commit('updateUser', resUser.data.user)
           // Recharge les images
-          coverPhoto.value = getImageSrc(user.value.images?.find((img) => img.cover))
-          profileImage.value = getImageSrc(user.value.images?.find((img) => img.profile))
+          coverPhoto.value = getValidImageSrc(
+            user.value.images?.find((img) => img.cover),
+            'default/defaut_couverture.jpg'
+          )
+          profileImage.value = getValidImageSrc(
+            user.value.images?.find((img) => img.profile),
+            'default/defaut_profile.png'
+          )
         }
         loaded.value = true
         return
@@ -289,33 +295,7 @@ onMounted(async () => {
     }
   }
   // Fonction robuste pour l'affichage des images
-  function getImageSrc(image) {
-    const defaultProfile = 'default/defaut_profile.png'
-    const defaultCover = 'default/defaut_couverture.jpg'
-    if (!image) return defaultProfile
-    if (
-      image.data &&
-      image.data !== 'false' &&
-      image.data !== '' &&
-      image.data !== null &&
-      image.data !== undefined
-    ) {
-      if (image.data.startsWith('data:image')) {
-        return image.data
-      }
-      return `data:image/png;base64,${image.data}`
-    }
-    if (
-      image.link &&
-      image.link !== 'false' &&
-      image.link !== '' &&
-      image.link !== null &&
-      image.link !== undefined
-    ) {
-      return image.link
-    }
-    return image.cover ? defaultCover : defaultProfile
-  }
+  // getImageSrc replaced by getValidImageSrc
 })
 
 const syncUser = (updatedUser) => {
@@ -325,9 +305,8 @@ const syncUser = (updatedUser) => {
 
 <style scoped>
 .q-tabs__content {
-  align: 'justify';
-  align-items: 'justify-center';
-  justify-content: 'justify-center';
+  align-items: center;
+  justify-content: center;
   padding: 0;
 }
 .separator-margin {

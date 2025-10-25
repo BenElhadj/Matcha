@@ -127,10 +127,16 @@ const changePassword = async (user) => {
 }
 
 // Get images
+const isValidImage = (img) => {
+    const validLink = img.link && img.link !== 'false' && img.link !== '' && img.link !== null && img.link !== undefined;
+    const validData = img.data && img.data !== 'false' && img.data !== '' && img.data !== null && img.data !== undefined;
+    return validLink || validData;
+};
+
 const getImages = async (id) => {
     const query = `SELECT *, COALESCE(link, '') AS link, COALESCE(data, '') AS data FROM images WHERE user_id = $1 AND cover = 0 AND profile = 0`;
     const result = await db.query(query, [id]);
-    return result.rows.map(img => ({
+    return result.rows.filter(isValidImage).map(img => ({
         ...img,
         image: img.link ? img.link : img.data
     }));
@@ -140,7 +146,7 @@ const getImages = async (id) => {
 const getImagesById = async (id, user_id) => {
     const query = `SELECT *, COALESCE(link, '') AS link, COALESCE(data, '') AS data FROM images WHERE id = $1 AND user_id = $2`;
     const result = await db.query(query, [id, user_id]);
-    return result.rows.map(img => ({
+    return result.rows.filter(isValidImage).map(img => ({
         ...img,
         image: img.link ? img.link : img.data
     }));
@@ -150,7 +156,7 @@ const getImagesById = async (id, user_id) => {
 const getImagesByUid = async (user_id) => {
     const query = `SELECT *, COALESCE(link, '') AS link, COALESCE(data, '') AS data FROM images WHERE user_id = $1`;
     const result = await db.query(query, [user_id]);
-    return result.rows.map(img => ({
+    return result.rows.filter(isValidImage).map(img => ({
         ...img,
         image: img.link ? img.link : img.data
     }));

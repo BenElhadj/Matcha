@@ -78,6 +78,7 @@ import { useStore } from 'vuex'
 import moment from 'moment'
 import utility from '@/utility'
 import axios from 'axios'
+import { getValidImageSrc } from './ProfileGallery.vue'
 // import io from 'socket.io-client'
 // const socket = io(`${import.meta.env.VITE_APP_API_URL}`)
 
@@ -121,34 +122,13 @@ const lastSeen = computed(() => {
 })
 
 const getProfileImage = computed(() => {
-  // Check if user has images array
+  const defaultImage = 'default/defaut_profile.png'
   if (props.user.images && props.user.images.length > 0) {
-    // Find profile image
     const profileImg = props.user.images.find((img) => img.profile)
-    if (profileImg) {
-      // Return data if exists (base64), otherwise link, otherwise default
-      if (profileImg.data && profileImg.data !== 'false') {
-        return profileImg.data // Already has data:image/png;base64, prefix
-      }
-      if (profileImg.link && profileImg.link !== 'false') {
-        return profileImg.link
-      }
-    }
-    // If no profile image, use first image
-    const firstImg = props.user.images[0]
-    if (firstImg.data && firstImg.data !== 'false') {
-      return firstImg.data
-    }
-    if (firstImg.link && firstImg.link !== 'false') {
-      return firstImg.link
-    }
+    const img = profileImg || props.user.images[0]
+    return getValidImageSrc(img, defaultImage)
   }
-  // Fallback to old name field if exists
-  if (props.user.name && props.user.name !== 'false') {
-    return props.user.name
-  }
-  // Default image
-  return utility.getFullPath(null)
+  return defaultImage
 })
 
 const profileImage = (image) => {

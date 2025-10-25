@@ -1,3 +1,9 @@
+// Utilitaire global pour l'affichage d'image export function getValidImageSrc(image, defaultImage =
+'default/defaut_profile.png') { if (!image) return defaultImage if ( image.link && image.link !==
+'false' && image.link !== '' && image.link !== null && image.link !== undefined ) { return
+image.link } if ( image.data && image.data !== 'false' && image.data !== '' && image.data !== null
+&& image.data !== undefined ) { if (image.data.startsWith('data:image')) { return image.data }
+return `data:image/png;base64,${image.data}` } return defaultImage }
 <template>
   <q-page>
     <q-page-container>
