@@ -15,7 +15,11 @@ const getVisitors = async (user_id) => {
 			history.visitor as visitor_id,
 			history.created_at as visit_date,
 			users.username as username,
-			images.name as profile_image
+			CASE 
+				WHEN images.link IS NOT NULL THEN images.link
+				WHEN images.data IS NOT NULL THEN CONCAT('data:image/png;base64,', images.data)
+				ELSE ''
+			END as profile_image
 		FROM history
 			INNER JOIN users 
 			ON 
@@ -38,7 +42,11 @@ const getVisited = async (user_id) => {
 			history.visited as visited_id,
 			history.created_at as visit_date,
 			users.username as username,
-			images.name as profile_image
+			CASE 
+				WHEN images.link IS NOT NULL THEN images.link
+				WHEN images.data IS NOT NULL THEN CONCAT('data:image/png;base64,', images.data)
+				ELSE ''
+			END as profile_image
 		FROM history
 			INNER JOIN users 
 			ON 
@@ -66,7 +74,11 @@ const getAllHistory = async (user_id) => {
 			u.username,
 			u.first_name,
 			u.last_name,
-			COALESCE(i.link, i.data, '') as profile_image
+			CASE 
+				WHEN i.link IS NOT NULL THEN i.link
+				WHEN i.data IS NOT NULL THEN CONCAT('data:image/png;base64,', i.data)
+				ELSE ''
+			END as profile_image
 		FROM history h
 		INNER JOIN users u ON h.visitor = u.id
 		LEFT JOIN images i ON h.visitor = i.user_id AND i.profile = TRUE
