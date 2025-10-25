@@ -614,13 +614,6 @@ const createBlockedTable = async () => {
       );
     `;
     
-      // Ensure 'type' column exists for visit actions
-      try {
-        await pool.query("ALTER TABLE history ADD COLUMN IF NOT EXISTS type VARCHAR(20) NOT NULL DEFAULT 'visit';");
-        console.log("Ensured 'type' column exists in history table.");
-      } catch (err) {
-        console.error("Error ensuring 'type' column in history table:", err);
-      }
     await pool.query(createTableQuery);
     console.log('Blocked table created successfully!');
     
@@ -856,6 +849,13 @@ const createHistoryTable = async () => {
     `;
     await pool.query(createTableQuery);
     console.log('History table created successfully!');
+    // Ensure 'type' column exists for visit actions
+    try {
+      await pool.query("ALTER TABLE history ADD COLUMN IF NOT EXISTS type VARCHAR(20) NOT NULL DEFAULT 'visit';");
+      console.log("Ensured 'type' column exists in history table.");
+    } catch (err) {
+      console.error("Error ensuring 'type' column in history table:", err);
+    }
     const countQuery = 'SELECT COUNT(*) AS count FROM history';
     const countResult = await pool.query(countQuery);
     const rowCount = parseInt(countResult.rows[0].count);
