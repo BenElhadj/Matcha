@@ -119,7 +119,8 @@ import ProfileEditor from '@/components/afterLogin/ProfileEditor.vue'
 import ProfileTabs from '@/components/afterLogin/ProfileTabs.vue'
 import ProfileForm from '@/components/afterLogin/ProfileForm.vue'
 import ProfileSettings from '@/components/afterLogin/ProfileSettings.vue'
-import ProfileGallery, { getValidImageSrc } from '@/components/afterLogin/ProfileGallery.vue'
+import { getImageSrc } from '@/utility.js'
+import ProfileGallery from '@/components/afterLogin/ProfileGallery.vue'
 import ProfileHistory from '@/components/afterLogin/ProfileHistory.vue'
 
 import axios from 'axios'
@@ -278,11 +279,11 @@ onMounted(async () => {
           user.value = resUser.data.user
           store.commit('updateUser', resUser.data.user)
           // Recharge les images
-          coverPhoto.value = getValidImageSrc(
+          coverPhoto.value = getImageSrc(
             user.value.images?.find((img) => img.cover),
             'default/defaut_couverture.jpg'
           )
-          profileImage.value = getValidImageSrc(
+          profileImage.value = getImageSrc(
             user.value.images?.find((img) => img.profile),
             'default/defaut_profile.png'
           )

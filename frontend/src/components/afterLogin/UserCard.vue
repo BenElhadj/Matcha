@@ -78,7 +78,7 @@ import { useStore } from 'vuex'
 import moment from 'moment'
 import utility from '@/utility'
 import axios from 'axios'
-import { getValidImageSrc } from './ProfileGallery.vue'
+import { getImageSrc } from '@/utility.js'
 // import io from 'socket.io-client'
 // const socket = io(`${import.meta.env.VITE_APP_API_URL}`)
 
@@ -126,7 +126,7 @@ const getProfileImage = computed(() => {
   if (props.user.images && props.user.images.length > 0) {
     const profileImg = props.user.images.find((img) => img.profile)
     const img = profileImg || props.user.images[0]
-    return getValidImageSrc(img, defaultImage)
+    return getImageSrc(img)
   }
   return defaultImage
 })

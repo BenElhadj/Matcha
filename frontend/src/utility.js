@@ -1,3 +1,38 @@
+// Utilitaire global pour l'affichage d'image
+export function getImageSrc(image, defaultImage = 'default/defaut_profile.png') {
+  if (!image) return defaultImage
+  if (
+    image.data &&
+    image.data !== 'false' &&
+    image.data !== '' &&
+    image.data !== null &&
+    image.data !== undefined
+  ) {
+    if (image.data.startsWith('data:image')) {
+      return image.data
+    }
+    return `data:image/png;base64,${image.data}`
+  }
+  if (
+    image.link &&
+    image.link !== 'false' &&
+    image.link !== '' &&
+    image.link !== null &&
+    image.link !== undefined
+  ) {
+    return image.link
+  }
+  if (
+    image.name &&
+    image.name !== 'false' &&
+    image.name !== '' &&
+    image.name !== null &&
+    image.name !== undefined
+  ) {
+    return getFullPath(image.name)
+  }
+  return defaultImage
+}
 import axios from 'axios'
 import moment from 'moment'
 
