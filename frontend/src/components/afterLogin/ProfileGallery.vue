@@ -34,7 +34,7 @@
             @click="deleteImg(image)"
           >
           </q-btn>
-          <img :src="profileImage(image.name)" class="image full-width" />
+          <img :src="getImageSrc(image)" class="image full-width" />
         </div>
       </div>
       <AlertView :alert="alert" />
@@ -55,6 +55,35 @@ const getFullPath = utility.getFullPath
 const user = computed(() => store.getters.user)
 const alert = ref({ state: false, color: '', text: '' })
 const profileImage = (image) => getFullPath(image)
+
+// New function to handle image src with link/data format
+const getImageSrc = (image) => {
+  if (!image) return getFullPath(null)
+
+  // Check if image has data (base64)
+  if (image.data && image.data !== 'false') {
+    // If data already has the prefix, return it directly
+    if (image.data.startsWith('data:image')) {
+      return image.data
+    }
+    // Otherwise add the prefix
+    return `data:image/png;base64,${image.data}`
+  }
+
+  // Check if image has link (URL)
+  if (image.link && image.link !== 'false') {
+    return image.link
+  }
+
+  // Fallback to old name field if exists
+  if (image.name && image.name !== 'false') {
+    return getFullPath(image.name)
+  }
+
+  // Default image
+  return getFullPath(null)
+}
+
 const username = ref('')
 const photoInputRef = ref(null)
 if (props.userToto?.username ?? false) {
