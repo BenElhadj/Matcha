@@ -1,36 +1,53 @@
 <template>
   <q-card :to="`/user/${user.user_id}`">
-    <div  class="pt-1 column justify-center align-center">
-
+    <div class="pt-1 column justify-center align-center">
       <div class="row justify-between q-ma-sm">
         <q-chip outline small text-color="grey-7">{{ distance }}</q-chip>
         <q-item-section side>
           <q-tooltip bottom class="status_container">
             <span>{{ lastSeen }}</span>
           </q-tooltip>
-          <q-badge small rounded :color="`${user.isConnected ? 'green' : 'grey'}`"/>
+          <q-badge small rounded :color="`${user.isConnected ? 'green' : 'grey'}`" />
         </q-item-section>
       </div>
 
       <q-avatar class="justify-center" size="150px">
-        <img class="icon-avatar " square :src="likeIcon">
-        <img :src="profileImage(user.name)"/>
+        <img class="icon-avatar" square :src="likeIcon" />
+        <img :src="getProfileImage" />
       </q-avatar>
-      <span justify-center class="name headline text-capitalize mt-2 ">{{ user.username }}</span>
-      <span justify-center class="name headline text-capitalize mt-2 ">{{ user.last_name }} {{ user.first_name }}</span>
-      <span justify-center class="name headline text-capitalize mt-2 ">
-      <q-icon class="mr-2" size="25px" :name="user.gender === 'male' ? 'icon-male' : (user.gender === 'female' ? 'icon-femel' : 'icon-other')"/>
-      <span v-if="user.birthdate">
-        <q-icon size="30px" name="icon-age"/>
-        {{ age }}
-      </span>
+      <span justify-center class="name headline text-capitalize mt-2">{{ user.username }}</span>
+      <span justify-center class="name headline text-capitalize mt-2"
+        >{{ user.last_name }} {{ user.first_name }}</span
+      >
+      <span justify-center class="name headline text-capitalize mt-2">
+        <q-icon
+          class="mr-2"
+          size="25px"
+          :name="
+            user.gender === 'male'
+              ? 'icon-male'
+              : user.gender === 'female'
+              ? 'icon-femel'
+              : 'icon-other'
+          "
+        />
+        <span v-if="user.birthdate">
+          <q-icon size="30px" name="icon-age" />
+          {{ age }}
+        </span>
       </span>
 
       <div class="note">
-        <p class="caption text-capitalize rating_value">{{ user.rating ? user.rating.toFixed(1) : '0.0' }}</p>
+        <p class="caption text-capitalize rating_value">
+          {{ user.rating ? user.rating.toFixed(1) : '0.0' }}
+        </p>
         <q-rating
-          :color="user.gender === 'male' ? 'blue-3' : user.gender === 'female' ? 'pink-2' : 'blue-5'"
-          :color-selected="user.gender === 'male' ? 'blue-9' : user.gender === 'female' ? 'pink-8' : 'pink-4'"
+          :color="
+            user.gender === 'male' ? 'blue-3' : user.gender === 'female' ? 'pink-2' : 'blue-5'
+          "
+          :color-selected="
+            user.gender === 'male' ? 'blue-9' : user.gender === 'female' ? 'pink-8' : 'pink-4'
+          "
           :modelValue="user.rating && !isNaN(user.rating) ? user.rating : 0"
           icon="mdi-heart-outline"
           icon-selected="mdi-heart"
@@ -40,15 +57,17 @@
           dense
           size="1.7em"
           half-increments
-          class="rating"/>
+          class="rating"
+        />
       </div>
 
       <div class="row justify-center align-center bottom mb-0 mt-auto py-2 px-4 grey-2">
         <q-icon color="primary" size="40px" name="icon-map"></q-icon>
-        <span v-if="user.city && user.country" class="text-truncate">{{ `${user.city},  ${user.country}` }}</span>
+        <span v-if="user.city && user.country" class="text-truncate">{{
+          `${user.city},  ${user.country}`
+        }}</span>
         <span v-else class="text-truncate">Earth</span>
       </div>
-
     </div>
   </q-card>
 </template>
@@ -94,12 +113,42 @@ const distance = computed(() => {
 })
 
 const lastSeen = computed(() => {
-  if (props.user.lastSeen == 'online')
-  {
+  if (props.user.lastSeen == 'online') {
     return 'online'
   } else {
-    return props.user.lastSeen = moment(props.user.status).utc().fromNow()
+    return (props.user.lastSeen = moment(props.user.status).utc().fromNow())
   }
+})
+
+const getProfileImage = computed(() => {
+  // Check if user has images array
+  if (props.user.images && props.user.images.length > 0) {
+    // Find profile image
+    const profileImg = props.user.images.find((img) => img.profile)
+    if (profileImg) {
+      // Return data if exists (base64), otherwise link, otherwise default
+      if (profileImg.data && profileImg.data !== 'false') {
+        return profileImg.data // Already has data:image/png;base64, prefix
+      }
+      if (profileImg.link && profileImg.link !== 'false') {
+        return profileImg.link
+      }
+    }
+    // If no profile image, use first image
+    const firstImg = props.user.images[0]
+    if (firstImg.data && firstImg.data !== 'false') {
+      return firstImg.data
+    }
+    if (firstImg.link && firstImg.link !== 'false') {
+      return firstImg.link
+    }
+  }
+  // Fallback to old name field if exists
+  if (props.user.name && props.user.name !== 'false') {
+    return props.user.name
+  }
+  // Default image
+  return utility.getFullPath(null)
 })
 
 const profileImage = (image) => {
@@ -108,23 +157,32 @@ const profileImage = (image) => {
 
 const getHistory = async () => {
   try {
-    const selectedUserId = props.user.user_id;
-    const token = store.getters.user.token || localStorage.getItem('token');
-    const url = `${import.meta.env.VITE_APP_API_URL}/api/browse/allhistory`;
-    const headers = { 'x-auth-token': token };
-    const typesToFilter = ['he_like', 'you_like', 'he_like_back', 'you_like_back', 'he_unlike', 'you_unlike'];
-    const result = await axios.get(url, { headers });
+    const selectedUserId = props.user.user_id
+    const token = store.getters.user.token || localStorage.getItem('token')
+    const url = `${import.meta.env.VITE_APP_API_URL}/api/browse/allhistory`
+    const headers = { 'x-auth-token': token }
+    const typesToFilter = [
+      'he_like',
+      'you_like',
+      'he_like_back',
+      'you_like_back',
+      'he_unlike',
+      'you_unlike'
+    ]
+    const result = await axios.get(url, { headers })
 
-    let latestInteraction = null;
+    let latestInteraction = null
     if (Array.isArray(result.data)) {
       latestInteraction = result.data
         .filter((item) => typesToFilter.includes(item.type))
         .filter((item) => item.his_id === selectedUserId)
-        .sort((a, b) => new Date(b.match_date) - new Date(a.match_date))[0];
+        .sort((a, b) => new Date(b.match_date) - new Date(a.match_date))[0]
     }
-    likeIcon.value = latestInteraction ? getLikeIcon(latestInteraction.type) : getLikeIcon('default');
+    likeIcon.value = latestInteraction
+      ? getLikeIcon(latestInteraction.type)
+      : getLikeIcon('default')
   } catch (err) {
-    console.error('Error in frontend/ProfileHistory.vue:', err);
+    console.error('Error in frontend/ProfileHistory.vue:', err)
   }
 }
 
@@ -169,9 +227,9 @@ onMounted(() => {
   width: 35px !important;
   height: 35px !important;
   position: absolute;
-  size: 100%; 
-  top: 5px; 
-  left: 80%; 
+  size: 100%;
+  top: 5px;
+  left: 80%;
   transform: translateX(-50%);
 }
 .icon-male {
@@ -226,15 +284,15 @@ onMounted(() => {
   box-sizing: border-box;
   height: 100%;
   box-shadow: none;
-  border: 1px solid rgba(0, 0, 0, .1) !important;
-  transition: all .3s ease-out;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  transition: all 0.3s ease-out;
   padding-bottom: 23px;
 }
 .q-avatar {
   margin: 0 auto;
-  border: 1px solid rgba(0, 0, 0, .1);
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, .1);
-  transition: all .3s ease-out;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease-out;
 }
 .align-center {
   text-align: center;
@@ -242,19 +300,20 @@ onMounted(() => {
 }
 
 .q-card:hover {
-  border: 1px solid rgba(25, 25, 25, .3) !important;
+  border: 1px solid rgba(25, 25, 25, 0.3) !important;
 }
 
 .q-card__title {
   background: none;
 }
 
-.top, .bottom {
+.top,
+.bottom {
   width: 100%;
 }
 
 .rating {
-  transform: scale(.8) translateY(-1px);
+  transform: scale(0.8) translateY(-1px);
 }
 
 .rating_value {
@@ -286,6 +345,6 @@ onMounted(() => {
 }
 
 .v-responsive.v-image {
-  border: 3px solid rgba(0, 0, 0, .1) !important;
+  border: 3px solid rgba(0, 0, 0, 0.1) !important;
 }
 </style>
