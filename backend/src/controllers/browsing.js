@@ -52,11 +52,19 @@ const showUsers = async (req, res) => {
 		// Add images for each user with proper format
 		for (let i = 0; i < result.length; i++) {
 			const images = await userModel.getImagesByUid(result[i].user_id);
-			result[i].images = images.map(img => ({
-				...img,
-				link: img.link || null,
-				data: img.data ? `data:image/png;base64,${img.data}` : null
-			}));
+			result[i].images = images
+				.map(img => {
+					const validLink = img.link && img.link !== 'false' && img.link !== '' && img.link !== null && img.link !== undefined;
+					const validData = img.data && img.data !== 'false' && img.data !== '' && img.data !== null && img.data !== undefined;
+					if (validLink) {
+						return { ...img, link: img.link, data: null };
+					} else if (validData) {
+						return { ...img, link: null, data: `data:image/png;base64,${img.data}` };
+					} else {
+						return null;
+					}
+				})
+				.filter(Boolean);
 			// Add profile image for backward compatibility
 			const profileImg = images.find(img => img.profile);
 			if (profileImg) {

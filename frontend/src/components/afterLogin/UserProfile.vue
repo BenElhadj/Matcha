@@ -242,7 +242,7 @@ import ProfileEditor from '@/components/afterLogin/ProfileEditor.vue'
 import ProfileTabs from '@/components/afterLogin/ProfileTabs.vue'
 import ProfileForm from '@/components/afterLogin/ProfileForm.vue'
 import ProfileSettings from '@/components/afterLogin/ProfileSettings.vue'
-import ProfileGallery from '@/components/afterLogin/ProfileGallery.vue'
+import ProfileGallery, { getValidImageSrc } from '@/components/afterLogin/ProfileGallery.vue'
 import ProfileHistory from '@/components/afterLogin/ProfileHistory.vue'
 import chatTrue from '@/assets/chat/chatUnavailable.png'
 import chatFalse from '@/assets/chat/chat.png'
@@ -417,10 +417,7 @@ const coverPhoto = computed(() => {
   const cover = 'default/defaut_couverture.jpg'
   if (!user.value || !user.value.images) return getFullPath(cover)
   const image = user.value.images.find((cur) => cur.cover)
-  if (!image) return getFullPath(cover)
-  if (image.link) return getFullPath(image.link)
-  if (image.data) return `data:image/png;base64,${image.data}`
-  return getFullPath(cover)
+  return getValidImageSrc(image, cover)
 })
 
 const filteredImages = computed(() => {
@@ -435,12 +432,10 @@ const userTags = computed(() => {
 })
 
 const getProfileImage = () => {
-  if (!user.value || !user.value.images) return 'default/defaut_profile.png'
-  const image = user.value.images.find((cur) => cur.profile === 1)
-  if (!image) return 'default/defaut_profile.png'
-  if (image.link) return getFullPath(image.link)
-  if (image.data) return `data:image/png;base64,${image.data}`
-  return 'default/defaut_profile.png'
+  const defaultImage = 'default/defaut_profile.png'
+  if (!user.value || !user.value.images) return defaultImage
+  const image = user.value.images.find((cur) => cur.profile === 1) || user.value.images[0]
+  return getValidImageSrc(image, defaultImage)
 }
 
 const matchFunction = async () => {
