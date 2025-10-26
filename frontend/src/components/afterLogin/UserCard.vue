@@ -122,7 +122,7 @@ const lastSeen = computed(() => {
 })
 
 const getProfileImage = computed(() => {
-  const defaultImage = 'default/defaut_profile.png'
+  const defaultImage = 'default/defaut_profile.txt'
   if (props.user.images && props.user.images.length > 0) {
     const profileImg = props.user.images.find((img) => img.profile)
     const img = profileImg || props.user.images[0]

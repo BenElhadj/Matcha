@@ -1,58 +1,68 @@
-// Utilitaire global pour l'affichage d'image
-export function getImageSrc(image, defaultImage = 'default/defaut_profile.png') {
+// Utilitaire global pour l'affichage d'image (gère 'false', base64 et URLs)
+export function getImageSrc(image, defaultImage = 'default/defaut_profile.txt') {
   if (!image) return defaultImage;
-  // Check for valid link first
-  if (
-    image.link &&
-    typeof image.link === 'string' &&
-    image.link !== 'false' &&
-    image.link.trim() !== '' &&
-    image.link !== null &&
-    image.link !== undefined &&
-    image.link !== false
-  ) {
-    return image.link;
+
+  // Si c'est une chaîne directe
+  if (typeof image === 'string') {
+    const s = image.trim();
+    if (!s || s === 'false') return defaultImage;
+    if (s.startsWith('data:image')) return s;
+    if (isExternal(s)) return s;
+    return getFullPath(s);
   }
-  // Then check for valid data
-  if (
-    image.data &&
-    typeof image.data === 'string' &&
-    image.data !== 'false' &&
-    image.data.trim() !== '' &&
-    image.data !== null &&
-    image.data !== undefined &&
-    image.data !== false
-  ) {
-    if (image.data.startsWith('data:image')) {
-      return image.data;
+
+  // Champ image prioritaire si présent
+  if (typeof image.image === 'string') {
+    const val = image.image.trim();
+    if (val && val !== 'false') {
+      if (val.startsWith('data:image')) return val;
+      if (isExternal(val)) return val;
+      return getFullPath(val);
     }
-    // Only return base64 if not 'false', not empty, and not 'false' string
-    if (/^[A-Za-z0-9+/=]+$/.test(image.data)) {
-      return `data:image/png;base64,${image.data}`;
+  }
+
+  // Lien explicite
+  if (typeof image.link === 'string') {
+    const val = image.link.trim();
+    if (val && val !== 'false') {
+      if (isExternal(val)) return val;
+      return getFullPath(val);
     }
-    // If not valid base64, fallback
-    return defaultImage;
   }
-  // Fallback to old name field if exists
-  if (
-    image.name &&
-    typeof image.name === 'string' &&
-    image.name !== 'false' &&
-    image.name.trim() !== '' &&
-    image.name !== null &&
-    image.name !== undefined &&
-    image.name !== false
-  ) {
-    return getFullPath(image.name);
+
+  // Données base64 ou data URI
+  if (typeof image.data === 'string') {
+    const val = image.data.trim();
+    if (val && val !== 'false') {
+      if (val.startsWith('data:image')) return val;
+      if (/^[A-Za-z0-9+/=]+$/.test(val)) return `data:image/png;base64,${val}`;
+    }
   }
+
+  // Ancien champ name
+  if (typeof image.name === 'string') {
+    const val = image.name.trim();
+    if (val && val !== 'false') return getFullPath(val);
+  }
+
   return defaultImage;
 }
 
 import axios from 'axios'
 import moment from 'moment'
 
-const isExternal = url => url && (url.indexOf(':') > -1 || url.indexOf('//') > -1 || url.indexOf('www.') > -1)
-const isBlocked = (state, id) => state.blocked.includes(id) || state.blockedBy.includes(id)
+export const isExternal = url => url && (url.indexOf(':') > -1 || url.indexOf('//') > -1 || url.indexOf('www.') > -1)
+export const isBlocked = (state, id) => {
+  const b = Array.isArray(state?.blocked) ? state.blocked : []
+  const bb = Array.isArray(state?.blockedBy) ? state.blockedBy : []
+  return b.includes(id) || bb.includes(id)
+}
+
+// Nom complet vers le fichier uploads côté backend
+export function getFullPath(file) {
+  if (!file || file === 'false') return `${import.meta.env.VITE_APP_API_URL}/uploads/default/defaut_profile.txt`
+  return isExternal(file) ? file : `${import.meta.env.VITE_APP_API_URL}/uploads/${file}`
+}
 
 const getDate = item => {
   if (!item) return new Date()
@@ -157,7 +167,53 @@ import receive from '@/assets/match/receive-match.png'
 import dislike from '@/assets/match/dislike.png'
 import defaultIcon from '@/assets/match/heart-default.png'
 
+// Upload helpers alignés avec le backend (champ 'image' et token dans header)
+export async function uploadProfileImage(file) {
+  try {
+    const token = localStorage.getItem('token')
+    const url = `${import.meta.env.VITE_APP_API_URL}/api/users/image/profile`
+    const formData = new FormData()
+    formData.append('image', file)
+    const headers = { 'x-auth-token': token }
+    const res = await axios.post(url, formData, { headers })
+    return res.data
+  } catch (err) {
+    console.error('err uploadProfileImage in utility.js ===> ', err)
+    return { msg: 'Oops... error uploading profile image!' }
+  }
+}
+
+export async function uploadGalleryImage(file) {
+  try {
+    const token = localStorage.getItem('token')
+    const url = `${import.meta.env.VITE_APP_API_URL}/api/users/image`
+    const formData = new FormData()
+    formData.append('image', file)
+    const headers = { 'x-auth-token': token }
+    const res = await axios.post(url, formData, { headers })
+    return res.data
+  } catch (err) {
+    console.error('err uploadGalleryImage in utility.js ===> ', err)
+    return { msg: 'Oops... error uploading gallery image!' }
+  }
+}
+
+export async function deleteUserImage(imageId, isProfile = false) {
+  try {
+    const token = localStorage.getItem('token')
+    const url = `${import.meta.env.VITE_APP_API_URL}/api/users/image/del`
+    const body = { id: imageId, profile: isProfile }
+    const headers = { 'x-auth-token': token }
+    const res = await axios.post(url, body, { headers })
+    return res.data
+  } catch (err) {
+    console.error('err deleteUserImage in utility.js ===> ', err)
+    return { msg: 'Oops... error deleting image!' }
+  }
+}
+
 export default {
+  getImageSrc,
   getDate,
   isBlocked,
   updateOneNotif,
@@ -166,7 +222,7 @@ export default {
   syncLocation,
   getLocationFromIp,
   // eslint-disable-next-line
-  getFullPath: (file) => isExternal(file) ? file : `${import.meta.env.VITE_APP_API_URL}/uploads/${file ? file : 'default/defaut_profile.png'}`,
+  getFullPath,
   // consoleLog: ('utility.js getFullPath => ', getFullPath),
   formatTime (date) {
     const when = moment(getDate(date))
@@ -378,4 +434,7 @@ export default {
   },
 
   passMatch: (p1, p2) => !p1.length || p2 === p1 ? '' : 'Passwords must match'
+  ,uploadProfileImage
+  ,uploadGalleryImage
+  ,deleteUserImage
 }
