@@ -15,7 +15,7 @@ app.use(cors({
     'https://benelhadj.github.io',
     'https://benelhadj.github.io/Matcha',
     'http://localhost:5173',
-    'https://matcha-backend-t6dr.onrender.com/'
+    'https://matcha-backend-t6dr.onrender.com'
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
