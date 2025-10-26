@@ -1,16 +1,16 @@
 // Upload image de profil
 const uploadProfileImage = async (req, res) => {
 	if (!req.user.id)
-		return res.json({ msg: 'Not logged in' })
+		return res.json({ status: 'error', type: 'auth', message: 'Not logged in', data: null })
 	try {
 	let link = req.body.link || null;
 	let data = req.file ? req.file.buffer.toString('base64') : null;
 	await userModel.updateProfilePic(req.user.id)
 	await userModel.insertImages({ id: req.user.id, link, data, profile: true, cover: false })
 	await userModel.setImages(req.user.id)
-	return res.json({ ok: true, status: 'Profile image updated', image: link ? link : data, user_id: req.user.id })
+	return res.json({ status: 'success', type: 'profile', message: 'Profile image updated', data: { image: link ? link : data, user_id: req.user.id } })
 	} catch (err) {
-		return res.json({ msg: 'Fatal error', err })
+		return res.json({ status: 'error', type: 'profile', message: 'Fatal error', data: err })
 	}
 }
 const bcrypt = require('bcryptjs')
@@ -36,32 +36,32 @@ const tokenExp = { expiresIn: 7 * 24 * 60 * 60 }
 const updateProfile = async (req, res) => {
 	if (!req.user.id) return res.json({ msg: 'Not logged in' })
 	if (!validator(req.body.first_name, 'fname'))
-		return res.json({ msg: 'First name is invalid' })
+		return res.json({ status: 'error', type: 'profile', message: 'First name is invalid', data: null })
 	if (!validator(req.body.last_name, 'lname'))
-		return res.json({ msg: 'Last name is invalid' })
+		return res.json({ status: 'error', type: 'profile', message: 'Last name is invalid', data: null })
 	if (!validator(req.body.email, 'email'))
-		return res.json({ msg: 'Email is invalid' })
+		return res.json({ status: 'error', type: 'profile', message: 'Email is invalid', data: null })
 	if (!validator(req.body.username, 'username'))
-		return res.json({ msg: 'Username is invalid' })
+		return res.json({ status: 'error', type: 'profile', message: 'Username is invalid', data: null })
 	if (!validator(req.body.gender, 'gender'))
-		return res.json({ msg: 'Gender is invalid' })
+		return res.json({ status: 'error', type: 'profile', message: 'Gender is invalid', data: null })
 	if (!validator(req.body.looking, 'looking'))
-		return res.json({ msg: 'Looking is invalid' })
+		return res.json({ status: 'error', type: 'profile', message: 'Looking is invalid', data: null })
 	if (!validator(req?.body?.phone, 'phone'))
-		return res.json({ msg: 'Phone number is invalid' })
+		return res.json({ status: 'error', type: 'profile', message: 'Phone number is invalid', data: null })
 	if (req.body.birthdate && new Date(req.body.birthdate) >= new Date().getTime())
-		return res.json({ msg: 'Birthdate is invalid' })
+		return res.json({ status: 'error', type: 'profile', message: 'Birthdate is invalid', data: null })
 	if (req?.body?.biography?.length > 500)
-		return res.json({ msg: 'bio is too large' })
+		return res.json({ status: 'error', type: 'profile', message: 'bio is too large', data: null })
 	let Tags
 	if (req.body.tags)
 		Tags = req.body.tags.split(',')
 	else
 		Tags = []
-	if (Tags.length > 20) return res.json({ msg: 'Too many tags' })
+	if (Tags.length > 20) return res.json({ status: 'error', type: 'profile', message: 'Too many tags', data: null })
 	for (const iterator of Tags) {
 		if (iterator.length > 25)
-			return res.json({ msg: 'Tags are invalid' })
+			return res.json({ status: 'error', type: 'profile', message: 'Tags are invalid', data: null })
 	}
 	try {
 		const result = await userModel.getUserById(req.user.id)
@@ -93,19 +93,19 @@ const updateProfile = async (req, res) => {
 							try {
 								await tagsModel.insertTags(element)
 							} catch (err) {
-								return res.json({ msg: 'Fatal error', err })
+								return res.json({ status: 'error', type: 'profile', message: 'Fatal error', data: err })
 							}
 						}
 					}
 				}
-				return res.json({ ok: true, status: 'User Updated' })
+				return res.json({ status: 'success', type: 'profile', message: 'User Updated', data: null })
 			}
-			return res.json({ ok: false, status: 'User not updated' })
+			return res.json({ status: 'error', type: 'profile', message: 'User not updated', data: null })
 		} else {
-			return res.json({ ok: false, status: 'User not found' })
+			return res.json({ status: 'error', type: 'profile', message: 'User not found', data: null })
 		}
 	} catch (err) {
-		return res.json({ msg: 'Fatal error', err })
+		return res.json({ status: 'error', type: 'profile', message: 'Fatal error', data: err })
 	}
 }
 
@@ -114,30 +114,30 @@ const updateProfile = async (req, res) => {
 
 const changeEmail = async (req, res) => {
 	if (!req.user.id)
-		return res.json({ msg: 'Not logged in' })
+		return res.json({ status: 'error', type: 'auth', message: 'Not logged in', data: null })
 	if (!validator(req.body.email, 'email'))
-		return res.json({ msg: 'Email is invalid' })
+		return res.json({ status: 'error', type: 'profile', message: 'Email is invalid', data: null })
 	if (!validator(req.body.password, 'password'))
-		return res.json({ msg: 'Password is invalid' })
+		return res.json({ status: 'error', type: 'profile', message: 'Password is invalid', data: null })
 	if (req.user.email == req.body.email)
-		return res.json({ msg: 'The provided email matches your current email' })
+		return res.json({ status: 'error', type: 'profile', message: 'The provided email matches your current email', data: null })
 	try {
 		let hash = await bcrypt.compare(req.body.password, req.user.password)
 		if (!hash)
-			return res.json({ msg: 'Wrong password' })
+			return res.json({ status: 'error', type: 'profile', message: 'Wrong password', data: null })
 		const result = await userModel.getUserByemail(req.body.email)
 		if (result.length)
-			return res.json({ msg: 'Email already exists' })
+			return res.json({ status: 'error', type: 'profile', message: 'Email already exists', data: null })
 		let user = {
 			id: req.user.id,
 			email: req.body.email
 		}
 		const updateRes = await userModel.changeEmail(user)
 		if (!updateRes)
-			return res.json({ msg: 'Oups something went wrong' })
-		return res.json({ ok: true })
+			return res.json({ status: 'error', type: 'profile', message: 'Something went wrong', data: null })
+		return res.json({ status: 'success', type: 'profile', message: 'Email updated', data: null })
 	} catch (err) {
-		return res.json({ msg: 'Fatal error', err })
+		return res.json({ status: 'error', type: 'profile', message: 'Fatal error', data: err })
 	}
 }
 
@@ -146,17 +146,17 @@ const changeEmail = async (req, res) => {
 const changePassword = async (req, res) => {
 	if (!req.user.id) return res.json({ msg: 'Not logged in' })
 	if (!validator(req.body.password, 'password'))
-		return res.json({ msg: 'Password is invalid' })
+		return res.json({ status: 'error', type: 'profile', message: 'Password is invalid', data: null })
 	if (!validator(req.body.newPassword, 'password'))
-		return res.json({ msg: 'New password is invalid' })
+		return res.json({ status: 'error', type: 'profile', message: 'New password is invalid', data: null })
 	if (!req.body.confNewPassword || req.body.newPassword != req.body.confNewPassword)
-		return res.json({ msg: 'Confirmation password is invalid' })
+		return res.json({ status: 'error', type: 'profile', message: 'Confirmation password is invalid', data: null })
 	if (req.body.password == req.body.newPassword)
-		return res.json({ msg: 'The provided password matches your current password' })
+		return res.json({ status: 'error', type: 'profile', message: 'The provided password matches your current password', data: null })
 	try {
 		let hash = await bcrypt.compare(req.body.password, req.user.password)
 		if (!hash)
-			return res.json({ msg: 'Wrong password' })
+			return res.json({ status: 'error', type: 'profile', message: 'Wrong password', data: null })
 		const password = await bcrypt.hash(req.body.newPassword, 10)
 		let user = {
 			password: password,
@@ -164,10 +164,10 @@ const changePassword = async (req, res) => {
 		}
 		const updateRes = await userModel.changePassword(user)
 		if (!updateRes)
-			return res.json({ msg: 'Oups something went wrong' })
-		return res.json({ ok: true })
+			return res.json({ status: 'error', type: 'profile', message: 'Something went wrong', data: null })
+		return res.json({ status: 'success', type: 'profile', message: 'Password updated', data: null })
 	} catch (err) {
-		return res.json({ msg: 'Fatal error', err })
+		return res.json({ status: 'error', type: 'profile', message: 'Fatal error', data: err })
 	}
 }
 
@@ -175,7 +175,7 @@ const changePassword = async (req, res) => {
 
 const uploadImages = async (req, res) => {
 	   if (!req.user.id)
-		   return res.json({ msg: 'Not logged in' })
+		   return res.json({ status: 'error', type: 'auth', message: 'Not logged in', data: null })
 	   try {
 		   const images = await userModel.getImages(req.user.id)
 		   if (images.length < 5) {
@@ -193,16 +193,16 @@ const uploadImages = async (req, res) => {
 				   console.log(`[UPLOAD] Insertion DB :`, insertRes)
 			   } catch (dbErr) {
 				   console.error(`[UPLOAD] Erreur insertion DB :`, dbErr)
-				   return res.json({ msg: 'Erreur insertion DB', err: dbErr })
+				   return res.json({ status: 'error', type: 'profile', message: 'Erreur insertion DB', data: dbErr })
 			   }
 			   await userModel.setImages(req.user.id)
-			   return res.json({ ok: true, status: 'Image Updated', image: link ? link : data, user_id: req.user.id })
+			   return res.json({ status: 'success', type: 'profile', message: 'Image Updated', data: { image: link ? link : data, user_id: req.user.id } })
 		   } else {
-			   return res.json({ msg: 'User already has 5 photos' })
+			   return res.json({ status: 'error', type: 'profile', message: 'User already has 5 photos', data: null })
 		   }
 	   } catch (err) {
 		   console.error(`[UPLOAD] Erreur générale :`, err)
-		   return res.json({ msg: 'Fatal error', err })
+		   return res.json({ status: 'error', type: 'profile', message: 'Fatal error', data: err })
 	   }
 }
 
@@ -210,7 +210,7 @@ const uploadImages = async (req, res) => {
 
 const uploadCover = async (req, res) => {
 	if (!req.user.id)
-		return res.json({ msg: 'Not logged in' })
+		return res.json({ status: 'error', type: 'auth', message: 'Not logged in', data: null })
 	try {
 		const result = await userModel.getCover(req.user.id)
 		if (result.length) {
@@ -218,7 +218,7 @@ const uploadCover = async (req, res) => {
 				try {
 					await unlinkAsync(resolve(dirname(dirname(__dirname)), 'uploads', result[0].link))
 				} catch (err) {
-					return res.json({ msg: 'Fatal error', err })
+					return res.json({ status: 'error', type: 'profile', message: 'Fatal error', data: err })
 				}
 			}
 			await userModel.delCover(result[0].id, req.user.id)
@@ -227,10 +227,10 @@ const uploadCover = async (req, res) => {
 		let data = req.file ? req.file.buffer.toString('base64') : null;
 		const insertRes = await userModel.insertCover(req.user.id, link, data)
 		if (!insertRes)
-			return res.json({ msg: 'Oups.. Something went wrong!' })
-		return res.json({ ok: true, status: 'Image Updated', image: link ? link : data, user_id: req.user.id })
+			return res.json({ status: 'error', type: 'profile', message: 'Something went wrong', data: null })
+		return res.json({ status: 'success', type: 'profile', message: 'Image Updated', data: { image: link ? link : data, user_id: req.user.id } })
 	} catch (err) {
-		return res.json({ msg: 'Fatal error', err })
+		return res.json({ status: 'error', type: 'profile', message: 'Fatal error', data: err })
 	}
 }
 
@@ -238,9 +238,9 @@ const uploadCover = async (req, res) => {
 
 const deleteImage = async (req, res) => {
 	if (!req.user.id)
-		return res.json({ msg: 'Not logged in' })
+		return res.json({ status: 'error', type: 'auth', message: 'Not logged in', data: null })
 	if (!req.body.id || isNaN(req.body.id))
-		return res.json({ msg: 'Invalid request' })
+		return res.json({ status: 'error', type: 'profile', message: 'Invalid request', data: null })
 	try {
 		const result = await userModel.getImagesById(req.body.id, req.user.id)
 		if (result.length) {
@@ -248,7 +248,7 @@ const deleteImage = async (req, res) => {
 				try {
 					await unlinkAsync(resolve(dirname(dirname(__dirname)), 'uploads', result[0].link))
 				} catch (err) {
-					return res.json({ msg: 'Fatal error', err })
+					return res.json({ status: 'error', type: 'profile', message: 'Fatal error', data: err })
 				}
 			}
 			const delRes = await userModel.delImage(req.body.id, req.user.id)
@@ -256,33 +256,30 @@ const deleteImage = async (req, res) => {
 				await userModel.setImages(req.user.id)
 			}
 			if (delRes)
-				return res.json({ ok: true })
-			return res.json({ msg: 'Oups something went wrong' })
+				return res.json({ status: 'success', type: 'profile', message: 'Image deleted', data: null })
+			return res.json({ status: 'error', type: 'profile', message: 'Something went wrong', data: null })
 		} else {
-			return res.json({ msg: 'Oups something went wrong' })
+			return res.json({ status: 'error', type: 'profile', message: 'Something went wrong', data: null })
 		}
 	} catch (err) {
-		return res.json({ msg: 'Fatal error', err })
+		return res.json({ status: 'error', type: 'profile', message: 'Fatal error', data: err })
 	}
 }
 
 const blacklisted = async (req, res) => {
 	if (!req.user.id) {
-	  return res.json({ msg: 'not logged in' })
+	  return res.json({ status: 'error', type: 'auth', message: 'Not logged in', data: null })
 	}
 	const id = req.body.id; 
 	if (!Array.isArray(id) || !id.length) {
-	  return res.json({ msg: 'bad query' })
+	  return res.json({ status: 'error', type: 'profile', message: 'Bad query', data: null })
 	}
 	const placehoder = `(${id.map(cur => '?').join(', ')}`
 	try {
 	  const result = await userModel.blacklist(id, placehoder)
-	  res.json({
-		ok: true,
-		list: result
-	  });
+	  res.json({ status: 'success', type: 'profile', message: 'Blacklist updated', data: result });
 	} catch (err) {
-	  return res.json({ msg: 'Fatal error', err })
+	  return res.json({ status: 'error', type: 'profile', message: 'Fatal error', data: err });
 	}
 }
 
