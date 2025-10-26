@@ -82,7 +82,7 @@
                 />
               </q-btn>
 
-              <div class="flex" style="center center">
+              <div class="flex" style="display: flex; align-items: center; justify-content: center">
                 <q-tooltip top class="status_container">
                   <span>You can block or report</span>
                 </q-tooltip>
@@ -144,7 +144,7 @@
       </div>
 
       <q-dialog v-model="dialogVisible" persistent transition-show="rotate" transition-hide="scale">
-        <q-card :class="`bg-${confirmDialog.color} text-white`" style="width: 300px; bg-color: red">
+        <q-card :class="`bg-${confirmDialog.color} text-white`" style="width: 300px">
           <q-card-section>
             <div class="text-h6">Alert</div>
           </q-card-section>
@@ -299,9 +299,13 @@ let allHistory = ref([])
 let liked = ref(false)
 
 const profileImage = computed(() => {
-  return getFullPath(getProfileImage())
-    ? getFullPath(getProfileImage())
-    : 'default/defaut_profile.png'
+  // Select image where profile is true/1 and cover is not true/1
+  const defaultImage = 'default/defaut_profile.png'
+  if (!user.value || !user.value.images) return getFullPath(defaultImage)
+  const image = user.value.images.find(
+    (cur) => (cur.profile === true || cur.profile === 1) && !(cur.cover === true || cur.cover === 1)
+  )
+  return getImageSrc(image, defaultImage)
 })
 
 const confirmDialog = ref({
@@ -425,7 +429,10 @@ const distance = computed(() => {
 const coverPhoto = computed(() => {
   const cover = 'default/defaut_couverture.jpg'
   if (!user.value || !user.value.images) return getFullPath(cover)
-  const image = user.value.images.find((cur) => cur.cover)
+  // Select image where cover is true/1 and profile is not true/1
+  const image = user.value.images.find(
+    (cur) => (cur.cover === true || cur.cover === 1) && !(cur.profile === true || cur.profile === 1)
+  )
   return getImageSrc(image, cover)
 })
 
@@ -645,28 +652,27 @@ function updateConnectedUsers() {
 }
 
 onMounted(() => {
-  const fetchUserPromise = new Promise((resolve) => {
-    fetchUser(route.params.id).then(() => {
-      resolve()
-    })
-  })
-
-  liked.value = getLikeValue(lastHistory) ? true : false
-  if (isNaN(route.params.id) || !route.params.id) router.push('/404')
-
-  if (user.value && route.params.id) {
-    fetchUser(route.params.id)
+  // Only fetch user once on mount
+  if (isNaN(route.params.id) || !route.params.id) {
+    router.push('/404')
+    return
   }
+  fetchUser(route.params.id)
+  liked.value = getLikeValue(lastHistory) ? true : false
+  // Start polling for connected users at a lower frequency
+  refreshInterval = setInterval(() => {
+    updateConnectedUsers()
+  }, 5000) // every 5 seconds instead of 1s
 })
 
 function refreshMethods() {
   updateConnectedUsers()
 }
 
-const refreshInterval = setInterval(refreshMethods, 1000)
+let refreshInterval = null
 
 onBeforeUnmount(() => {
-  clearInterval(refreshInterval)
+  if (refreshInterval) clearInterval(refreshInterval)
 })
 </script>
 

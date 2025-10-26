@@ -65,9 +65,9 @@ export const getters = {
   return cover
   },
   convos: (state) =>
-    [...state.convos].sort(
-      (a, b) => new Date(b.last_update) - new Date(a.last_update)
-    ),
+    Array.isArray(state.convos)
+      ? [...state.convos].sort((a, b) => new Date(b.last_update) - new Date(a.last_update))
+      : [],
   imageConvo: (state) => {
     const convo = state.convos.find(
       (cur) => cur.id_conversation === state.selectedConvo
