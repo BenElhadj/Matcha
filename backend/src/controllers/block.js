@@ -7,9 +7,9 @@ const chatModel = require('../models/chatModel')
 
 const blockUser = async (req, res) => {
 	if (!req.user.id)
-		return res.json({ msg: 'Not logged in' })
+		return res.json({ status: 'error', type: 'block', message: 'Not logged in', data: null })
 	if (!req.body.id || isNaN(req.body.id))
-		return res.json({ msg: 'Invalid request' })
+		return res.json({ status: 'error', type: 'block', message: 'Invalid request', data: null })
 	try {
 		const alreadyBlocked = await userModel.isBlocked(req.user.id, req.body.id);
 		if (!alreadyBlocked) {
@@ -18,12 +18,12 @@ const blockUser = async (req, res) => {
 			await matchingModel.delMatche(req.user.id, req.body.id)
 			await notifModel.delNotif(req.user.id, req.body.id)
 			await chatModel.delConv(req.user.id, req.body.id)
-			return res.json({ ok: true })
+			return res.json({ status: 'success', type: 'block', message: 'User blocked', data: null })
 		} else {
-			return res.json({ msg: 'User already Blocked' })
+			return res.json({ status: 'error', type: 'block', message: 'User already blocked', data: null })
 		}
 	} catch (err) {
-		return res.json({ msg: 'Fatal error', err })
+		return res.json({ status: 'error', type: 'block', message: 'Fatal error', data: err })
 	}
 }
 
@@ -31,20 +31,20 @@ const blockUser = async (req, res) => {
 
 const unblockUser = async (req, res) => {
 	if (!req.user.id) {
-		return res.json({ msg: 'Not logged in' })}
+		return res.json({ status: 'error', type: 'block', message: 'Not logged in', data: null })}
 	if (!req.body.id || isNaN(req.body.id)){
-		return res.json({ msg: 'Invalid request' })}
+		return res.json({ status: 'error', type: 'block', message: 'Invalid request', data: null })}
 	try {
 		const result = await userModel.unblockUser(req.user.id, req.body.id)
 		// result is undefined, so check if the unblock actually deleted a row
 		// Let's re-query to check if the block still exists
 		const stillBlocked = await userModel.isBlocked(req.user.id, req.body.id);
 		if (stillBlocked) {
-			return res.json({ msg: 'Cannot unblock user' })
+			return res.json({ status: 'error', type: 'block', message: 'Cannot unblock user', data: null })
 		}
-		res.json({ ok: true })
+		res.json({ status: 'success', type: 'block', message: 'User unblocked', data: null })
 	} catch (err) {
-		return res.json({ msg: 'Fatal error', err })
+		return res.json({ status: 'error', type: 'block', message: 'Fatal error', data: err })
 	}
 }
 
@@ -52,15 +52,15 @@ const unblockUser = async (req, res) => {
 
 const reportUser = async (req, res) => {
 	if (!req.user.id)
-		return res.json({ msg: 'Not logged in' })
+		return res.json({ status: 'error', type: 'block', message: 'Not logged in', data: null })
 	if (!req.body.id || isNaN(req.body.id))
-		return res.json({ msg: 'Invalid request' })
+		return res.json({ status: 'error', type: 'block', message: 'Invalid request', data: null })
 	try {
-		   await userModel.reportUser(req.body.id)
-		   return res.json({ ok: true })
-	   } catch (err) {
-		   return res.json({ msg: 'Fatal error', err })
-	   }
+		await userModel.reportUser(req.body.id)
+		return res.json({ status: 'success', type: 'block', message: 'User reported', data: null })
+	} catch (err) {
+		return res.json({ status: 'error', type: 'block', message: 'Fatal error', data: err })
+	}
 	}
 
 	module.exports = {

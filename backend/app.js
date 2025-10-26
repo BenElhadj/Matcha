@@ -49,18 +49,10 @@ app.use('/api', require('./src/routes/matchingRoutes'))
 app.get('/api/test-db', async (req, res) => {
   try {
     const result = await pool.query('SELECT NOW() as current_time, version() as postgres_version');
-    res.json({ 
-      success: true, 
-      message: '✅ Database connection successful',
-      data: result.rows[0]
-    });
+    res.json({ status: 'success', type: 'db', message: 'Database connection successful', data: result.rows[0] });
   } catch (error) {
     console.error('Database test error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: '❌ Database connection failed',
-      error: error.message 
-    });
+    res.status(500).json({ status: 'error', type: 'db', message: 'Database connection failed', data: error.message });
   }
 });
 
@@ -72,16 +64,10 @@ app.get('/api/tables', async (req, res) => {
       FROM information_schema.tables 
       WHERE table_schema = 'public'
     `);
-    res.json({ 
-      success: true, 
-      tables: result.rows.map(row => row.table_name)
-    });
+    res.json({ status: 'success', type: 'db', message: 'Tables fetched', data: result.rows.map(row => row.table_name) });
   } catch (error) {
     console.error('Tables query error:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: error.message 
-    });
+    res.status(500).json({ status: 'error', type: 'db', message: 'Tables query error', data: error.message });
   }
 });
 
@@ -89,16 +75,10 @@ app.get('/api/tables', async (req, res) => {
 app.get('/api/users-list', async (req, res) => {
   try {
     const result = await pool.query('SELECT id, email, username FROM users LIMIT 5');
-    res.json({ 
-      success: true, 
-      users: result.rows
-    });
+    res.json({ status: 'success', type: 'users', message: 'Users fetched', data: result.rows });
   } catch (error) {
     console.error('Users query error:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: error.message 
-    });
+    res.status(500).json({ status: 'error', type: 'users', message: 'Users query error', data: error.message });
   }
 });
 // --- Admin helper endpoints (protected by x-admin-token header matching process.env.SECRET)
@@ -114,10 +94,10 @@ const adminAuth = (req, res, next) => {
 app.get('/api/admin/count/users', adminAuth, async (req, res) => {
   try {
     const result = await pool.query('SELECT COUNT(*)::int AS count FROM users');
-    res.json({ success: true, count: result.rows[0].count });
+  res.json({ status: 'success', type: 'admin', message: 'User count fetched', data: result.rows[0].count });
   } catch (err) {
     console.error('admin count users error', err);
-    res.status(500).json({ success: false, error: err.message });
+  res.status(500).json({ status: 'error', type: 'admin', message: 'User count error', data: err.message });
   }
 });
 
@@ -125,10 +105,10 @@ app.get('/api/admin/count/users', adminAuth, async (req, res) => {
 app.get('/api/admin/count/photos', adminAuth, async (req, res) => {
   try {
     const result = await pool.query('SELECT COUNT(*)::int AS count FROM images');
-    res.json({ success: true, count: result.rows[0].count });
+  res.json({ status: 'success', type: 'admin', message: 'Photo count fetched', data: result.rows[0].count });
   } catch (err) {
     console.error('admin count photos error', err);
-    res.status(500).json({ success: false, error: err.message });
+  res.status(500).json({ status: 'error', type: 'admin', message: 'Photo count error', data: err.message });
   }
 });
 
@@ -137,13 +117,13 @@ app.get('/api/admin/user/username/:username', adminAuth, async (req, res) => {
   try {
     const { username } = req.params;
     const result = await pool.query('SELECT * FROM users WHERE username = $1 LIMIT 1', [username]);
-    if (!result.rows.length) return res.status(404).json({ success: false, msg: 'User not found' });
+  if (!result.rows.length) return res.status(404).json({ status: 'error', type: 'admin', message: 'User not found', data: null });
     const user = result.rows[0];
     delete user.password; delete user.vkey; delete user.rkey;
-    res.json({ success: true, user });
+  res.json({ status: 'success', type: 'admin', message: 'User fetched', data: user });
   } catch (err) {
     console.error('admin get user by username error', err);
-    res.status(500).json({ success: false, error: err.message });
+  res.status(500).json({ status: 'error', type: 'admin', message: 'User fetch error', data: err.message });
   }
 });
 
@@ -152,13 +132,13 @@ app.get('/api/admin/user/login/:identifier', adminAuth, async (req, res) => {
   try {
     const { identifier } = req.params;
     const result = await pool.query('SELECT * FROM users WHERE username = $1 OR email = $1 LIMIT 1', [identifier]);
-    if (!result.rows.length) return res.status(404).json({ success: false, msg: 'User not found' });
+  if (!result.rows.length) return res.status(404).json({ status: 'error', type: 'admin', message: 'User not found', data: null });
     const user = result.rows[0];
     delete user.password; delete user.vkey; delete user.rkey;
-    res.json({ success: true, user });
+  res.json({ status: 'success', type: 'admin', message: 'User fetched', data: user });
   } catch (err) {
     console.error('admin get user by login error', err);
-    res.status(500).json({ success: false, error: err.message });
+  res.status(500).json({ status: 'error', type: 'admin', message: 'User fetch error', data: err.message });
   }
 });
 
@@ -166,15 +146,15 @@ app.get('/api/admin/user/login/:identifier', adminAuth, async (req, res) => {
 app.get('/api/admin/user/id/:id', adminAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    if (isNaN(id)) return res.status(400).json({ success: false, msg: 'Invalid id' });
+  if (isNaN(id)) return res.status(400).json({ status: 'error', type: 'admin', message: 'Invalid id', data: null });
     const result = await pool.query('SELECT * FROM users WHERE id = $1 LIMIT 1', [id]);
-    if (!result.rows.length) return res.status(404).json({ success: false, msg: 'User not found' });
+  if (!result.rows.length) return res.status(404).json({ status: 'error', type: 'admin', message: 'User not found', data: null });
     const user = result.rows[0];
     delete user.password; delete user.vkey; delete user.rkey;
-    res.json({ success: true, user });
+  res.json({ status: 'success', type: 'admin', message: 'User fetched', data: user });
   } catch (err) {
     console.error('admin get user by id error', err);
-    res.status(500).json({ success: false, error: err.message });
+  res.status(500).json({ status: 'error', type: 'admin', message: 'User fetch error', data: err.message });
   }
 });
 // 🔼 FIN DES ROUTES DE TEST 🔼

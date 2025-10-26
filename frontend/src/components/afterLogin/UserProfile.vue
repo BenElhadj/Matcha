@@ -198,7 +198,11 @@ const onProfileChange = async (e) => {
       }
     })
     alert.value = { state: true, color: 'green', text: 'Photo de profil mise à jour !' }
-    setTimeout(() => window.location.reload(), 1000)
+    // Only AlertView handles display; reload after alert closes
+    setTimeout(() => {
+      alert.value.state = false
+      window.location.reload()
+    }, 1000)
   } catch (err) {
     alert.value = { state: true, color: 'red', text: 'Erreur upload photo de profil' }
   }
@@ -221,7 +225,11 @@ const onCoverChange = async (e) => {
       }
     })
     alert.value = { state: true, color: 'green', text: 'Cover mise à jour !' }
-    setTimeout(() => window.location.reload(), 1000)
+    // Only AlertView handles display; reload after alert closes
+    setTimeout(() => {
+      alert.value.state = false
+      window.location.reload()
+    }, 1000)
   } catch (err) {
     alert.value = { state: true, color: 'red', text: 'Erreur upload cover' }
   }
@@ -529,15 +537,11 @@ const block = async () => {
       id_to: route.params.id
     }
     socket.emit('block', data)
-    await new Promise((resolve) => {
-      const interval = setInterval(() => {
-        if (!alert.value.state) {
-          clearInterval(interval)
-          resolve()
-        }
-      }, 2000)
-    })
-    router.push('/')
+    // Wait for AlertView to close before redirect
+    setTimeout(() => {
+      alert.value.state = false
+      router.push('/')
+    }, 2000)
   } else {
     alert.value = { state: true, color: 'red', text: res.data.msg }
   }
@@ -569,11 +573,12 @@ const syncConvo = async (convo) => {
 
 const goToChat = async () => {
   if (!userCanChat.value)
-    return (alert.value = {
+    alert.value = {
       state: true,
       color: 'red',
       text: `You will need to add ${user.value.first_name} ${user.value.last_name} to your friends list to be able to chat with him`
-    })
+    }
+  return
 
   const conversation = store.getters.convos.filter((obj) => obj.user_id == route.params.id)
 
