@@ -281,11 +281,11 @@ onMounted(async () => {
           // Recharge les images
           coverPhoto.value = getImageSrc(
             user.value.images?.find((img) => img.cover),
-            'default/defaut_couverture.jpg'
+            'default/defaut_couverture.txt'
           )
           profileImage.value = getImageSrc(
             user.value.images?.find((img) => img.profile),
-            'default/defaut_profile.png'
+            'default/defaut_profile.txt'
           )
         }
         loaded.value = true

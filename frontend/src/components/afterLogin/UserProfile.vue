@@ -300,7 +300,7 @@ let liked = ref(false)
 
 const profileImage = computed(() => {
   // Select image where profile is true/1 and cover is not true/1
-  const defaultImage = 'default/defaut_profile.png'
+  const defaultImage = 'default/defaut_profile.txt'
   if (!user.value || !user.value.images) return getFullPath(defaultImage)
   const image = user.value.images.find(
     (cur) => (cur.profile === true || cur.profile === 1) && !(cur.cover === true || cur.cover === 1)
@@ -427,7 +427,7 @@ const distance = computed(() => {
 })
 
 const coverPhoto = computed(() => {
-  const cover = 'default/defaut_couverture.jpg'
+  const cover = 'default/defaut_couverture.txt'
   if (!user.value || !user.value.images) return getFullPath(cover)
   // Select image where cover is true/1 and profile is not true/1
   const image = user.value.images.find(
@@ -448,7 +448,7 @@ const userTags = computed(() => {
 })
 
 const getProfileImage = () => {
-  const defaultImage = 'default/defaut_profile.png'
+  const defaultImage = 'default/defaut_profile.txt'
   if (!user.value || !user.value.images) return defaultImage
   const image = user.value.images.find((cur) => cur.profile === 1) || user.value.images[0]
   return getImageSrc(image, defaultImage)
@@ -615,7 +615,7 @@ const fetchUser = async (id) => {
           date: new Date(),
           id_from: store.state.user.id,
           username: store.state.user.username,
-          profile_image: profileImg ? profileImg.name : 'default/defaut_profile.png',
+          profile_image: profileImg ? profileImg.name : 'default/defaut_profile.txt',
           id_to: id,
           type: 'visit'
         }
