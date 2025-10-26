@@ -26,14 +26,34 @@ export const user = {
     },
     updateTags: (state, tags) => (state.user.tags = tags.map(cur => cur.text.toLowerCase()).join(',')),
 
-    updateUser: (state, user) => (state.user = user),
+    updateUser: (state, user) => {
+      state.user = user;
+      try {
+        localStorage.setItem('user', JSON.stringify(user));
+        if (user.images) {
+          localStorage.setItem('user_images', JSON.stringify(user.images));
+        }
+      } catch (e) {
+        console.error('Erreur lors de la sauvegarde user dans localStorage:', e);
+      }
+    },
     updateProfileImage: (state, data) => {
       state.user.images.forEach(cur => (cur.profile = 0))
       state.user.images.push({ link: data.link || null, data: data.data || null, cover: 0, profile: 1, user_id: data.user_id, id: data.id })
+      try {
+        localStorage.setItem('user_images', JSON.stringify(state.user.images));
+      } catch (e) {
+        console.error('Erreur lors de la sauvegarde images dans localStorage:', e);
+      }
     },
     updateCoverImage: (state, data) => {
       state.user.images = state.user.images.filter(cur => !cur.cover)
       state.user.images.push({ link: data.link || null, data: data.data || null, cover: 1, profile: 0, user_id: data.user_id, id: data.id })
+      try {
+        localStorage.setItem('user_images', JSON.stringify(state.user.images));
+      } catch (e) {
+        console.error('Erreur lors de la sauvegarde images dans localStorage:', e);
+      }
     },
     locate: (state, location) => {
       state.location = location
@@ -78,6 +98,11 @@ export const user = {
           }
         }
       }
+      try {
+        localStorage.setItem('user_images', JSON.stringify(state.user.images));
+      } catch (e) {
+        console.error('Erreur lors de la sauvegarde images dans localStorage:', e);
+      }
     },
     syncBlacklist: (state, list) => {
       if (Array.isArray(list)) {
@@ -89,6 +114,8 @@ export const user = {
   },
   actions: {
     fetchUserImages: async ({ commit, state }) => {
+      // Optimisation : ne refetch pas si déjà présent
+      if (state.user.images && state.user.images.length) return;
       try {
         const token = state.user.token || localStorage.getItem('token')
         const userId = state.user.id || JSON.parse(localStorage.getItem('user') || '{}').id
@@ -179,34 +206,62 @@ export const user = {
       }
     },
     syncHistory: async ({ commit }) => {
-      const merge = cur => ({
-        id: cur[cur.visitor_id ? 'visitor_id' : 'visited_id'],
-        visit_date: cur.visit_date,
-        username: cur.username,
-        profile_image: cur.profile_image
-      })
+      // Optimisation : ne refetch pas si déjà présent
+      if (state.history && state.history.length) return;
       try {
-        const res = await utility.sync('browse/history')
-        let responseBody = res.data
-        if (!responseBody) {
-          responseBody = []
-        } else if (!Array.isArray(responseBody)) {
-          responseBody = [responseBody]
+        // Vérifie le localStorage
+        const cachedHistory = localStorage.getItem('user_history');
+        if (cachedHistory) {
+          const parsed = JSON.parse(cachedHistory);
+          commit('syncHistory', parsed);
+          return;
         }
-        const history = responseBody.map(cur => ({ ...cur, id: cur.visitor_id || cur.visited_id }))
-        const visitor = responseBody.filter(cur => cur.visitor_id).map(merge)
-        const visited = responseBody.filter(cur => cur.visited_id).map(merge)
-        commit('syncHistory', { history, visitor, visited })
+        const merge = cur => ({
+          id: cur[cur.visitor_id ? 'visitor_id' : 'visited_id'],
+          visit_date: cur.visit_date,
+          username: cur.username,
+          profile_image: cur.profile_image
+        });
+        const res = await utility.sync('browse/history');
+        let responseBody = res.data;
+        if (!responseBody) {
+          responseBody = [];
+        } else if (!Array.isArray(responseBody)) {
+          responseBody = [responseBody];
+        }
+        const history = responseBody.map(cur => ({ ...cur, id: cur.visitor_id || cur.visited_id }));
+        const visitor = responseBody.filter(cur => cur.visitor_id).map(merge);
+        const visited = responseBody.filter(cur => cur.visited_id).map(merge);
+        const toSave = { history, visitor, visited };
+        commit('syncHistory', toSave);
+        localStorage.setItem('user_history', JSON.stringify(toSave));
       } catch (err) {
-        console.error('err syncHistory in frontend/user.js ===> ', err)
+        console.error('err syncHistory in frontend/user.js ===> ', err);
       }
     },
-    getTags: async ({ commit }) => {
+  getTags: async ({ commit, state }) => {
+      // Optimisation : ne refetch pas si déjà présent
+      // Correction : signature correcte avec state
+      if (state.tags && state.tags.length) return;
       try {
-        const tags = await utility.sync('browse/tags')
-        commit('getTags', tags.body)
+        // Vérifie le localStorage
+        const cachedTags = localStorage.getItem('user_tags');
+        let tagsArr = [];
+        if (cachedTags && cachedTags !== 'undefined') {
+          try {
+            tagsArr = JSON.parse(cachedTags);
+          } catch (parseErr) {
+            console.error('err parsing user_tags in localStorage:', parseErr);
+            tagsArr = [];
+          }
+          commit('getTags', tagsArr);
+          return;
+        }
+        const tags = await utility.sync('browse/tags');
+        commit('getTags', tags.body);
+        localStorage.setItem('user_tags', JSON.stringify(tags.body));
       } catch (err) {
-        console.error('err getTags in frontend/user.js ===> ', err)
+        console.error('err getTags in frontend/user.js ===> ', err);
       }
     },
     getNotif: async ({ commit }) => {
