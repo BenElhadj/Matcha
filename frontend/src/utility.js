@@ -1,38 +1,53 @@
 // Utilitaire global pour l'affichage d'image
 export function getImageSrc(image, defaultImage = 'default/defaut_profile.png') {
-  if (!image) return defaultImage
-  if (
-    image.data &&
-    image.data !== 'false' &&
-    image.data !== '' &&
-    image.data !== null &&
-    image.data !== undefined
-  ) {
-    if (image.data.startsWith('data:image')) {
-      return image.data
-    }
-    return `data:image/png;base64,${image.data}`
-  }
+  if (!image) return defaultImage;
+  // Check for valid link first
   if (
     image.link &&
+    typeof image.link === 'string' &&
     image.link !== 'false' &&
-    image.link !== '' &&
+    image.link.trim() !== '' &&
     image.link !== null &&
-    image.link !== undefined
+    image.link !== undefined &&
+    image.link !== false
   ) {
-    return image.link
+    return image.link;
   }
+  // Then check for valid data
+  if (
+    image.data &&
+    typeof image.data === 'string' &&
+    image.data !== 'false' &&
+    image.data.trim() !== '' &&
+    image.data !== null &&
+    image.data !== undefined &&
+    image.data !== false
+  ) {
+    if (image.data.startsWith('data:image')) {
+      return image.data;
+    }
+    // Only return base64 if not 'false', not empty, and not 'false' string
+    if (/^[A-Za-z0-9+/=]+$/.test(image.data)) {
+      return `data:image/png;base64,${image.data}`;
+    }
+    // If not valid base64, fallback
+    return defaultImage;
+  }
+  // Fallback to old name field if exists
   if (
     image.name &&
+    typeof image.name === 'string' &&
     image.name !== 'false' &&
-    image.name !== '' &&
+    image.name.trim() !== '' &&
     image.name !== null &&
-    image.name !== undefined
+    image.name !== undefined &&
+    image.name !== false
   ) {
-    return getFullPath(image.name)
+    return getFullPath(image.name);
   }
-  return defaultImage
+  return defaultImage;
 }
+
 import axios from 'axios'
 import moment from 'moment'
 
@@ -68,12 +83,15 @@ const getLocationFromIp = async f => {
   try {
     const url = 'https://ipinfo.io?token=3443e12245bdcf'
     const res = await axios.get(url)
-    if (!res.error) {
+    if (!res.error && res.data && res.data.loc) {
       const splitted = res.data.loc.split(',')
       f({ lat: Number(splitted[0]), lng: Number(splitted[1]) })
+    } else {
+      f({ lat: 0, lng: 0 }) // fallback
     }
   } catch (error) {
     console.error('err getLocationFromIp in frontend/utility.js ===> ', error)
+    f({ lat: 0, lng: 0 }) // fallback
   }
 }
 
@@ -85,6 +103,7 @@ const syncLocation = async location => {
     await axios.post(url, location, { headers })
   } catch (error) {
     console.error('err syncLocation in frontend/utility.js ===> ', error)
+    return false;
   }
 }
 
@@ -94,27 +113,29 @@ const updateOneNotif = async (id_from, id_to) => {
     const url = `${import.meta.env.VITE_APP_API_URL}/api/notif/updateOneNotif`;
     const headers = { 'x-auth-token': token };
     const response = await axios.put(url, { id_from, id_to }, { headers });
-
     if (response.status === 200) {
       console.log('Notification marked as seen successfully.');
+      return true;
     } else {
       console.error('Failed to mark the notification as seen.');
+      return false;
     }
   } catch (error) {
     console.error('Error in seenOneNotif:', error);
+    return false;
   }
 }
 
 const getAllTags = async () => {
   try {
-      const url = `${import.meta.env.VITE_APP_API_URL}/allTags`
-      const response = await axios.get(url, {
-          headers: { 'X-Requested-With': 'XMLHttpRequest' }
-      });
-      return response.data
+    const url = `${import.meta.env.VITE_APP_API_URL}/allTags`
+    const response = await axios.get(url, {
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    });
+    return response.data
   } catch (error) {
     console.error('err getAllTags in frontend/utility.js ===> ', error)
-      throw error
+    return [];
   }
 }
 
@@ -126,7 +147,7 @@ const getConnectedUsers = async () => {
     return response.data
   } catch (error) {
     console.error('err getConnectedUsers in frontend/utility.js ===> ', error)
-    throw error
+    return [];
   }
 }
 
@@ -164,9 +185,10 @@ export default {
       const url = `${import.meta.env.VITE_APP_API_URL}/api/${type}`
       const headers = { 'x-auth-token': token }
       const res = await axios.get(url, { headers })
-      return res.data.msg ? [] : res.data
+      return res.data && res.data.msg ? [] : (res.data || []);
     } catch (error) {
-    console.error('err sync in frontend/utility.js ===> ', error)
+      console.error('err sync in frontend/utility.js ===> ', error)
+      return [];
     }
   },
   syncNotif: async () => {
@@ -175,9 +197,10 @@ export default {
       const url = `${import.meta.env.VITE_APP_API_URL}/api/notif/all`
       const headers = { 'x-auth-token': token }
       const result = await axios.get(url, { headers })
-      return result.data.msg ? [] : result.data
+      return result.data && result.data.msg ? [] : (result.data || []);
     } catch (error) {
-    console.error('err syncNotif in frontend/utility.js ===> ', error)
+      console.error('err syncNotif in frontend/utility.js ===> ', error)
+      return [];
     }
   },
   calculateDistance: (from, to, mile) => {

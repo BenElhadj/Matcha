@@ -20,7 +20,7 @@
       </h3>
       <div class="row q-gutter-md mt-4">
         <div
-          v-for="image in props.images"
+          v-for="image in props.images || []"
           :key="image.id"
           class="col-xs-12 col-sm-6 col-md-4 img_container"
         >
@@ -44,63 +44,16 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
 import { useStore } from 'vuex'
-import utility from '@/utility.js'
-import AlertView from '@/views/AlertView.vue'
+import { ref, computed } from 'vue'
+import { getImageSrc } from '../../utility.js'
 import axios from 'axios'
+import AlertView from '../../views/AlertView.vue'
 
 const store = useStore()
 const props = defineProps({ images: Array, userToto: Object })
-const getFullPath = utility.getFullPath
 const user = computed(() => store.getters.user)
 const alert = ref({ state: false, color: '', text: '' })
-const profileImage = (image) => getFullPath(image)
-
-// New function to handle image src with link/data format
-const getImageSrc = (image) => {
-  const defaultImage = 'default/defaut_profile.png'
-  if (!image) return defaultImage
-
-  // Check if image has valid data (base64)
-  if (
-    image.data &&
-    image.data !== 'false' &&
-    image.data !== '' &&
-    image.data !== null &&
-    image.data !== undefined
-  ) {
-    if (image.data.startsWith('data:image')) {
-      return image.data
-    }
-    return `data:image/png;base64,${image.data}`
-  }
-
-  // Check if image has valid link (URL)
-  if (
-    image.link &&
-    image.link !== 'false' &&
-    image.link !== '' &&
-    image.link !== null &&
-    image.link !== undefined
-  ) {
-    return image.link
-  }
-
-  // Fallback to old name field if exists
-  if (
-    image.name &&
-    image.name !== 'false' &&
-    image.name !== '' &&
-    image.name !== null &&
-    image.name !== undefined
-  ) {
-    return getFullPath(image.name)
-  }
-
-  return defaultImage
-}
-
 const username = ref('')
 const photoInputRef = ref(null)
 if (props.userToto?.username ?? false) {
