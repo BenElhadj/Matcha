@@ -251,14 +251,14 @@ notif.value = store.getters.notif
 let convos = ref([])
 convos.value = store.getters.convos
 let notifs = ref([])
-notifs.value = notif.value
-  .sort((a, b) => {
-    if (a.is_read !== b.is_read) {
-      return a.is_read - b.is_read
-    }
-    return new Date(b.date) - new Date(a.date)
-  })
-  .slice(0, 5)
+notifs.value = Array.isArray(notif.value)
+  ? notif.value.sort((a, b) => {
+      if (a.is_read !== b.is_read) {
+        return a.is_read - b.is_read
+      }
+      return new Date(b.date) - new Date(a.date)
+    })
+  : [].slice(0, 5)
 
 let menuConvos = ref([])
 let newMessage = ref([])
@@ -397,14 +397,16 @@ const updateNotifAndMsg = async () => {
   if (connected.value !== null) {
     convos.value = store.getters.convos
     notif.value = store.getters.notif
-    notifs.value = notif.value
-      .sort((a, b) => {
-        if (a.is_read !== b.is_read) {
-          return a.is_read - b.is_read
-        }
-        return new Date(b.date) - new Date(a.date)
-      })
-      .slice(0, 5)
+    notifs.value = Array.isArray(notif.value)
+      ? notif.value
+          .sort((a, b) => {
+            if (a.is_read !== b.is_read) {
+              return a.is_read - b.is_read
+            }
+            return new Date(b.date) - new Date(a.date)
+          })
+          .slice(0, 5)
+      : []
     newMessage.value = await getNewMsg()
     if (Array.isArray(newMessage.value)) {
       menuConvos.value = sortAndFilterMessages(newMessage.value)

@@ -3,7 +3,7 @@
   <q-page>
     <q-page-container>
       <!-- Bouton d'upload positionné en haut à droite, au-dessus de tout -->
-      <div class="upload-btn-container">
+      <div v-if="route && route.path === '/Matcha/settings'" class="upload-btn-container">
         <input
           type="file"
           id="photo-upload"
@@ -35,7 +35,7 @@
             @click="deleteImg(image)"
           >
           </q-btn>
-          <img :src="getImageSrc(image)" class="image full-width" />
+          <img :src="getImageSrc(image || {})" class="image full-width" />
         </div>
       </div>
       <AlertView :alert="alert" />
@@ -46,11 +46,13 @@
 <script setup>
 import { useStore } from 'vuex'
 import { ref, computed } from 'vue'
+import { useRoute } from 'vue-router'
 import { getImageSrc } from '../../utility.js'
 import axios from 'axios'
 import AlertView from '../../views/AlertView.vue'
 
 const store = useStore()
+const route = useRoute()
 const props = defineProps({ images: Array, userToto: Object })
 const user = computed(() => store.getters.user)
 const alert = ref({ state: false, color: '', text: '' })

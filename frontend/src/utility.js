@@ -365,6 +365,7 @@ export default {
   },
 
   filterBlocked: (state, type) => {
+    if (!Array.isArray(state[type])) return [];
     return state[type].filter(cur => !isBlocked(state, cur[getId(type)]))
   },
   showAlert (color, text) {
