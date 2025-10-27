@@ -279,13 +279,20 @@ onMounted(async () => {
           user.value = resUser.data.user
           store.commit('updateUser', resUser.data.user)
           // Recharge les images
+          const base = import.meta.env.BASE_URL || '/'
+          const coverFallback =
+            (utility.getCachedDefault && utility.getCachedDefault('cover')) ||
+            `${base}default/defaut_couverture.txt`
+          const profileFallback =
+            (utility.getCachedDefault && utility.getCachedDefault('profile')) ||
+            `${base}default/defaut_profile.txt`
           coverPhoto.value = getImageSrc(
             user.value.images?.find((img) => img.cover),
-            'default/defaut_couverture.txt'
+            coverFallback
           )
           profileImage.value = getImageSrc(
             user.value.images?.find((img) => img.profile),
-            'default/defaut_profile.txt'
+            profileFallback
           )
         }
         loaded.value = true

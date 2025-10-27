@@ -1,20 +1,18 @@
 <template>
   <div class="cs-loader">
     <div class="cs-loader-inner">
-      <label>●</label>
-      <label>●</label>
-      <label>●</label>
-      <label>●</label>
-      <label>●</label>
-      <label>●</label>
+      <span>●</span>
+      <span>●</span>
+      <span>●</span>
+      <span>●</span>
+      <span>●</span>
+      <span>●</span>
     </div>
   </div>
 </template>
 
 <script setup>
-
 const { alert } = defineProps(['alert'])
-
 </script>
 
 <style>
@@ -37,10 +35,10 @@ const { alert } = defineProps(['alert'])
   text-align: center;
 }
 
-.cs-loader-inner label {
+.cs-loader-inner span {
   font-size: 20px;
   opacity: 0;
-  display:inline-block;
+  display: inline-block;
 }
 
 @keyframes lol {
@@ -62,27 +60,27 @@ const { alert } = defineProps(['alert'])
   }
 }
 
-.cs-loader-inner label:nth-child(6) {
+.cs-loader-inner span:nth-child(6) {
   animation: lol 3s infinite ease-in-out;
 }
 
-.cs-loader-inner label:nth-child(5) {
+.cs-loader-inner span:nth-child(5) {
   animation: lol 3s 100ms infinite ease-in-out;
 }
 
-.cs-loader-inner label:nth-child(4) {
+.cs-loader-inner span:nth-child(4) {
   animation: lol 3s 200ms infinite ease-in-out;
 }
 
-.cs-loader-inner label:nth-child(3) {
+.cs-loader-inner span:nth-child(3) {
   animation: lol 3s 300ms infinite ease-in-out;
 }
 
-.cs-loader-inner label:nth-child(2) {
+.cs-loader-inner span:nth-child(2) {
   animation: lol 3s 400ms infinite ease-in-out;
 }
 
-.cs-loader-inner label:nth-child(1) {
+.cs-loader-inner span:nth-child(1) {
   animation: lol 3s 500ms infinite ease-in-out;
 }
 </style>

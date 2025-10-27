@@ -1,19 +1,34 @@
 <template>
   <q-page>
     <q-page-container>
-      <h1 class="q-pb-md" style="margin-top: -10px; text-align: center;">Profile</h1>
-      <h3 style="margin-top: -70px; margin-bottom:100px; text-align: center;">{{user.username}}</h3>
+      <h1 class="q-pb-md" style="margin-top: -10px; text-align: center">Profile</h1>
+      <h3 style="margin-top: -70px; margin-bottom: 100px; text-align: center">
+        {{ user.username }}
+      </h3>
 
       <div v-if="owner" class="q-flex column items-center justify-center">
-        <q-btn v-if="isEditing" class="edit icon-edit stack" flat square fab @click="isEditing = false" />
-        <q-btn v-else class="edit icon-toEdit stack" flat square fab @click="isEditing = true"/>
+        <q-btn
+          v-if="isEditing"
+          class="edit icon-edit stack"
+          flat
+          square
+          fab
+          @click="isEditing = false"
+        />
+        <q-btn v-else class="edit icon-toEdit stack" flat square fab @click="isEditing = true" />
       </div>
 
       <div v-else class="note">
-        <p class="caption text-capitalize rating_value">{{ user.rating ? user.rating.toFixed(1) : '0.0' }}</p>
+        <p class="caption text-capitalize rating_value">
+          {{ user.rating ? user.rating.toFixed(1) : '0.0' }}
+        </p>
         <q-rating
-          :color="user.gender === 'male' ? 'blue-3' : user.gender === 'female' ? 'pink-2' : 'blue-5'"
-          :color-selected="user.gender === 'male' ? 'blue-9' : user.gender === 'female' ? 'pink-8' : 'pink-4'"
+          :color="
+            user.gender === 'male' ? 'blue-3' : user.gender === 'female' ? 'pink-2' : 'blue-5'
+          "
+          :color-selected="
+            user.gender === 'male' ? 'blue-9' : user.gender === 'female' ? 'pink-8' : 'pink-4'
+          "
           :modelValue="user.rating && !isNaN(user.rating) ? user.rating : 0"
           icon="mdi-heart-outline"
           icon-selected="mdi-heart"
@@ -23,65 +38,145 @@
           dense
           size="4em"
           half-increments
-          class="rating"/>
+          class="rating"
+        />
       </div>
 
       <q-form @submit.prevent="updateUser" class="q-gutter-md" style="margin-top: 70px" v-if="user">
+        <q-input
+          id="username"
+          v-model="user.username"
+          :readonly="!isEditing"
+          label="Username"
+          class="one-input"
+        />
 
-          <label for="username">Username</label>
-          <q-input id="username" v-model="user.username" :readonly="!isEditing" label="Username" class="one-input"/>
+        <div class="q-gutter-md row">
+          <q-input
+            id="first_name"
+            v-model="user.first_name"
+            :readonly="!isEditing"
+            label="First Name"
+            class="tow-input"
+          />
+          <q-separator vertical spacing class="separator-margin"></q-separator>
+          <q-input
+            id="last_name"
+            v-model="user.last_name"
+            :readonly="!isEditing"
+            label="Last Name"
+            class="tow-input"
+          />
+        </div>
 
-          <div class="q-gutter-md row">
-            <label for="first_name">First Name</label>
-            <q-input id="first_name" v-model="user.first_name" :readonly="!isEditing" label="First Name" class="tow-input"/>
-            <q-separator vertical spacing class="separator-margin"></q-separator>
-            <label for="last_name">Last Name</label>
-            <q-input id="last_name" v-model="user.last_name" :readonly="!isEditing" label="Last Name" class="tow-input"/>
+        <q-input
+          id="birthdate"
+          v-model="birthdate"
+          :readonly="!isEditing"
+          label="Birth Date"
+          type="date"
+          class="one-input"
+        />
+        <q-input
+          id="phone"
+          v-model="user.phone"
+          :readonly="!isEditing"
+          label="Phone Number"
+          class="one-input"
+        />
+
+        <div class="q-gutter-md row">
+          <q-select
+            v-model="user.gender"
+            label="Gender"
+            id="gender"
+            :readonly="!isEditing"
+            :options="genders"
+            dropdown-icon="mdi-chevron-down"
+            class="tow-input"
+          />
+          <q-separator vertical spacing class="separator-margin"></q-separator>
+          <q-select
+            v-model="user.looking"
+            id="looking"
+            :readonly="!isEditing"
+            label="Looking For"
+            :options="looking"
+            dropdown-icon="mdi-chevron-down"
+            class="tow-input"
+          />
+        </div>
+
+        <q-input
+          id="address"
+          v-model="user.address"
+          :readonly="!isEditing"
+          label="Address"
+          class="one-input"
+        />
+
+        <div class="q-gutter-md row">
+          <q-input
+            id="city"
+            v-model="user.city"
+            :readonly="!isEditing"
+            label="City"
+            class="tow-input"
+          />
+          <q-separator vertical spacing></q-separator>
+          <q-input
+            id="postal_code"
+            v-model="user.postal_code"
+            :readonly="!isEditing"
+            label="Postal Code"
+            type="number"
+            class="tow-input"
+          />
+        </div>
+
+        <q-input
+          id="country"
+          v-model="user.country"
+          :readonly="!isEditing"
+          label="Country"
+          class="one-input"
+        />
+
+        <div class="one-input">
+          <span class="text-h8 text-grey-7">Tags</span>
+          <vue3-tags-input
+            v-if="isEditing"
+            :max-tags="20"
+            :maxlength="25"
+            :add-on-key="tagEsc"
+            :tags="tags"
+            @on-tags-changed="updateUserTags"
+          />
+          <div v-else>
+            <q-input
+              id="tags"
+              label="Tags"
+              :model-value="Array.isArray(user.tags) ? user.tags.join(', ') : user.tags"
+              readonly
+            />
           </div>
+        </div>
+        <q-input
+          id="biography"
+          v-model="user.biography"
+          :readonly="!isEditing"
+          label="Bio"
+          filled
+          type="textarea"
+          class="one-input"
+          :counter="true"
+          :max-length="500"
+        />
 
-
-          <label for="birthdate">Birth Date</label>
-          <q-input id="birthdate" v-model="birthdate" :readonly="!isEditing" label="Birth Date" type="date" class="one-input"/>
-          <label for="phone">Phone Number</label>
-          <q-input id="phone" v-model="user.phone"  :readonly="!isEditing" label="Phone Number" class="one-input"/>
-          
-          <div class="q-gutter-md row">
-            <q-select v-model="user.gender" label="Gender" id="gender" :readonly="!isEditing" :options="genders" dropdown-icon="mdi-chevron-down" class="tow-input"/>
-            <q-separator vertical spacing class="separator-margin"></q-separator>
-            <q-select v-model="user.looking" id="looking" :readonly="!isEditing" label="Looking For" :options="looking" dropdown-icon="mdi-chevron-down" class="tow-input"/>
-          </div>
-
-          <label for="address">Address</label>
-          <q-input id="address" v-model="user.address" :readonly="!isEditing" label="Address" class="one-input"/>
-          
-          <div class="q-gutter-md row">
-            <label for="city">City</label>
-            <q-input id="city" v-model="user.city" :readonly="!isEditing" label="City" class="tow-input"/>
-            <q-separator vertical spacing ></q-separator>
-            <label for="postal_code">Postal Code</label>
-            <q-input id="postal_code" v-model="user.postal_code" :readonly="!isEditing" type="number" class="tow-input"/>
-          </div>
-
-          <label for="country">Country</label>
-          <q-input id="country" v-model="user.country" :readonly="!isEditing" label="Country" class="one-input"/>
-          
-          <div class="one-input">
-            <span class="text-h8 text-grey-7">Tags</span>
-            <vue3-tags-input v-if="isEditing" :max-tags="20" :maxlength="25" :add-on-key="tagEsc" :tags="tags" @on-tags-changed="updateUserTags" />   
-            <div v-else>
-              <label for="tags">Tags</label>
-              <q-input id="tags" :model-value="Array.isArray(user.tags) ? user.tags.join(', ') : user.tags" readonly />
-            </div>
-          </div>
-
-          <label for="biography">Bio</label>
-          <q-input id="biography" v-model="user.biography" :readonly="!isEditing" label="Bio" filled type="textarea" class="one-input" :counter="true" :max-length="500"/>
-          
-          <div v-if="isEditing" >
-            <q-btn label="Enregistrer" type="submit" color="primary"/>
-            <q-btn label="Reset" @click="resetForm" color="red" flat class="q-ml-sm" />
-          </div>
-
+        <div v-if="isEditing">
+          <q-btn label="Enregistrer" type="submit" color="primary" />
+          <q-btn label="Reset" @click="resetForm" color="red" flat class="q-ml-sm" />
+        </div>
       </q-form>
       <AlertView :alert="alert"></AlertView>
     </q-page-container>
@@ -99,7 +194,7 @@ import moment from 'moment'
 const store = useStore()
 const isEditing = ref(false)
 const genders = ['male', 'female', 'other']
-const looking = ['male', 'female', 'other','all']
+const looking = ['male', 'female', 'other', 'all']
 const tagEsc = [13, ':', ',', ';']
 const tagsString = ref('')
 const owner = ref(false)
@@ -111,8 +206,8 @@ const initialUser = ref({ ...user })
 const alert = ref({
   state: false,
   color: '',
-  text: '',
-});
+  text: ''
+})
 
 const birthdate = computed({
   get: () => moment(user.birthdate).format('YYYY-MM-DD').toString().split('T')[0],
@@ -122,15 +217,15 @@ const birthdate = computed({
 })
 
 const updateUserTags = (newTags) => {
-  user.tags = newTags.join(', ');
+  user.tags = newTags.join(', ')
 }
 
 const syncTags = () => {
   if (user.tags) {
     if (Array.isArray(user.tags)) {
-      tags.value = user.tags.map(tag => tag.trim())
+      tags.value = user.tags.map((tag) => tag.trim())
     } else if (typeof user.tags === 'string') {
-      tags.value = user.tags.split(',').map(tag => tag.trim())
+      tags.value = user.tags.split(',').map((tag) => tag.trim())
     } else {
       tags.value = []
     }
@@ -157,23 +252,34 @@ const resetForm = () => {
 
 const updateUser = async () => {
   try {
-
     const token = localStorage.getItem('token')
     const url = `${import.meta.env.VITE_APP_API_URL}/api/users/updateprofile`
     const headers = { 'x-auth-token': token }
 
     const res = await axios.post(url, user, { headers })
-    
+
     if (res && res.data && !res.data.msg) {
       isEditing.value = false
       store.dispatch('updateUser', user)
 
-      alert.value = { state: true, color: 'green', text: 'Your account has been updated successfully'}
+      alert.value = {
+        state: true,
+        color: 'green',
+        text: 'Your account has been updated successfully'
+      }
     } else {
-      alert.value = { state: true, color: 'red', text: res.data.msg ? res.data.msg : 'Oops... something went wrong!'}
+      alert.value = {
+        state: true,
+        color: 'red',
+        text: res.data.msg ? res.data.msg : 'Oops... something went wrong!'
+      }
     }
   } catch (err) {
-    alert.value = { state: true, color: 'red', text: err.data.msg ? err.data.msg : 'Oops... error update User!' }
+    alert.value = {
+      state: true,
+      color: 'red',
+      text: err.data.msg ? err.data.msg : 'Oops... error update User!'
+    }
     console.error('err updateUser in frontend/ProfileForm.vue ===> ', err)
   }
 }
@@ -184,7 +290,6 @@ onMounted(async () => {
     syncTags()
   }
 })
-
 </script>
 
 <style scoped>
@@ -194,9 +299,9 @@ onMounted(async () => {
 }
 .note {
   display: flex;
-    align-items: flex-start;
-    flex-direction: row;
-    justify-content: center;
+  align-items: flex-start;
+  flex-direction: row;
+  justify-content: center;
 }
 .icon-toEdit {
   background-image: url('@/assets/Edit/clicToEdit.png');
@@ -216,19 +321,21 @@ onMounted(async () => {
   min-width: 40px;
   margin-left: 30px;
   margin-right: 55px;
-  color: "primary"; 
+  color: 'primary';
 }
 
 .tow-input {
   min-width: 330px;
-  color: "primary";
+  color: 'primary';
 }
 
 .separator-margin {
   margin-left: 20px;
 }
 
-.edit, .edit:hover, .edit:focus {
+.edit,
+.edit:hover,
+.edit:focus {
   position: absolute;
 }
 
@@ -246,7 +353,7 @@ onMounted(async () => {
   left: 50%;
   transform: translate(-50%, 25%);
   height: 1.2px;
-  transition: width .2s ease-in-out;
+  transition: width 0.2s ease-in-out;
 }
 
 .ti-tag {
@@ -255,7 +362,7 @@ onMounted(async () => {
 
 .ti-autocomplete {
   border: 1px solid var(--color-primary) !important;
-  transform: translate(-.5px, -1.2px);
+  transform: translate(-0.5px, -1.2px);
 }
 
 .vue-tags-input.ti-focus .ti-input::after {

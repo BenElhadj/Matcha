@@ -5,6 +5,12 @@ import { quasar, transformAssetUrls } from '@quasar/vite-plugin';
 
 export default defineConfig({
   base: '/Matcha/',
+  test: {
+    environment: 'node',
+    coverage: {
+      reporter: ['text', 'html'],
+    }
+  },
   plugins: [
     vue({
       template: { transformAssetUrls }

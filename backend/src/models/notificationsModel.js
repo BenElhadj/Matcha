@@ -20,10 +20,31 @@ const insertNotifConv = async (type, id_from, id_to, id_conversation) => {
     await db.query(query, [type, id_from, id_to, id_conversation])
 }
 
-const getNotif = async (id) => {
-    const query = `SELECT notifications.id, notifications.id_from as id_from, notifications.created_at as date, notifications.is_read as is_read, notifications.type as type, users.username as username, images.name as profile_image, images.profile as profile, images.cover as cover FROM notifications INNER JOIN users ON notifications.id_from = users.id LEFT JOIN images ON notifications.id_from = images.user_id WHERE notifications.id_to = $1 AND users.id NOT IN (SELECT blocker FROM blocked WHERE blocked = $1 UNION SELECT blocked FROM blocked WHERE blocker = $1)`
-    const result = await db.query(query, [id])
-    return result.rows
+// Get latest notification per sender for a user, with pagination.
+// Uses a subquery to pick the most recent notification per id_from,
+// joins the profile image (images.profile = TRUE) and users while
+// excluding blocked users. Returns rows ordered by notification date desc.
+const getNotif = async (id, limit = 50, offset = 0) => {
+        const query = `
+        SELECT n.id, n.id_from, n.date, n.is_read, n.type, u.username, i.name as profile_image, i.profile, i.cover
+        FROM (
+            SELECT DISTINCT ON (id_from) id, id_from, created_at as date, is_read, type, id_conversation
+            FROM notifications
+            WHERE id_to = $1
+            ORDER BY id_from, created_at DESC
+        ) n
+        JOIN users u ON n.id_from = u.id
+        LEFT JOIN images i ON n.id_from = i.user_id AND i.profile = TRUE
+        WHERE u.id NOT IN (
+            SELECT blocker FROM blocked WHERE blocked = $1
+            UNION
+            SELECT blocked FROM blocked WHERE blocker = $1
+        )
+        ORDER BY n.date DESC
+        LIMIT $2 OFFSET $3
+        `
+        const result = await db.query(query, [id, limit, offset])
+        return result.rows
 }
 
 const seenOneNotif = async (id_from, id_to) => {

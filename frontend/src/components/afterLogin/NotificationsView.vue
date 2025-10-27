@@ -17,7 +17,7 @@
               <q-card-section>
                 <div class="row items-center">
                   <q-avatar>
-                    <img :src="getFullPath(entry.profile_image)" :alt="entry.username" />
+                    <img :src="entryImg(entry.profile_image)" :alt="entry.username" />
                   </q-avatar>
                   <div class="q-ml-md">
                     <router-link :to="`/user/${entry.id_from}`" class="timeline_link">
@@ -72,7 +72,15 @@ const notChats = computed(() => notif.value.filter((cur) => cur.type !== 'chat')
 const notifs = computed(() =>
   [...notChats.value].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, limit.value)
 )
-const { fromNow, formatTime, getFullPath, getNotifMsg, getNotifIcon } = utility
+const { fromNow, formatTime, getNotifMsg, getNotifIcon } = utility
+const base = import.meta.env.BASE_URL || '/'
+const defaultProfileTxt = `${base}default/defaut_profile.txt`
+const entryImg = (img) =>
+  utility.getImageSrc
+    ? utility.getImageSrc(img, utility.getCachedDefault?.('profile') || defaultProfileTxt)
+    : utility.getFullPath
+    ? utility.getFullPath(img)
+    : defaultProfileTxt
 
 const increaseLimit = () => {
   if (limit.value + 11 < notChats.value.length) {

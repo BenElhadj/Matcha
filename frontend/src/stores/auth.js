@@ -81,6 +81,8 @@ export const auth = {
     
     logout({ commit }, id) {
       localStorage.removeItem('token')
+      // Clear persisted store snapshot
+      localStorage.removeItem('matcha_app_state_v1')
       commit('logout')
     }
   }

@@ -6,8 +6,10 @@ import { socket } from './socket'
 import { getters } from './getter'
 import { allTags } from './allTags'
 import { connectedUsers } from './connectedUsers'
+import persist from './plugins/persist'
 
 export const store = createStore({
+  plugins: [persist],
   state: {
     allTags: allTags.state,
     connectedUsers: connectedUsers.state,

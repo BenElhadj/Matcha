@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import axios from 'axios'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -46,7 +47,25 @@ const router = createRouter({
     {
       path: '/user/:id',
       name: 'userprofile',
-      component: () => import('@/components/afterLogin/UserProfile.vue')
+      component: () => import('@/components/afterLogin/UserProfile.vue'),
+      beforeEnter: async (to) => {
+        const id = to.params.id
+        if (!id || isNaN(id)) return '/404'
+        try {
+          const token = localStorage.getItem('token')
+          const headers = { 'x-auth-token': token }
+          const url = `${import.meta.env.VITE_APP_API_URL}/api/users/show/${id}`
+          const res = await axios.get(url, { headers })
+          if (res.data && !res.data.msg) {
+            to.meta.prefetchedUser = res.data
+            return true
+          }
+          return '/404'
+        } catch (e) {
+          console.error('[router] prefetch /user failed', e)
+          return '/404'
+        }
+      }
     },
     {
       path: '/',
