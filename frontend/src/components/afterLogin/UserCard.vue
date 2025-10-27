@@ -122,18 +122,20 @@ const lastSeen = computed(() => {
 })
 
 const getProfileImage = computed(() => {
-  const defaultImage = 'default/defaut_profile.txt'
+  const base = import.meta.env.BASE_URL || '/'
+  const defaultTxt = `${base}default/defaut_profile.txt`
+  const cachedDefault = utility.getCachedDefault ? utility.getCachedDefault('profile') : null
+  const fallback = cachedDefault || defaultTxt
   if (props.user.images && props.user.images.length > 0) {
     const profileImg = props.user.images.find((img) => img.profile)
     const img = profileImg || props.user.images[0]
-    return getImageSrc(img)
+    return getImageSrc(img, fallback)
   }
-  return defaultImage
+  return fallback
 })
 
-const profileImage = (image) => {
-  return utility.getFullPath(image)
-}
+// Deprecated helper kept for reference; prefer computed getProfileImage using getImageSrc
+// const profileImage = (image) => utility.getImageSrc(image, utility.getCachedDefault?.('profile') || `${import.meta.env.BASE_URL || '/' }default/defaut_profile.txt`)
 
 const getHistory = async () => {
   try {

@@ -1,38 +1,28 @@
-<script setup>
-import { onMounted } from 'vue'
-import NavbarView from '@/views/NavbarView.vue'
-import FooterView from '@/views/FooterView.vue'
-
-const components = {
-  NavbarView,
-  FooterView
-};
-
-onMounted(() => {
-  // Suppression du chargement manuel Google Maps : l'intégration se fait via le package Vue
-});
-
-</script>
-
-
 <template>
   <q-layout view="lHh lpR fFf">
-
     <q-header>
-      <NavbarView/>
+      <NavbarView />
     </q-header>
 
-    <q-page-container >
+    <q-page-container>
       <router-view />
     </q-page-container>
 
-    <q-footer >
+    <q-footer>
       <FooterView />
     </q-footer>
-
   </q-layout>
 </template>
+<script setup>
+import { onMounted, ref } from 'vue'
+import NavbarView from '@/views/NavbarView.vue'
+import FooterView from '@/views/FooterView.vue'
 
+const hydrated = ref(false)
+onMounted(() => {
+  hydrated.value = true
+})
+</script>
 
 <style scoped>
 *,
@@ -78,14 +68,11 @@ footer {
   background-color: transparent;
 }
 
-
 .q-page-container {
   padding-bottom: 50vh;
   margin-top: calc(var(--header-height) + var(--footer-height) + 20px);
   margin-bottom: calc(var(--header-height) + var(--footer-height) + 20px);
-  
 }
-
 
 .content {
   flex: 1 0 auto;
@@ -145,7 +132,7 @@ footer {
   position: absolute;
   top: 85%;
   left: 85%;
-  transform: translate(-50%, -50%) scale(.95);
+  transform: translate(-50%, -50%) scale(0.95);
 }
 
 .avatar__like {
@@ -155,15 +142,14 @@ footer {
 
 .q-btn--floating:not(.q-btn--depressed):not(.q-btn--flat),
 .q-btn--floating:not(.q-btn--depressed):not(.q-btn--flat):focus {
-  box-shadow: 0 0 3px rgba(0, 0, 0, .2) inset;
+  box-shadow: 0 0 3px rgba(0, 0, 0, 0.2) inset;
 }
 .q-layout {
- padding-bottom: 70px !important;
+  padding-bottom: 70px !important;
 }
 
 .avatar__img {
-  box-shadow: 0 0 0 3px #f5f5f5,
-    0 1px 5px rgba(0, 0, 0, .2);
+  box-shadow: 0 0 0 3px #f5f5f5, 0 1px 5px rgba(0, 0, 0, 0.2);
 }
 
 .profile {
@@ -176,7 +162,7 @@ footer {
 
 @keyframes point {
   0% {
-    opacity: .3;
+    opacity: 0.3;
   }
   100% {
     opacity: 1;
@@ -196,8 +182,8 @@ footer {
   background: var(--color-primary);
   border-radius: 50%;
   animation-name: point;
-  animation-duration: .9s;
-  animation-iteration-count:infinite;
+  animation-duration: 0.9s;
+  animation-iteration-count: infinite;
 }
 
 .typing_point:nth-child(1) {
@@ -205,27 +191,27 @@ footer {
 }
 
 .typing_point:nth-child(2) {
-  animation-delay: .3s;
+  animation-delay: 0.3s;
 }
 
 .typing_point:nth-child(3) {
-  animation-delay: .6s;
+  animation-delay: 0.6s;
 }
 
 .editor_dialog {
-  overflow: hidden
+  overflow: hidden;
 }
 
 @media only screen and (max-width: 600px) {
   .heading {
     font-size: 2.5em !important;
-    padding-bottom: .5rem !important;
+    padding-bottom: 0.5rem !important;
   }
   .title {
     font-size: 16px !important;
   }
   .q-chip__content {
-    transform: scale(.9);
+    transform: scale(0.9);
   }
   .chat_container {
     font-size: 85% !important;
@@ -243,7 +229,7 @@ footer {
     width: 3.5rem !important;
   }
   .header_content > * {
-    transform: scale(.9) !important;
+    transform: scale(0.9) !important;
   }
   .header_content > .header_center > h1 {
     font-size: 1rem;
@@ -252,7 +238,7 @@ footer {
 
 @media only screen and (max-width: 400px) {
   .timeline_container {
-    transform: scale(.8) translate(-5%, -10%);
+    transform: scale(0.8) translate(-5%, -10%);
   }
   .title {
     font-size: 14px !important;
@@ -265,22 +251,22 @@ footer {
     width: 3rem !important;
   }
   .header_content > * {
-    transform: scale(.8) !important;
+    transform: scale(0.8) !important;
   }
   .header_content > .header_center > h1 {
-    font-size: .7rem;
+    font-size: 0.7rem;
   }
 }
 
 @media only screen and (max-width: 350px) {
   .timeline_container {
-    transform: scale(.7) translate(-10%, -20%);
+    transform: scale(0.7) translate(-10%, -20%);
   }
   .title {
     font-size: 12px !important;
   }
   .q-chip__content {
-    transform: scale(.8);
+    transform: scale(0.8);
   }
   .chat_container {
     font-size: 70% !important;
@@ -293,11 +279,10 @@ footer {
     width: 2.5rem !important;
   }
   .header_content > * {
-    transform: scale(.7) !important;
+    transform: scale(0.7) !important;
   }
   .header_content > .header_center > h1 {
-    font-size: .6rem;
+    font-size: 0.6rem;
   }
 }
-
 </style>

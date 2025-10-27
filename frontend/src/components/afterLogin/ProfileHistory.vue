@@ -23,7 +23,7 @@
             :icon="getNotifIcon(entry.type)[1]"
           >
             <q-avatar clickable v-ripple avatar @click="redirectToUser(entry.his_id)">
-              <img :src="getFullPath(entry.avatar)" />
+              <img :src="historyImg(entry.avatar)" />
             </q-avatar>
             <q-item-section right>
               {{ moment(entry.created_at).fromNow() }}
@@ -72,7 +72,13 @@ const getNotifIcon = utility.getNotifIcon
 const allHistory = ref([])
 const fromNow = utility.fromNow
 const formatTime = utility.formatTime
+const base = import.meta.env.BASE_URL || '/'
+const defaultProfileTxt = `${base}default/defaut_profile.txt`
 const getFullPath = utility.getFullPath
+const historyImg = (img) =>
+  utility.getImageSrc
+    ? utility.getImageSrc(img, utility.getCachedDefault?.('profile') || defaultProfileTxt)
+    : getFullPath(img)
 const getHistoryAction = utility.getHistoryAction
 const getHistory = async () => {
   try {

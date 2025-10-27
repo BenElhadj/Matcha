@@ -1,6 +1,6 @@
 <template>
   <q-page class="page-container">
-    <q-page-container v-if="loading">
+    <q-page-container v-if="!loading">
       <div>
         <div class="profile__cover">
           <img :src="coverPhoto" alt="Cover Photo" class="cover__img" />
@@ -300,8 +300,10 @@ let liked = ref(false)
 
 const profileImage = computed(() => {
   // Select image where profile is true/1 and cover is not true/1
-  const defaultImage = 'default/defaut_profile.txt'
-  if (!user.value || !user.value.images) return getFullPath(defaultImage)
+  const cachedDefault = utility.getCachedDefault ? utility.getCachedDefault('profile') : null
+  const base = import.meta.env.BASE_URL || '/'
+  const defaultImage = cachedDefault || `${base}default/defaut_profile.txt`
+  if (!user.value || !user.value.images) return defaultImage
   const image = user.value.images.find(
     (cur) => (cur.profile === true || cur.profile === 1) && !(cur.cover === true || cur.cover === 1)
   )
@@ -402,12 +404,7 @@ watch(
         const headers = { 'x-auth-token': token }
         const res = await axios.get(url, { headers })
         data.value = res.data
-        if (!res.data.msg) {
-          loading.value = true
-          return
-        } else {
-          loading.value = false
-        }
+        // Do not toggle page loading here; loading is controlled by data prefetch.
       } catch (err) {
         console.error('err watch user in frontend/MessengerView.vue ===> ', err)
       }
@@ -427,8 +424,10 @@ const distance = computed(() => {
 })
 
 const coverPhoto = computed(() => {
-  const cover = 'default/defaut_couverture.txt'
-  if (!user.value || !user.value.images) return getFullPath(cover)
+  const cachedDefault = utility.getCachedDefault ? utility.getCachedDefault('cover') : null
+  const base = import.meta.env.BASE_URL || '/'
+  const cover = cachedDefault || `${base}default/defaut_couverture.txt`
+  if (!user.value || !user.value.images) return cover
   // Select image where cover is true/1 and profile is not true/1
   const image = user.value.images.find(
     (cur) => (cur.cover === true || cur.cover === 1) && !(cur.profile === true || cur.profile === 1)
@@ -448,7 +447,9 @@ const userTags = computed(() => {
 })
 
 const getProfileImage = () => {
-  const defaultImage = 'default/defaut_profile.txt'
+  const cachedDefault = utility.getCachedDefault ? utility.getCachedDefault('profile') : null
+  const base = import.meta.env.BASE_URL || '/'
+  const defaultImage = cachedDefault || `${base}default/defaut_profile.txt`
   if (!user.value || !user.value.images) return defaultImage
   const image = user.value.images.find((cur) => cur.profile === 1) || user.value.images[0]
   return getImageSrc(image, defaultImage)
@@ -628,6 +629,13 @@ const fetchUser = async (id) => {
   }
 }
 
+// Use prefetched user from route meta (set by router beforeEnter)
+const prefetched = route?.meta?.prefetchedUser
+if (prefetched) {
+  user.value = { ...prefetched, rating: Number(prefetched.rating) }
+  loading.value = false
+}
+
 function updateConnectedUsers() {
   if (user.value && route.params.id) {
     utility
@@ -652,12 +660,11 @@ function updateConnectedUsers() {
 }
 
 onMounted(() => {
-  // Only fetch user once on mount
+  // Validate route param and start lightweight polling only
   if (isNaN(route.params.id) || !route.params.id) {
     router.push('/404')
     return
   }
-  fetchUser(route.params.id)
   liked.value = getLikeValue(lastHistory) ? true : false
   // Start polling for connected users at a lower frequency
   refreshInterval = setInterval(() => {

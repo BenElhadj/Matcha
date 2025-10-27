@@ -1,12 +1,20 @@
 import utility from '@/utility'
 
 export const getters = {
-  user: (state) => state.user,
+  // Return the actual logged-in user object (prefers auth.user, falls back to module/root user)
+  user: (state) => state?.auth?.user || state?.user?.user || state.user,
   tags: (state) => state.tags?.filter((cur) => cur.length),
   notif: (state) => state.notif,
   typing: (state) => state.typing,
   online: (state) => state.online,
-  status: (state) => state.status,
+  // Consider multiple sources for connection status to avoid timing issues
+  status: (state) => {
+    if (state?.auth?.status === true) return true
+    if (state?.isConnected === true) return true
+    const hasUser = !!(state?.auth?.user?.id || state?.user?.user?.id || state?.user?.id)
+    if (hasUser) return true
+    return false
+  },
   blocked: (state) => state.blocked,
   location: (state) => state.location,
   typingSec: (state) => state.typingSec,
@@ -47,22 +55,27 @@ export const getters = {
       return false
     }),
   profileImage: (state) => {
-  const imageProfil = `${import.meta.env.VITE_APP_API_URL}/uploads/default/defaut_profile.txt`
-  if (!state.user.images) return imageProfil
-  const image = state.user.images.find((cur) => cur.profile)
-  if (!image) return imageProfil
-  if (image.link) return utility.getFullPath(image.link)
-  if (image.data) return `data:image/png;base64,${image.data}`
-  return imageProfil
+    const base = import.meta.env.BASE_URL || '/';
+    const imageProfilTxt = `${base}default/defaut_profile.txt`;
+    // Try cached data URI for default first (avoids rendering plain .txt)
+    const cachedDefault = utility.getCachedDefault ? utility.getCachedDefault('profile') : null
+    const fallback = cachedDefault || imageProfilTxt
+    if (!state.user.images) return fallback
+    const image = state.user.images.find((cur) => cur.profile)
+    if (!image) return fallback
+    // Use centralized logic to resolve image sources safely
+    return utility.getImageSrc(image, fallback)
   },
   coverPhoto: (state) => {
-  const cover = `${import.meta.env.VITE_APP_API_URL}/uploads/default/defaut_couverture.txt`
-  if (!state.user.images) return cover
-  const image = state.user.images.find((cur) => cur.cover)
-  if (!image) return cover
-  if (image.link) return utility.getFullPath(image.link)
-  if (image.data) return `data:image/png;base64,${image.data}`
-  return cover
+    const base = import.meta.env.BASE_URL || '/';
+    const coverTxt = `${base}default/defaut_couverture.txt`;
+    const cachedDefault = utility.getCachedDefault ? utility.getCachedDefault('cover') : null
+    const fallback = cachedDefault || coverTxt
+    if (!state.user.images) return fallback
+    const image = state.user.images.find((cur) => cur.cover)
+    if (!image) return fallback
+    // Use centralized logic to resolve image sources safely
+    return utility.getImageSrc(image, fallback)
   },
   convos: (state) =>
     Array.isArray(state.convos)

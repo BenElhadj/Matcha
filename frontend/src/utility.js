@@ -6,7 +6,16 @@ export function getImageSrc(image, defaultImage = 'default/defaut_profile.txt') 
   if (typeof image === 'string') {
     const s = image.trim();
     if (!s || s === 'false') return defaultImage;
-    if (s.startsWith('data:image')) return s;
+    if (s.startsWith('data:image')) {
+      // Validate data URI doesn't contain HTML or invalid base64 payload
+      const parts = s.split(',')
+      const payload = parts.length > 1 ? parts.slice(1).join(',') : ''
+      const base64Pattern = /^[A-Za-z0-9+/=\s]+$/
+      if (!payload || payload.startsWith('<!DOCTYPE') || payload.startsWith('<html') || !base64Pattern.test(payload)) {
+        return defaultImage
+      }
+      return s
+    }
     if (isExternal(s)) return s;
     return getFullPath(s);
   }
@@ -34,7 +43,16 @@ export function getImageSrc(image, defaultImage = 'default/defaut_profile.txt') 
   if (typeof image.data === 'string') {
     const val = image.data.trim();
     if (val && val !== 'false') {
-      if (val.startsWith('data:image')) return val;
+      if (val.startsWith('data:image')) {
+        // validate payload
+        const parts = val.split(',')
+        const payload = parts.length > 1 ? parts.slice(1).join(',') : ''
+        const base64Pattern = /^[A-Za-z0-9+/=\s]+$/
+        if (!payload || payload.startsWith('<!DOCTYPE') || payload.startsWith('<html') || !base64Pattern.test(payload)) {
+          return defaultImage
+        }
+        return val
+      }
       if (/^[A-Za-z0-9+/=]+$/.test(val)) return `data:image/png;base64,${val}`;
     }
   }
@@ -51,7 +69,111 @@ export function getImageSrc(image, defaultImage = 'default/defaut_profile.txt') 
 import axios from 'axios'
 import moment from 'moment'
 
-export const isExternal = url => url && (url.indexOf(':') > -1 || url.indexOf('//') > -1 || url.indexOf('www.') > -1)
+// --- Default .txt image helpers -------------------------------------------------
+// Cache for default txt images converted to data URIs
+const __defaultTxtCache = {
+  profile: null,
+  cover: null
+}
+
+function detectMimeFromBase64 (b64) {
+  // Heuristics based on common base64 prefixes
+  if (!b64 || typeof b64 !== 'string') return 'image/png'
+  const s = b64.trim()
+  if (s.startsWith('data:image/')) {
+    // Already a data URI
+    const m = s.slice(5, s.indexOf(';')) // image/png
+    return m || 'image/png'
+  }
+  if (s.startsWith('/9j/')) return 'image/jpeg' // JPEG
+  if (s.startsWith('iVBORw0KGgo')) return 'image/png' // PNG
+  if (s.startsWith('R0lGOD')) return 'image/gif' // GIF
+  if (s.startsWith('PHN2Zy')) return 'image/svg+xml' // SVG
+  return 'image/png'
+}
+
+export function getCachedDefault (kind = 'profile') {
+  const key = kind === 'cover' ? 'default_cover_data_uri' : 'default_profile_data_uri'
+  if (__defaultTxtCache[kind]) return __defaultTxtCache[kind]
+  let val = null
+  try { val = localStorage.getItem(key) } catch (_) { val = null }
+  if (val && typeof val === 'string') {
+    const s = val.trim()
+    if (s.startsWith('data:image')) {
+      const parts = s.split(',')
+      const payload = parts.length > 1 ? parts.slice(1).join(',') : ''
+      const base64Pattern = /^[A-Za-z0-9+/=\s]+$/
+      if (!payload || payload.startsWith('<!DOCTYPE') || payload.startsWith('<html') || !base64Pattern.test(payload)) {
+        // Bad cache, purge it
+        try { localStorage.removeItem(key) } catch (_) {}
+        return null
+      }
+    } else if (s.includes('<!DOCTYPE') || s.includes('<html')) {
+      try { localStorage.removeItem(key) } catch (_) {}
+      return null
+    }
+    __defaultTxtCache[kind] = val
+    return val
+  }
+  return null
+}
+
+export async function getDefaultTxtImage (relativeTxtPath, kind = 'profile') {
+  const fallbackBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/wwAAn8B9Qp0GfoAAAAASUVORK5CYII=';
+  const base64Pattern = /^[A-Za-z0-9+/=]+$/;
+  try {
+    // If already cached, return
+    const existing = getCachedDefault(kind)
+    if (existing) return existing
+
+    const base = import.meta.env.BASE_URL || '/';
+    const url = relativeTxtPath.startsWith('http')
+      ? relativeTxtPath
+      : `${base}${relativeTxtPath.replace(/^\//, '')}`
+
+    const res = await axios.get(url, { responseType: 'text' })
+    let content = (res && res.data) ? String(res.data).trim() : ''
+    // Defensive: If content looks like HTML, is empty, or not base64, fallback
+    if (!content || content.startsWith('<!DOCTYPE html') || content.startsWith('<html') || !base64Pattern.test(content)) {
+      content = fallbackBase64;
+    }
+
+    let dataUri = content
+    if (!content.startsWith('data:image')) {
+      const mime = detectMimeFromBase64(content)
+      dataUri = `data:${mime};base64,${content}`
+    }
+
+    const key = kind === 'cover' ? 'default_cover_data_uri' : 'default_profile_data_uri'
+    __defaultTxtCache[kind] = dataUri
+    try { localStorage.setItem(key, dataUri) } catch (_) {}
+    return dataUri
+  } catch (err) {
+    console.error('err getDefaultTxtImage in utility.js ===> ', err)
+    // Always fallback to valid PNG
+    return `data:image/png;base64,${fallbackBase64}`;
+  }
+}
+
+export async function warmDefaultTxtImages () {
+  // Pass relative paths; getDefaultTxtImage will prepend BASE_URL correctly
+  const profilePath = `default/defaut_profile.txt`;
+  const coverPath = `default/defaut_couverture.txt`;
+  // Fire and forget; cache results for sync access in getters/components
+  try { await getDefaultTxtImage(profilePath, 'profile') } catch (_) {}
+  try { await getDefaultTxtImage(coverPath, 'cover') } catch (_) {}
+}
+
+// Stricter external URL check (only schemes/protocols at start or protocol-relative)
+export const isExternal = url => {
+  if (!url || typeof url !== 'string') return false
+  const s = url.trim()
+  if (/^data:image\//i.test(s)) return true
+  if (/^(https?:)?\/\//i.test(s)) return true
+  if (/^(blob:|data:)/i.test(s)) return true
+  if (/^www\./i.test(s)) return true
+  return false
+}
 export const isBlocked = (state, id) => {
   const b = Array.isArray(state?.blocked) ? state.blocked : []
   const bb = Array.isArray(state?.blockedBy) ? state.blockedBy : []
@@ -60,8 +182,27 @@ export const isBlocked = (state, id) => {
 
 // Nom complet vers le fichier uploads côté backend
 export function getFullPath(file) {
-  if (!file || file === 'false') return `${import.meta.env.VITE_APP_API_URL}/uploads/default/defaut_profile.txt`
-  return isExternal(file) ? file : `${import.meta.env.VITE_APP_API_URL}/uploads/${file}`
+  const base = import.meta.env.BASE_URL || '/';
+  const fallback = `${base}default/defaut_profile.txt`
+  if (!file || file === 'false') return fallback
+  if (typeof file !== 'string') return fallback
+  const s = file.trim()
+  // If it's a data URI, validate payload to avoid HTML-in-data
+  if (s.startsWith('data:image')) {
+    const parts = s.split(',')
+    const payload = parts.length > 1 ? parts.slice(1).join(',') : ''
+    const base64Pattern = /^[A-Za-z0-9+/=\s]+$/
+    if (!payload || payload.startsWith('<!DOCTYPE') || payload.startsWith('<html') || !base64Pattern.test(payload)) {
+      return fallback
+    }
+    return s
+  }
+  // If it's an external URL or protocol-relative, return as-is
+  if (isExternal(s)) return s
+  // For any value containing obvious HTML markers, fallback
+  if (s.includes('<!DOCTYPE') || s.includes('<html')) return fallback
+  // Otherwise, treat as backend upload filename
+  return `${import.meta.env.VITE_APP_API_URL}/uploads/${s}`
 }
 
 const getDate = item => {
@@ -221,6 +362,9 @@ export default {
   getConnectedUsers,
   syncLocation,
   getLocationFromIp,
+  getDefaultTxtImage,
+  warmDefaultTxtImages,
+  getCachedDefault,
   // eslint-disable-next-line
   getFullPath,
   // consoleLog: ('utility.js getFullPath => ', getFullPath),
@@ -253,7 +397,17 @@ export default {
       const url = `${import.meta.env.VITE_APP_API_URL}/api/notif/all`
       const headers = { 'x-auth-token': token }
       const result = await axios.get(url, { headers })
-      return result.data && result.data.msg ? [] : (result.data || []);
+      const payload = result && result.data ? result.data : null
+      // Support both old and new response shapes
+      if (!payload) return []
+      if (payload.msg) return []
+      // New shape: { status, type, message, data: { items, page, limit } }
+      if (payload.data && Array.isArray(payload.data.items)) return payload.data.items
+      // Sometimes backend used to return array directly
+      if (Array.isArray(payload)) return payload
+      // Or nested array
+      if (payload.data && Array.isArray(payload.data)) return payload.data
+      return []
     } catch (error) {
       console.error('err syncNotif in frontend/utility.js ===> ', error)
       return [];

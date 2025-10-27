@@ -49,7 +49,7 @@
               >
                 <q-item-section avatar>
                   <q-avatar>
-                    <img :src="getFullPath(item.profile_image)" />
+                    <img :src="resolveImg(item.profile_image)" />
                   </q-avatar>
                 </q-item-section>
                 <q-item-section>
@@ -107,7 +107,7 @@
               >
                 <q-item-section avatar>
                   <q-avatar>
-                    <img :src="getFullPath(item.profile_image)" />
+                    <img :src="resolveImg(item.profile_image)" />
                   </q-avatar>
                 </q-item-section>
                 <div>
@@ -263,7 +263,13 @@ notifs.value = Array.isArray(notif.value)
 let menuConvos = ref([])
 let newMessage = ref([])
 
+const base = import.meta.env.BASE_URL || '/'
+const defaultProfileTxt = `${base}default/defaut_profile.txt`
 const getFullPath = utility.getFullPath
+const resolveImg = (img) =>
+  utility.getImageSrc
+    ? utility.getImageSrc(img, utility.getCachedDefault?.('profile') || defaultProfileTxt)
+    : getFullPath(img)
 const getNotifMsg = utility.getNotifMsg
 const getNotifIcon = utility.getNotifIcon
 const formatNotifDate = utility.formatTime
@@ -301,23 +307,10 @@ onUnmounted(() => {
   document.body.removeEventListener('click', handleClickOutside, true)
 })
 
-onMounted(async () => {
-  try {
-    const token = localStorage.getItem('token')
-    const url = `${import.meta.env.VITE_APP_API_URL}/api/auth/isloggedin`
-    const headers = { 'x-auth-token': token }
-    const res = await axios.get(url, { headers })
-    if (!res.data.msg) {
-      const user = res.data
-      if (user.birthdate) {
-        user.birthdate = new Date(user.birthdate).toISOString().substr(0, 10)
-      }
-      store.dispatch('login', user)
-      updateNotifAndMsg()
-    }
-  } catch (err) {
-    console.error('err async onMounted in frontend/NavbarView.view ===> ', err)
-  }
+// Auth bootstrap now happens before app mount in main.js to avoid flicker/races
+onMounted(() => {
+  // After mount, just refresh counters/menus if already connected
+  if (connected.value) updateNotifAndMsg()
 })
 
 const syncConvo = async (convo) => {
