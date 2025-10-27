@@ -122,13 +122,14 @@
             </q-bar>
           </q-header>
           <q-page-container>
-            <map-location-selector
+            <MapLocationSelector
               style="margin: 700px 0px 0px important;"
               :latitude="latitude"
               :longitude="longitude"
               api-key="AIzaSyAHVSMrIeymA40C-a9ap0zCQzrHXkycXX8"
               @location-updated="locationUpdated"
-            ></map-location-selector>
+              v-if="locDialog"
+            ></MapLocationSelector>
           </q-page-container>
         </q-card>
       </q-dialog>
@@ -191,12 +192,12 @@
 
 <script setup>
 import moment from 'moment'
-import { ref, onMounted, computed, nextTick } from 'vue'
+import { ref, onMounted, computed, nextTick, defineAsyncComponent, watch } from 'vue'
 import { useStore } from 'vuex'
 import axios from 'axios'
 import utility from '@/utility'
 import AlertView from '@/views/AlertView.vue'
-import mapLocationSelector from 'vue-google-maps-location-selector'
+const MapLocationSelector = defineAsyncComponent(() => import('vue-google-maps-location-selector'))
 
 const store = useStore()
 const user = computed(() => store.getters.user)
@@ -386,8 +387,9 @@ const unBlock = async (banned) => {
   }
 }
 
-onMounted(() => {
-  fetchBlacklist()
+// Defer blacklist fetch until the dialog is opened
+watch(blackListDialog, (open) => {
+  if (open) fetchBlacklist()
 })
 
 </script>

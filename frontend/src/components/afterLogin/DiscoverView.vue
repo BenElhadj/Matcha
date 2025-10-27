@@ -18,7 +18,6 @@
                     text
                     label="First/Last name or Nickname"
                     placeholder="Recherche"
-                    @keyup="displaySearchText()"
                   >
                     <template v-slot:append>
                       <q-icon name="mdi-magnify"></q-icon>
@@ -154,27 +153,24 @@ const filters = {
     // Check if gender.value is 'all' and return true, or apply the regular filter logic
     return gender.value === 'all' || (!gender.value || val.gender === gender.value);
   },
-  location: val => !location.value || [val.country, val.address, val.city].some(cur => cur.includes(location.value)),
+  location: val => !location.value || [val.country, val.address, val.city].some(cur => cur && cur.includes(location.value)),
   distance: val => {
-    if (val.lat && val.lng) {
-      const { lat, lng } = val
-      const distanceCalc = utility.calculateDistance(userLocation, { lat, lng })
-      return distanceCalc >= distance.value.min && distanceCalc <= distance.value.max
-    } else {
-      return false
-    }
+    const d = typeof val.distanceKm === 'number' ? val.distanceKm : 0
+    return d >= distance.value.min && d <= distance.value.max
   },
   age: val => {
-    const year = new Date(val.birthdate).getFullYear()
-    const now = new Date().getFullYear()
-    return year >= now - age.value.max && year <= now - age.value.min
+    const years = typeof val.ageYears === 'number' ? val.ageYears : 0
+    return years >= age.value.min && years <= age.value.max
   },
   interest: val => {
     if (!interests.value.length) return true
     for (const interest of interests.value) if (val.tags.split(',').includes(interest)) return true
     return false
   },
-  search : val => !search.value || val.username.includes(search.value)
+  search : val => !recherche.value ||
+    (val.username && val.username.toLowerCase().includes(recherche.value.toLowerCase())) ||
+    (val.first_name && val.first_name.toLowerCase().includes(recherche.value.toLowerCase())) ||
+    (val.last_name && val.last_name.toLowerCase().includes(recherche.value.toLowerCase()))
 }
 
 const filtered = computed(() => {
@@ -188,32 +184,17 @@ const filtered = computed(() => {
     .filter(filters.age)
     .filter(filters.distance)
     .filter(filters.interest)
+    .filter(filters.search)
 })
 
-const displaySearchText = () => {
-  const searchTerm = recherche.value.toLowerCase();
-  const allUsers = users.value;
-
-  if (!searchTerm) {
-    created()
-    return; 
-  }
-
-  users.value = allUsers.filter((user) => {
-    const usernameMatch = user.username.toLowerCase().includes(searchTerm);
-    const firstNameMatch = user.first_name.toLowerCase().includes(searchTerm);
-    const lastNameMatch = user.last_name.toLowerCase().includes(searchTerm);
-    
-    return usernameMatch || firstNameMatch || lastNameMatch;
-  });
-};
-
-  const search = () => {
-     displaySearchText();
-  };
+// search handled reactively via filters.search
 
 const ageCalc = (birthdate) => {
-  return new Date() - new Date(birthdate);
+  const bd = new Date(birthdate)
+  if (isNaN(bd)) return 0
+  const diff = Date.now() - bd.getTime()
+  const ageDate = new Date(diff)
+  return Math.abs(ageDate.getUTCFullYear() - 1970)
 };
 
 const commonTags = (user, tags) => {
@@ -236,7 +217,7 @@ const sorted = computed(() => {
 
   switch (sort.value) {
     case 'age':
-      sortFunc = (a, b) => sortDir.value * (ageCalc(a.birthdate) - ageCalc(b.birthdate));
+      sortFunc = (a, b) => sortDir.value * ((a.ageYears||0) - (b.ageYears||0));
       break;
     case 'rating':
       sortFunc = (a, b) => sortDir.value * (b.rating - a.rating);
@@ -257,15 +238,9 @@ const sorted = computed(() => {
 });
 
 const calculateMaxDistance = () => {
-  if (users.value.length) {
-    const { lat, lng } = users.value[users.value.length - 1]
-    const to = {
-      lat: Number(lat),
-      lng: Number(lng)
-    }
-    maxDis.value = Math.ceil(utility.calculateDistance(userLocation, to))
-  }
-  // setTimeout(calculateMaxDistance, 1000)
+  if (!users.value.length) { maxDis.value = 0; return }
+  const maxVal = users.value.reduce((acc, u) => Math.max(acc, typeof u.distanceKm === 'number' ? u.distanceKm : 0), 0)
+  maxDis.value = Math.ceil(maxVal)
 }
 
 watch(users, () => {
@@ -352,17 +327,24 @@ async function created() {
   // console.log(res.data)
   
   if (!res.data.msg) {
-      users.value = res.data.slice(0, 1000).map(cur => ({
-      ...cur,
-      rating: Number(cur.rating)
-    }))
+      users.value = res.data.slice(0, 1000).map(cur => {
+        const lat = Number(cur.lat)
+        const lng = Number(cur.lng)
+        const distanceKm = (isFinite(lat) && isFinite(lng)) ? utility.calculateDistance(userLocation, { lat, lng }) : 0
+        return {
+          ...cur,
+          rating: Number(cur.rating),
+          ageYears: ageCalc(cur.birthdate),
+          distanceKm
+        }
+      })
 
   if (!resHistory.data.msg) {
     const blockedHistory = resHistory.data.filter((item) => typesToFilter.includes(item.type))
     const blockedUserIds = blockedHistory.map(item => item.his_id)
     users.value = users.value.filter(user => !blockedHistory.some(historyItem => historyItem.his_id === user.user_id))
   }
-    await calculateMaxDistance()
+    calculateMaxDistance()
     whoIsUp()
     distance.value.max = maxDis.value
     loaded.value = true
@@ -371,28 +353,18 @@ async function created() {
   }
 }
 
-onMounted(async () => {
-  try {
-    const token = localStorage.getItem('token')
-    const url = `${import.meta.env.VITE_APP_API_URL}/api/auth/isloggedin`
-    const headers = { 'x-auth-token': token }
-    const res = await axios.get(url, { headers })
-    socket.on('onlineUsers', (users) => {
-    onlineUsers.value = users
-    })
-    if (!res.data.msg && maxDis.value > 0) {
-      const user = res.data
-      if (user.birthdate) {
-        user.birthdate = new Date(user.birthdate).toISOString()
-      }
-      store.dispatch('login', user)
+// Auth is bootstrapped in main.js; only wire sockets here
+onMounted(() => {
+  socket.on('onlineUsers', (users) => {
+    // update connectivity flags efficiently
+    if (Array.isArray(users) && users.length && Array.isArray(users.value)) {
+      whoIsUp()
     }
-    socket.on('connectedUsers', (connectedUsers) => {
-      store.dispatch('connectedUsers', connectedUsers)
-    })
-  } catch (err) {
-    console.error('err onMounted in frontend/DiscoverView.vue ===> ', err)
-  }
+  })
+  socket.on('connectedUsers', (ids) => {
+    // store.dispatch('connectedUsers', ids) // assuming an action exists
+    whoIsUp()
+  })
 })
 
 onMounted(created)
@@ -402,7 +374,7 @@ function refreshMethods() {
   whoIsUp()
 }
 
-const refreshInterval = setInterval(refreshMethods, 5000)
+const refreshInterval = setInterval(() => { whoIsUp() }, 5000)
 
 onBeforeUnmount(() => {
   socket.off('onlineUsers')
@@ -432,9 +404,7 @@ a{
 
 .tags_menu > .v-input__control > .v-input__slot,
 .loaction_input > .v-input__control > .v-input__slot,
-.sort_select > .v-input__control > .v-input__slot {
- 
-}
+.sort_select > .v-input__control > .v-input__slot { display: block; }
 
 .v-slider.v-slider--is-active,
 .tags_menu.v-select--is-menu-active > .v-input__control > .v-input__slot,
@@ -451,10 +421,9 @@ a{
   color: var(--color-primary);
 }
 
-.v-select-list.v-card.theme--light > .v-list,
-.theme--light.q-btn-toggle,
-.v-menu__content.menuable__content__active.v-autocomplete__content > .v-select-list > .v-list {
-}
+.v-select-list.v-card.theme--light > .v-list { padding: inherit; }
+.theme--light.q-btn-toggle { box-shadow: none; }
+.v-menu__content.menuable__content__active.v-autocomplete__content > .v-select-list > .v-list { padding: inherit; }
 
 .q-btn-toggle {
   display: flex;
