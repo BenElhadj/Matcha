@@ -10,7 +10,7 @@ const { pool } = require('./src/config/database')
 const cors = require('cors')
 
 // Configuration CORS pour la production
-app.use(cors({
+const corsConfig = {
   origin: [
     'https://benelhadj.github.io',
     'https://benelhadj.github.io/Matcha',
@@ -20,7 +20,10 @@ app.use(cors({
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'x-auth-token']
-}))
+}
+app.use(cors(corsConfig))
+// Ensure preflight requests always get proper CORS headers
+app.options('*', cors(corsConfig))
 
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }))
 app.use(bodyParser.json({ limit: '50mb', extended: true }))
