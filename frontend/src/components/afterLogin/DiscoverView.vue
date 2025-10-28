@@ -185,16 +185,8 @@ import { matMenu } from '@quasar/extras/material-icons'
 import { mdiAbTesting } from '@quasar/extras/mdi-v5'
 import { useRouter } from 'vue-router'
 
-import io from 'socket.io-client'
-const socket = io(`${import.meta.env.VITE_APP_API_URL}`, {
-  transports: ['websocket'],
-  reconnection: true,
-  timeout: 20000
-})
-
-socket.on('connect_error', (err) => {
-  console.error('Erreur de connexion socket.io :', err)
-})
+import { getSocket } from '@/boot/socketClient'
+const socket = getSocket()
 
 const connectedUsers = computed(() => store.state.connectedUsers)
 
@@ -458,6 +450,7 @@ async function created() {
 
 // Auth is bootstrapped in main.js; only wire sockets here
 onMounted(() => {
+  if (!socket) return
   socket.on('onlineUsers', (users) => {
     // update connectivity flags efficiently
     if (Array.isArray(users) && users.length && Array.isArray(users.value)) {
@@ -482,8 +475,10 @@ const refreshInterval = setInterval(() => {
 }, 5000)
 
 onBeforeUnmount(() => {
-  socket.off('onlineUsers')
-  socket.off('connectedUsers')
+  if (socket) {
+    socket.off('onlineUsers')
+    socket.off('connectedUsers')
+  }
   clearInterval(refreshInterval)
 })
 </script>

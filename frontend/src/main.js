@@ -7,6 +7,7 @@ import router from '@/router/index'
 import { api } from '@/boot/axios' // Ajoutez cette ligne
 import 'quasar/src/css/index.sass' 
 import App from '@/App.vue'
+import { connectSocket } from '@/boot/socketClient'
 
 // Silence noisy console output in production (keep errors)
 if (import.meta.env.MODE === 'production') {
@@ -47,6 +48,38 @@ try { utility.warmDefaultTxtImages && utility.warmDefaultTxtImages() } catch (e)
 				const usr = { ...res.data }
 				if (usr.birthdate) usr.birthdate = new Date(usr.birthdate).toISOString().substr(0, 10)
 				await store.dispatch('login', usr)
+				// Init realtime socket after successful login
+				try {
+					const s = connectSocket(usr.id, { on: {
+						connect: () => {},
+						disconnect: () => {}
+					}})
+					// Notifications
+					s.on('notif:new', () => {
+						store.dispatch('getNotifPage', { limit: 50, page: 1 })
+					})
+					s.on('notif:seenAll', () => {
+						store.commit('seenNotif')
+					})
+					s.on('notif:seenFrom', (payload) => {
+						if (payload && payload.id_from) store.commit('seenNotifFrom', payload.id_from)
+					})
+					s.on('notif:seenIds', (payload) => {
+						const ids = payload && Array.isArray(payload.ids) ? payload.ids : []
+						if (ids.length) store.commit('markNotifsSeenByIds', ids)
+					})
+					// Visit / Match also refresh notifications list
+					s.on('visit', () => {
+						store.dispatch('getNotifPage', { limit: 50, page: 1 })
+					})
+					s.on('match', () => {
+						store.dispatch('getNotifPage', { limit: 50, page: 1 })
+					})
+					// Block/Unblock -> resynchroniser la blacklist
+					const resyncBlocked = () => store.dispatch('syncBlocked')
+					s.on('block', resyncBlocked)
+					s.on('unblock', resyncBlocked)
+				} catch (_) {}
 			}
 		}
 	} catch (e) {

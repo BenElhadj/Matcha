@@ -239,7 +239,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
-  socket.off('user-status-changed')
+  if (socket) socket.off('user-status-changed')
 })
 import AlertView from '@/views/AlertView.vue'
 import LoaderView from '@/views/LoaderView.vue'
@@ -261,11 +261,8 @@ import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
 import moment from 'moment'
 
-import io from 'socket.io-client'
-const socket = io(`${import.meta.env.VITE_APP_API_URL}`, {
-  transports: ['websocket'],
-  auth: { token: localStorage.getItem('token') }
-})
+import { getSocket } from '@/boot/socketClient'
+const socket = getSocket()
 const calculateDistance = utility.calculateDistance
 const getLikeIcon = utility.getLikeIcon
 const getFullPath = utility.getFullPath
@@ -505,7 +502,7 @@ const matchFunction = async () => {
           text: `You just removed ${user.value.first_name} ${user.value.last_name} from your friend list`
         }
       }
-      socket.emit('match', body)
+      socket && socket.emit('match', body)
       // Refresh local history status to update icon/chat
       await getHistory()
     }
@@ -543,7 +540,7 @@ const block = async () => {
       id_from: store.getters.user.id,
       id_to: route.params.id
     }
-    socket.emit('block', data)
+    socket && socket.emit('block', data)
     // Wait for AlertView to close before redirect
     setTimeout(() => {
       alert.value.state = false
@@ -619,7 +616,7 @@ const fetchUser = async (id) => {
           id_to: id,
           type: 'visit'
         }
-        socket.emit('visit', data)
+        socket && socket.emit('visit', data)
         loading.value = false
       } catch (err) {
         console.error(err)
