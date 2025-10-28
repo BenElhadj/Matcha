@@ -264,10 +264,9 @@ const updateOneNotif = async (id_from, id_to) => {
     const url = `${import.meta.env.VITE_APP_API_URL}/api/notif/updateOneNotif`;
     const headers = { 'x-auth-token': token };
     const response = await axios.put(url, { id_from, id_to }, { headers });
-    if (response.status === 200) {
-      console.log('Notification marked as seen successfully.');
-      return true;
-    } else {
+      if (response.status === 200) {
+        return true;
+      } else {
       console.error('Failed to mark the notification as seen.');
       return false;
     }
@@ -406,13 +405,7 @@ export default {
       const headers = { 'x-auth-token': token }
       const result = await axios.get(url, { headers })
       const payload = result && result.data ? result.data : null
-      try {
-        const keys = payload && typeof payload === 'object' ? Object.keys(payload) : []
-        console.log('[utility.syncNotif] GET', url, 'status:', result?.status, 'payloadKeys:', keys)
-        if (payload && payload.status === 'error') {
-          console.warn('[utility.syncNotif] backend error:', payload.message)
-        }
-      } catch (_) {}
+        // remove verbose debug logs in production
       // Support both old and new response shapes
       if (!payload) return []
       // Old backends sometimes returned a message key 'msg'
@@ -441,9 +434,6 @@ export default {
       const url = qp.toString() ? `${base}?${qp.toString()}` : base
       const headers = { 'x-auth-token': token }
       const res = await axios.get(url, { headers })
-      try {
-        console.log('[utility.notifDebug] data:', res?.data)
-      } catch (_) {}
       return res.data
     } catch (e) {
       console.error('err notifDebug in frontend/utility.js ===> ', e)
@@ -616,7 +606,7 @@ export default {
     return state[type].filter(cur => !isBlocked(state, cur[getId(type)]))
   },
   showAlert (color, text) {
-    console.log('showAlert color, text => ', color, text)
+    // keep console clean in production
     return {
       state: true,
       color: color,

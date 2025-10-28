@@ -88,15 +88,6 @@ const entryImg = (img) =>
 const loadMore = async () => {
   page.value += 1
   const items = await store.dispatch('getNotifPage', { limit: limit.value, page: page.value })
-  try {
-    console.log(
-      '[NotificationsView] loadMore page, limit, fetched:',
-      page.value,
-      limit.value,
-      Array.isArray(items) ? items.length : items,
-      items
-    )
-  } catch (_) {}
   if (!Array.isArray(items) || items.length < limit.value) hasMore.value = false
 }
 
@@ -145,26 +136,8 @@ watch(
 onMounted(async () => {
   // Récupère la page 1 au montage puis marque tout comme lu
   const items = await store.dispatch('getNotifPage', { limit: limit.value, page: page.value })
-  try {
-    console.log(
-      '[NotificationsView] initial fetch page, limit, fetched:',
-      page.value,
-      limit.value,
-      Array.isArray(items) ? items.length : items,
-      items
-    )
-  } catch (_) {}
   if (!Array.isArray(items) || items.length < limit.value) hasMore.value = false
   if (currentUser.value?.id) store.dispatch('seenNotif', { id: currentUser.value.id })
-  // Diagnostic: tente un appel de debug pour afficher l'utilisateur et les compteurs côté serveur
-  try {
-    const dbg = await utility.notifDebug?.()
-    if (dbg && dbg.data) {
-      console.log('[NotificationsView] debug user/meta:', dbg.data)
-    }
-  } catch (e) {
-    // noop
-  }
 })
 
 const openNotification = async (entry) => {
