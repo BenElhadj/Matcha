@@ -1,5 +1,6 @@
 const chatModel = require('../models/chatModel')
 const notifModel = require('../models/notificationsModel')
+const matchModel = require('../models/matchingModel')
 const validator = require('../utility/validator')
 // Get  conveersation (all )
 
@@ -7,6 +8,24 @@ const getConAll = async (req, res) => {
 	if (!req.user.id)
 		return res.json({ status: 'error', type: 'chat', message: 'Not logged in', data: null })
 	try {
+		// Ensure conversations exist for mutual matches (legacy behavior)
+		try {
+			const following = await matchModel.getFollowing(req.user.id)
+			const followers = await matchModel.getFollowers(req.user.id)
+			const followSet = new Set(following.map(f => String(f.matched_id)))
+			const mutualIds = followers
+				.map(f => f.matcher_id)
+				.filter(id => followSet.has(String(id)))
+			for (const otherId of mutualIds) {
+				const conv = await chatModel.getConv(req.user.id, otherId)
+				if (!conv.length) {
+					await chatModel.insertConv(req.user.id, otherId)
+				}
+			}
+		} catch (e) {
+			// Non-blocking: log and continue
+			console.error('getConAll ensure mutual conversations error:', e?.message || e)
+		}
 		let result = await chatModel.getConvAll(req.user.id)
 		result = result.filter((cur, i) => {
 			for (let j = 0; j < result.length; j++) {
