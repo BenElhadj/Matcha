@@ -10,7 +10,6 @@ export const user = {
     visitor: [],
     visited: [],
     notif: [],
-    localSeenNotifIds: [],
     tags: [],
     followers: [],
     following: [],
@@ -24,30 +23,6 @@ export const user = {
         state.user = {}
       }
       state.user.email = email
-    },
-    // Marquer un ensemble précis d'IDs comme lus localement (sans toucher le backend)
-    seenNotifIds: (state, ids = []) => {
-      if (!Array.isArray(state.notif) || !Array.isArray(ids) || !ids.length) return
-      const set = new Set(ids.map((x) => String(x)))
-      state.notif = state.notif.map((n) => {
-        if (n && set.has(String(n.id))) return { ...n, is_read: 1 }
-        return n
-      })
-    },
-    // Mémoriser les IDs marqués localement pour les réappliquer après un rafraîchissement
-    markNotifIdsLocally: (state, ids = []) => {
-      if (!Array.isArray(ids) || !ids.length) return
-      if (!Array.isArray(state.localSeenNotifIds)) state.localSeenNotifIds = []
-      const set = new Set([...(state.localSeenNotifIds || []).map(String)])
-      for (const id of ids) set.add(String(id))
-      state.localSeenNotifIds = Array.from(set)
-    },
-    // Réappliquer l'overlay local (utile après un fetch qui remplace state.notif)
-    applyLocalSeen: (state) => {
-      const ids = Array.isArray(state.localSeenNotifIds) ? state.localSeenNotifIds : []
-      if (!ids.length || !Array.isArray(state.notif)) return
-      const set = new Set(ids.map(String))
-      state.notif = state.notif.map((n) => (n && set.has(String(n.id)) ? { ...n, is_read: 1 } : n))
     },
     updateTags: (state, tags) => (state.user.tags = tags.map(cur => cur.text.toLowerCase()).join(',')),
 
@@ -151,7 +126,17 @@ export const user = {
       } else {
         console.error('err syncBlacklist in frontend/user.js ===> ', err)
       }
-    }
+    },
+    markNotifsSeenByIds: (state, ids) => {
+      if (!Array.isArray(ids) || !ids.length) return
+      const idSet = new Set(ids.map(String))
+      state.notif = state.notif.map(cur => {
+        if (cur && cur.type !== 'chat' && cur.id && idSet.has(String(cur.id))) {
+          return { ...cur, is_read: 1 }
+        }
+        return cur
+      })
+    },
   },
   actions: {
     fetchUserImages: async ({ commit, state }) => {
@@ -364,6 +349,22 @@ export const user = {
         commit('seenNotifFrom', id_from)
       } catch (err) {
         console.error('Error in seenNotifFrom action:', err)
+      }
+    },
+    // Marquer comme lus des notifications par identifiants précis
+    seenNotifByIds: async ({ commit, state }, ids) => {
+      try {
+        if (!Array.isArray(ids) || !ids.length) return
+        const token = state.user.token || localStorage.getItem('token')
+        const url = `${import.meta.env.VITE_APP_API_URL}/api/notif/updateByIds`
+        const headers = { 'x-auth-token': token }
+        const body = { ids }
+        const res = await axios.put(url, body, { headers })
+        if (res?.data?.status === 'success') {
+          commit('markNotifsSeenByIds', ids)
+        }
+      } catch (err) {
+        console.error('Error in seenNotifByIds action:', err)
       }
     },
     delImg: ({ commit }, id) => {

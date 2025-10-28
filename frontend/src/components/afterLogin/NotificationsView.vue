@@ -54,12 +54,13 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useStore } from 'vuex'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 import utility from '@/utility.js'
 import moment from 'moment'
+import { getSocket } from '@/boot/socketClient'
 
 const store = useStore()
 const router = useRouter()
@@ -138,6 +139,35 @@ onMounted(async () => {
   const items = await store.dispatch('getNotifPage', { limit: limit.value, page: page.value })
   if (!Array.isArray(items) || items.length < limit.value) hasMore.value = false
   if (currentUser.value?.id) store.dispatch('seenNotif', { id: currentUser.value.id })
+  // Si la socket est active, toute nouvelle notif pendant que la page est ouverte sera aussitôt marquée lue
+  try {
+    const s = getSocket && getSocket()
+    if (s) {
+      s.on('notif:new', async () => {
+        await store.dispatch('getNotifPage', { limit: limit.value, page: 1 })
+        if (currentUser.value?.id) await store.dispatch('seenNotif', { id: currentUser.value.id })
+      })
+    }
+  } catch (_) {}
+})
+
+// Fallback: si le push temps réel ne passe pas, on rafraîchit périodiquement
+let refreshTimer = null
+onMounted(() => {
+  refreshTimer = setInterval(() => {
+    store.dispatch('getNotifPage', { limit: limit.value, page: 1 }).then(() => {
+      if (currentUser.value?.id) store.dispatch('seenNotif', { id: currentUser.value.id })
+    })
+  }, 4000)
+})
+
+onUnmounted(() => {
+  if (refreshTimer) clearInterval(refreshTimer)
+  refreshTimer = null
+  try {
+    const s = getSocket && getSocket()
+    if (s && s.off) s.off('notif:new')
+  } catch (_) {}
 })
 
 const openNotification = async (entry) => {
