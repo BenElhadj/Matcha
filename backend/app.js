@@ -240,17 +240,12 @@ const userRoom = id => `user:${String(id)}`
 io.on('connection', socket => {
   console.log('✅ New socket connection');
 
-  // Chat message -> transmettre au destinataire et persister
+  // Chat message -> transmettre au destinataire (la persistance est gérée par l'API /api/chat/send)
   socket.on('chat', async (data) => {
     try {
       io.to(userRoom(data.id_to)).emit('chat', data)
-      const { convo_id, id_from, id_to, message } = data;
-      await pool.query(
-        'INSERT INTO chat (convo_id, id_from, id_to, message) VALUES ($1, $2, $3, $4)',
-        [convo_id, id_from, id_to, message]
-      );
     } catch (err) {
-      console.error('app.js chat error ===> ', err);
+      console.error('app.js chat emit error ===> ', err);
     }
   });
 
