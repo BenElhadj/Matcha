@@ -34,10 +34,11 @@ const getAllNotif = async (req, res) => {
 
 			const mode = (req.query.mode || '').toString().toLowerCase()
 			const useAll = mode === 'all'
+			const includeBlocked = String(req.query.includeBlocked || '').toLowerCase() === '1' || String(req.query.includeBlocked || '').toLowerCase() === 'true'
 		// Fetch items
 		let result = useAll
-				? await notifModel.getNotifAll(req.user.id, limit, offset)
-				: await notifModel.getNotif(req.user.id, limit, offset)
+				? await notifModel.getNotifAll(req.user.id, limit, offset, includeBlocked)
+				: await notifModel.getNotif(req.user.id, limit, offset, includeBlocked)
 
 		// Lightweight diagnostics to help understand empty sets in prod
 		let rawCount = 0, filteredCount = 0
@@ -48,7 +49,7 @@ const getAllNotif = async (req, res) => {
 			// non-fatal
 		}
 
-		console.log('[notif:getAllNotif] user:', req.user.id, 'mode:', useAll ? 'all' : 'latest', 'page:', page, 'limit:', limit,
+		console.log('[notif:getAllNotif] user:', req.user.id, 'mode:', useAll ? 'all' : 'latest', 'includeBlocked:', includeBlocked, 'page:', page, 'limit:', limit,
 			'rows:', Array.isArray(result) ? result.length : null,
 			'rawCount:', rawCount, 'filteredCount:', filteredCount)
 
@@ -70,6 +71,7 @@ const getAllNotif = async (req, res) => {
 			page,
 			limit,
 			mode: useAll ? 'all' : 'latest-per-sender',
+			includeBlocked,
 			meta: { total: rawCount, totalAfterFilter: filteredCount }
 		} })
 	} catch (err) {
