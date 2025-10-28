@@ -1,61 +1,127 @@
 <template>
   <q-page>
     <q-page-container>
-      <h1  class="q-pb-md" style="margin-top: -10px; text-align: center;">Settings</h1>
-      <h3 style="margin-top: -70px; margin-bottom:70px; text-align: center;">{{user.username}}</h3>
-      
-      <div class="q-pa-md row flex flex-center justify-between" style="margin: 7%;">
+      <h1 class="q-pb-md" style="margin-top: -10px; text-align: center">Settings</h1>
+      <h3 style="margin-top: -70px; margin-bottom: 70px; text-align: center">
+        {{ user.username }}
+      </h3>
+
+      <div class="q-pa-md row flex flex-center justify-between" style="margin: 7%">
         <div class="col-xs-12 col-sm-6 q-pa-md">
-          <div class="row items-center" style="display: flex; flex-direction: column; align-content: flex-start; align-items: center;">
-            <img style="width: 130px; margin-left:7px" class="col-auto q-ml-md" src="@/assets/Settings/resetEmail.png" @click="emailDialog = true"/>
-            <br>
-            <q-input v-model="user.email" readonly label="Email"/>
+          <div
+            class="row items-center"
+            style="
+              display: flex;
+              flex-direction: column;
+              align-content: flex-start;
+              align-items: center;
+            "
+          >
+            <img
+              style="width: 130px; margin-left: 7px"
+              class="col-auto q-ml-md"
+              src="@/assets/Settings/resetEmail.png"
+              @click="emailDialog = true"
+            />
+            <br />
+            <q-input v-model="user.email" readonly label="Email" />
           </div>
         </div>
         <div class="q-flex column items-center justify-center">
           <div class="align-center">
-            <img style="width: 130px; margin-left:7px" class="col-auto q-ml-md" src="@/assets/Settings/resetPasswd.png" @click="passDialog = true"/>
-            <br>
-            <q-input v-model="user.passe" readonly value="***********" label="Password" type="password"/>
+            <img
+              style="width: 130px; margin-left: 7px"
+              class="col-auto q-ml-md"
+              src="@/assets/Settings/resetPasswd.png"
+              @click="passDialog = true"
+            />
+            <br />
+            <q-input
+              v-model="user.passe"
+              readonly
+              value="***********"
+              label="Password"
+              type="password"
+            />
           </div>
         </div>
       </div>
 
-      <div class="q-pa-md row flex flex-center justify-between" style="margin: 7%;">
+      <div class="q-pa-md row flex flex-center justify-between" style="margin: 7%">
         <div class="q-flex column items-center justify-center">
           <div class="align-center">
-            <img style="width: 150px; margin-left:7px" src="@/assets/Settings/geolocalisation.png" @click="openLoc" alt="Location Icon">
+            <img
+              style="width: 150px; margin-left: 7px"
+              src="@/assets/Settings/geolocalisation.png"
+              @click="openLoc"
+              alt="Location Icon"
+            />
           </div>
           <span>Click here to update your location</span>
         </div>
         <div class="q-flex column items-center justify-center">
           <div class="align-center">
-            <img style="width: 150px;" src="@/assets/Settings/blocked.png" @click="blacklist.length === 0 ? noBlacklist() : blackListDialog = true"/>
+            <img
+              style="width: 150px"
+              src="@/assets/Settings/blocked.png"
+              @click="blacklist.length === 0 ? noBlacklist() : (blackListDialog = true)"
+            />
           </div>
           <span>Click here to view blocked users</span>
         </div>
       </div>
 
-      <q-dialog v-model="emailDialog" max-width="500" persistent transition-show="rotate" transition-hide="rotate">
+      <q-dialog
+        v-model="emailDialog"
+        max-width="500"
+        persistent
+        transition-show="rotate"
+        transition-hide="rotate"
+      >
         <q-card class="q-pa-md q-ma-md">
-          <h5 class="display-1 text-center text-md-left pt-3 pb-3 mb-4 hidden-sm-and-down">Change your email</h5>
+          <h5 class="display-1 text-center text-md-left pt-3 pb-3 mb-4 hidden-sm-and-down">
+            Change your email
+          </h5>
           <div class="my-4">
-            <q-input v-model="oldEmail" color="primary" label="Current email" :rules="rules.email" required >
+            <q-input
+              v-model="oldEmail"
+              color="primary"
+              label="Current email"
+              :rules="rules.email"
+              required
+            >
               <template #append>
                 <q-icon class="cursor-pointer"></q-icon>
               </template>
             </q-input>
-            <q-input v-model="newEmail" color="primary" label="New email" :rules="rules.email" required>
+            <q-input
+              v-model="newEmail"
+              color="primary"
+              label="New email"
+              :rules="rules.email"
+              required
+            >
               <template #append>
                 <q-icon class="cursor-pointer"></q-icon>
               </template>
             </q-input>
-            <q-input v-model="pwd" color="primary" class="mb-3" :rules="rules.passRules" label="Current password" hint="Start with your old password" autocomplete="off" filled :type="showPwd ? 'text' : 'password'">
+            <q-input
+              v-model="pwd"
+              color="primary"
+              class="mb-3"
+              :rules="rules.passRules"
+              label="Current password"
+              hint="Start with your old password"
+              autocomplete="off"
+              filled
+              :type="showPwd ? 'text' : 'password'"
+            >
               <template #append>
                 <q-icon
-                  :name="showPwd ? 'mdi-eye' : 'mdi-eye-off'" 
-                  class="cursor-pointer" 
-                  @click="showPwd = !showPwd"></q-icon>
+                  :name="showPwd ? 'mdi-eye' : 'mdi-eye-off'"
+                  class="cursor-pointer"
+                  @click="showPwd = !showPwd"
+                ></q-icon>
               </template>
             </q-input>
           </div>
@@ -66,19 +132,45 @@
         </q-card>
       </q-dialog>
 
-      <q-dialog v-model="passDialog" max-width="500px" persistent transition-show="rotate" transition-hide="rotate">
+      <q-dialog
+        v-model="passDialog"
+        max-width="500px"
+        persistent
+        transition-show="rotate"
+        transition-hide="rotate"
+      >
         <q-card class="q-pa-md q-ma-md">
-          <h5 class="display-1 text-center text-md-left pt-3 pb-3 mb-4 hidden-sm-and-down">Change your password</h5>
+          <h5 class="display-1 text-center text-md-left pt-3 pb-3 mb-4 hidden-sm-and-down">
+            Change your password
+          </h5>
           <div class="my-4">
-            <q-input v-model="oldPwd" color="primary" :rules="rules.passRules" label="Current password" hint="Start with your old password" autocomplete="off" filled :type="showPwd ? 'text' : 'password'">
+            <q-input
+              v-model="oldPwd"
+              color="primary"
+              :rules="rules.passRules"
+              label="Current password"
+              hint="Start with your old password"
+              autocomplete="off"
+              filled
+              :type="showPwd ? 'text' : 'password'"
+            >
               <template #append>
                 <q-icon
-                  :name="showPwd ? 'mdi-eye' : 'mdi-eye-off'" 
-                  class="cursor-pointer" 
-                  @click="showPwd = !showPwd"></q-icon>
+                  :name="showPwd ? 'mdi-eye' : 'mdi-eye-off'"
+                  class="cursor-pointer"
+                  @click="showPwd = !showPwd"
+                ></q-icon>
               </template>
             </q-input>
-            <q-input v-model="newPwd" color="primary" :rules="rules.newPwd" label="New password" hint="Choose your new password" filled :type="showNewPwd ? 'text' : 'password'">
+            <q-input
+              v-model="newPwd"
+              color="primary"
+              :rules="rules.newPwd"
+              label="New password"
+              hint="Choose your new password"
+              filled
+              :type="showNewPwd ? 'text' : 'password'"
+            >
               <template v-slot:append>
                 <q-icon
                   :name="showNewPwd ? 'mdi-eye' : 'mdi-eye-off'"
@@ -87,7 +179,17 @@
                 ></q-icon>
               </template>
             </q-input>
-            <q-input v-model="confNewPwd" color="primary" :rules="rules.confNewPwd" label="Confirm Password" hint="Confirm your password" filled :type="showConfPwd ? 'text' : 'password'" @keyup.enter="savePass" :error-messages="passwordMatch">
+            <q-input
+              v-model="confNewPwd"
+              color="primary"
+              :rules="rules.confNewPwd"
+              label="Confirm Password"
+              hint="Confirm your password"
+              filled
+              :type="showConfPwd ? 'text' : 'password'"
+              @keyup.enter="savePass"
+              :error-messages="passwordMatch"
+            >
               <template v-slot:append>
                 <q-icon
                   :name="showConfPwd ? 'mdi-eye' : 'mdi-eye-off'"
@@ -104,12 +206,18 @@
         </q-card>
       </q-dialog>
 
-      <q-dialog v-model="locDialog" persistent maximized-toggle transition-show="rotate" transition-hide="rotate">
-        <q-card style="position:initial; display:block;">
+      <q-dialog
+        v-model="locDialog"
+        persistent
+        maximized-toggle
+        transition-show="rotate"
+        transition-hide="rotate"
+      >
+        <q-card style="position: initial; display: block">
           <q-header>
             <q-bar>
-              <span>{{ 'Longitude : ' +  longitude  }}</span>
-              <span>{{ 'Latitude : ' +  latitude  }}</span>
+              <span>{{ 'Longitude : ' + longitude }}</span>
+              <span>{{ 'Latitude : ' + latitude }}</span>
               <q-space></q-space>
               <q-btn dense icon="mdi-google-maps" color="info" @click="changeLoc">
                 <q-tooltip class="bg-white text-primary">Update your location</q-tooltip>
@@ -123,7 +231,7 @@
           </q-header>
           <q-page-container>
             <MapLocationSelector
-              style="margin: 700px 0px 0px important;"
+              style="margin: 700px 0px 0px important"
               :latitude="latitude"
               :longitude="longitude"
               api-key="AIzaSyAHVSMrIeymA40C-a9ap0zCQzrHXkycXX8"
@@ -134,25 +242,53 @@
         </q-card>
       </q-dialog>
 
-      <q-dialog v-model="blackListDialog" class="q-pa-md" transition-show="rotate" transition-hide="rotate">
-        <div v-if="blacklist.length > 0" class="q-pa-md" style="background-color: white;">
-          <q-item v-for="banned in blacklist" :key="banned.id"   class="blacklist_item mx-2" style="width: 340px">
-            <q-expansion-item  class="bg-grey-3" dropdown-icon="mdi-chevron-down !important" icon='mdi-chevron-double-right' >
+      <q-dialog
+        v-model="blackListDialog"
+        class="q-pa-md"
+        transition-show="rotate"
+        transition-hide="rotate"
+      >
+        <div v-if="blacklist.length > 0" class="q-pa-md" style="background-color: white">
+          <q-item
+            v-for="banned in blacklist"
+            :key="banned.id"
+            class="blacklist_item mx-2"
+            style="width: 340px"
+          >
+            <q-expansion-item
+              class="bg-grey-3"
+              dropdown-icon="mdi-chevron-down !important"
+              icon="mdi-chevron-double-right"
+            >
               <template v-slot:header>
-                <q-item-section avatar >
+                <q-item-section avatar>
                   <q-avatar>
-                    <img :src="getFullPath(banned.avatar)">
+                    <img :src="getFullPath(banned.avatar)" />
                   </q-avatar>
                 </q-item-section>
                 <q-item-section>
-                  {{banned.username}}
+                  {{ banned.username }}
                 </q-item-section>
 
                 <div class="note">
-                  <p class="caption text-capitalize rating_value">{{ banned.rating ? banned.rating.toFixed(1) : '0.0' }}</p>
+                  <p class="caption text-capitalize rating_value">
+                    {{ banned.rating ? banned.rating.toFixed(1) : '0.0' }}
+                  </p>
                   <q-rating
-                    :color="user.gender === 'male' ? 'blue-3' : user.gender === 'female' ? 'pink-2' : 'blue-5'"
-                    :color-selected="user.gender === 'male' ? 'blue-9' : user.gender === 'female' ? 'pink-8' : 'pink-4'"
+                    :color="
+                      user.gender === 'male'
+                        ? 'blue-3'
+                        : user.gender === 'female'
+                        ? 'pink-2'
+                        : 'blue-5'
+                    "
+                    :color-selected="
+                      user.gender === 'male'
+                        ? 'blue-9'
+                        : user.gender === 'female'
+                        ? 'pink-8'
+                        : 'pink-4'
+                    "
                     :modelValue="banned.rating && !isNaN(banned.rating) ? banned.rating : 0"
                     icon="mdi-heart-outline"
                     icon-selected="mdi-heart"
@@ -162,22 +298,24 @@
                     dense
                     size="1.3em"
                     half-increments
-                    class="rating"/>
+                    class="rating"
+                  />
                 </div>
-
               </template>
               <q-card>
                 <q-card-section>
                   <span>
-                    {{ banned.first_name }} {{ banned.last_name }} is {{ new Date().getFullYear() - new Date(banned.birthdate).getFullYear() }} years old.
+                    {{ banned.first_name }} {{ banned.last_name }} is
+                    {{ new Date().getFullYear() - new Date(banned.birthdate).getFullYear() }} years
+                    old.
                   </span>
-                  <br>
+                  <br />
                   <span>
-                    You blocked him on {{moment(banned.blocked_at).format('D MMMM, YYYY')}}
+                    You blocked him on {{ moment(banned.blocked_at).format('D MMMM, YYYY') }}
                   </span>
                 </q-card-section>
                 <q-card-actions align="right">
-                  <q-btn color="green" flat  @click="unBlock(banned)">unblocked</q-btn>
+                  <q-btn color="green" flat @click="unBlock(banned)">unblocked</q-btn>
                 </q-card-actions>
               </q-card>
             </q-expansion-item>
@@ -185,7 +323,7 @@
         </div>
       </q-dialog>
 
-      <AlertView :alert="alert"/>
+      <AlertView :alert="alert" />
     </q-page-container>
   </q-page>
 </template>
@@ -215,11 +353,11 @@ const oldEmail = ref('')
 const newEmail = ref('')
 const blacklist = ref(null)
 const blackListDialog = ref(false)
-const latitude = computed(() => location.value ? Number(location.value.lat) : 0)
-const longitude = computed(() => location.value ? Number(location.value.lng) : 0)
+const latitude = computed(() => (location.value ? Number(location.value.lat) : 0))
+const longitude = computed(() => (location.value ? Number(location.value.lng) : 0))
 const location = computed(() => store.getters.location)
 const passwordMatch = () => {
-  return confNewPwd.value === newPwd.value || 'Passwords do not match!';
+  return confNewPwd.value === newPwd.value || 'Passwords do not match!'
 }
 
 const getFullPath = utility.getFullPath
@@ -243,7 +381,7 @@ const fetchBlacklist = async () => {
   try {
     blacklist.value = await utility.sync('users/getblocked')
   } catch (error) {
-    console.error('Une erreur s\'est produite :', error)
+    console.error("Une erreur s'est produite :", error)
   }
 }
 const noBlacklist = async () => {
@@ -251,26 +389,23 @@ const noBlacklist = async () => {
 }
 
 const rules = {
-  email: [
-    v => !!v || 'Email field is required',
-    v => /.+@.+/.test(v) || 'Invalid email'
-  ],
-  passRules: [
-    v => !!v || 'Password field is required',
-  ],
+  email: [(v) => !!v || 'Email field is required', (v) => /.+@.+/.test(v) || 'Invalid email'],
+  passRules: [(v) => !!v || 'Password field is required'],
   newPwd: [
-    v => !!v || 'Password field is required',
-    v => /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/.test(v) || 'The password must contain at least one uppercase letter, one lowercase letter, one number and one special character',
-    v => v.length >= 8 || 'Password must contain at least 8 characters'
+    (v) => !!v || 'Password field is required',
+    (v) =>
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/.test(v) ||
+      'The password must contain at least one uppercase letter, one lowercase letter, one number and one special character',
+    (v) => v.length >= 8 || 'Password must contain at least 8 characters'
   ],
   confNewPwd: [
-    v => !!v || 'Confirm Password field is required',
-    v => v === newPwd.value || 'Passwords do not match',
+    (v) => !!v || 'Confirm Password field is required',
+    (v) => v === newPwd.value || 'Passwords do not match'
   ]
 }
 
 const validPwd = computed(() => {
-  return rules.newPwd.every(rule => rule(newPwd.value) === true)
+  return rules.newPwd.every((rule) => rule(newPwd.value) === true)
 })
 
 const savePass = async () => {
@@ -310,7 +445,7 @@ const closePass = () => {
 }
 
 const validEmail = computed(() => {
-  return rules.email.every(rule => rule(newEmail.value) === true)
+  return rules.email.every((rule) => rule(newEmail.value) === true)
 })
 
 const saveEmail = async () => {
@@ -336,7 +471,7 @@ const saveEmail = async () => {
       console.error('err saveEmail in frontend/ProfileSettings.vue ===> ', err)
     }
   } else {
-    alert.value = { state: true, color: 'red', text: 'Please fill all fields!' };
+    alert.value = { state: true, color: 'red', text: 'Please fill all fields!' }
   }
 }
 
@@ -348,7 +483,7 @@ const closeEmail = () => {
 }
 
 const googleLoaded = () => {
-  return (typeof window.google === 'object' && typeof window.google.maps === 'object')
+  return typeof window.google === 'object' && typeof window.google.maps === 'object'
 }
 
 const flag = ref(googleLoaded())
@@ -370,7 +505,11 @@ const changeLoc = async () => {
     store.commit('locate', location)
     alert.value = { state: true, color: 'green', text: 'Your location has been updated' }
   } else {
-    alert.value = { state: true, color: 'red', text: res.data.msg ? res.data.msg : 'Oops... something went wrong!' }
+    alert.value = {
+      state: true,
+      color: 'red',
+      text: res.data.msg ? res.data.msg : 'Oops... something went wrong!'
+    }
   }
 }
 
@@ -391,7 +530,6 @@ const unBlock = async (banned) => {
 watch(blackListDialog, (open) => {
   if (open) fetchBlacklist()
 })
-
 </script>
 
 <style>

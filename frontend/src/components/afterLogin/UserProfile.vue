@@ -354,7 +354,7 @@ const getHistory = async () => {
     const token = user.value.token || localStorage.getItem('token')
     const url = `${import.meta.env.VITE_APP_API_URL}/api/browse/allhistory`
     const headers = { 'x-auth-token': token }
-    const userId = route.params.id
+    const userId = String(route.params.id)
     const typesToFilter = [
       'he_like',
       'you_like',
@@ -367,15 +367,15 @@ const getHistory = async () => {
 
     if (Array.isArray(result.data)) {
       const filteredByType = result.data.filter((item) => typesToFilter.includes(item.type))
-      const filteredByHisId = filteredByType.filter((item) => userId.includes(item.his_id))
-      filteredByHisId.sort((a, b) => new Date(a.match_date) - new Date(b.match_date))
-
-      likeIcon.value = getLikeIcon(filteredByHisId[0] ? filteredByHisId[0].type : 'default')
-      userCanChat.value = filteredByHisId[0]
-        ? filteredByHisId[0].type === 'he_like_back' || filteredByHisId[0].type === 'you_like_back'
-        : false
-      likedAlert.value = filteredByHisId[0] ? filteredByHisId[0].type.toString() : 'default'
-      return filteredByHisId[0] ? filteredByHisId[0].type : 'default'
+      const filteredByHisId = filteredByType.filter((item) => String(item.his_id) === userId)
+      // Latest event first
+      filteredByHisId.sort((a, b) => new Date(b.match_date) - new Date(a.match_date))
+      const last = filteredByHisId[0]
+      const t = last ? last.type : 'default'
+      likeIcon.value = getLikeIcon(t)
+      userCanChat.value = t === 'he_like_back' || t === 'you_like_back'
+      likedAlert.value = t
+      return t
     } else {
       if (result.data && result.data.msg) {
         alert.value = { state: true, color: 'red', text: result.data.msg }
@@ -455,60 +455,61 @@ const getProfileImage = () => {
   return getImageSrc(image, defaultImage)
 }
 
+function actionForType(type) {
+  // Return liked boolean to send to backend
+  switch (type) {
+    case 'default':
+    case 'he_unlike':
+    case 'you_unlike':
+    case 'he_like': // like back to confirm
+      return true
+    case 'you_like': // cancel your like
+    case 'he_like_back': // unmatch
+    case 'you_like_back': // unmatch
+      return false
+    default:
+      return true
+  }
+}
+
 const matchFunction = async () => {
   const url = `${import.meta.env.VITE_APP_API_URL}/api/match`
-  const data = {
-    id: route.params.id,
-    liked: liked
-  }
-  const token = store.state.user.token || localStorage.getItem('token')
+  const token = store.state.user?.token || localStorage.getItem('token')
   const headers = { 'x-auth-token': token }
-
   try {
-    liked = !liked
-    const res = await axios.post(url, data, { headers })
-    if (!res.data.msg) {
-      switch (likedAlert.value) {
-        case 'default':
-        case 'he_unlike':
-        case 'you_unlike':
-          alert.value = {
-            state: true,
-            color: 'green',
-            text: `Your friendship request has been sent to ${user.value.first_name} ${user.value.last_name} successfully`
-          }
-          break
-        case 'he_like':
-          alert.value = {
-            state: true,
-            color: 'green',
-            text: `You just added ${user.value.first_name} ${user.value.last_name} to your friends list`
-          }
-          break
-        case 'he_like':
+    // Determine current relation type and appropriate action
+    const type = likedAlert.value || (await getHistory()) || 'default'
+    const likedBool = actionForType(type)
+    const body = { id: route.params.id, liked: likedBool }
+    const res = await axios.post(url, body, { headers })
+    if (!res.data?.msg) {
+      // Success: update UI hints based on intended action
+      if (likedBool) {
+        // Sent like or like_back
+        if (type === 'he_like') {
           alert.value = {
             state: true,
             color: 'green',
             text: `You have just accepted the friend request from ${user.value.first_name} ${user.value.last_name}`
           }
-          break
-        case 'you_like':
+        } else {
           alert.value = {
             state: true,
-            color: 'red',
-            text: `You have just canceled your friend request to ${user.value.first_name} ${user.value.last_name}`
+            color: 'green',
+            text: `Your friendship request has been sent to ${user.value.first_name} ${user.value.last_name} successfully`
           }
-          break
-        case 'he_like_back':
-        case 'you_like_back':
-          alert.value = {
-            state: true,
-            color: 'red',
-            text: `You just removed ${user.value.first_name} ${user.value.last_name} from your friend list`
-          }
-          break
+        }
+      } else {
+        // Unlike / unmatch
+        alert.value = {
+          state: true,
+          color: 'red',
+          text: `You just removed ${user.value.first_name} ${user.value.last_name} from your friend list`
+        }
       }
-      socket.emit('match', data)
+      socket.emit('match', body)
+      // Refresh local history status to update icon/chat
+      await getHistory()
     }
   } catch (error) {
     if (error.response && error.response.status === 404) {
@@ -524,7 +525,7 @@ const matchFunction = async () => {
         text: "Une erreur s'est produite : " + (error.message || 'Erreur inconnue')
       }
     }
-    console.error("Une erreur s'est produite :", error)
+    console.error('matchFunction error:', error)
   }
 }
 

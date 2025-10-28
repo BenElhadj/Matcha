@@ -391,15 +391,31 @@ export default {
       return [];
     }
   },
-  syncNotif: async () => {
+  syncNotif: async (params = {}) => {
     try {
       const token = localStorage.getItem('token')
-      const url = `${import.meta.env.VITE_APP_API_URL}/api/notif/all`
+      const base = `${import.meta.env.VITE_APP_API_URL}/api/notif/all`
+      const qp = new URLSearchParams()
+      // Accept optional params; keep legacy behaviour if none provided
+      const { limit, page, mode, includeBlocked } = params || {}
+      if (Number.isFinite(limit)) qp.set('limit', String(limit))
+      if (Number.isFinite(page)) qp.set('page', String(page))
+      if (typeof mode === 'string' && mode) qp.set('mode', mode)
+      if (includeBlocked !== undefined && includeBlocked !== null) qp.set('includeBlocked', String(includeBlocked))
+      const url = qp.toString() ? `${base}?${qp.toString()}` : base
       const headers = { 'x-auth-token': token }
       const result = await axios.get(url, { headers })
       const payload = result && result.data ? result.data : null
+      try {
+        const keys = payload && typeof payload === 'object' ? Object.keys(payload) : []
+        console.log('[utility.syncNotif] GET', url, 'status:', result?.status, 'payloadKeys:', keys)
+        if (payload && payload.status === 'error') {
+          console.warn('[utility.syncNotif] backend error:', payload.message)
+        }
+      } catch (_) {}
       // Support both old and new response shapes
       if (!payload) return []
+      // Old backends sometimes returned a message key 'msg'
       if (payload.msg) return []
       // New shape: { status, type, message, data: { items, page, limit } }
       if (payload.data && Array.isArray(payload.data.items)) return payload.data.items
@@ -411,6 +427,27 @@ export default {
     } catch (error) {
       console.error('err syncNotif in frontend/utility.js ===> ', error)
       return [];
+    }
+  },
+  // Lightweight debug helper to inspect auth + counts
+  notifDebug: async (params = {}) => {
+    try {
+      const token = localStorage.getItem('token')
+      const base = `${import.meta.env.VITE_APP_API_URL}/api/notif/debug`
+      const qp = new URLSearchParams()
+      const { mode, includeBlocked } = params || {}
+      if (typeof mode === 'string' && mode) qp.set('mode', mode)
+      if (includeBlocked !== undefined && includeBlocked !== null) qp.set('includeBlocked', String(includeBlocked))
+      const url = qp.toString() ? `${base}?${qp.toString()}` : base
+      const headers = { 'x-auth-token': token }
+      const res = await axios.get(url, { headers })
+      try {
+        console.log('[utility.notifDebug] data:', res?.data)
+      } catch (_) {}
+      return res.data
+    } catch (e) {
+      console.error('err notifDebug in frontend/utility.js ===> ', e)
+      return null
     }
   },
   calculateDistance: (from, to, mile) => {

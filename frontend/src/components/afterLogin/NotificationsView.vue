@@ -13,16 +13,14 @@
             </q-tooltip>
           </div>
           <div style="font-family: 'Elliane' !important" class="col-9">
-            <q-card class="notif_bubble">
+            <q-card class="notif_bubble" clickable @click="openNotification(entry)">
               <q-card-section>
                 <div class="row items-center">
                   <q-avatar>
                     <img :src="entryImg(entry.profile_image)" :alt="entry.username" />
                   </q-avatar>
                   <div class="q-ml-md">
-                    <router-link :to="`/user/${entry.id_from}`" class="timeline_link">
-                      <span class="text-h6 text-weight-bold">{{ entry.username }}</span>
-                    </router-link>
+                    <span class="text-h6 text-weight-bold timeline_link">{{ entry.username }}</span>
                     <q-icon small style="font-size: 16px !important" class="mr-2 q-ml-xl">
                       <span :class="getNotifIcon(entry.type)"></span>&nbsp;
                     </q-icon>
@@ -65,13 +63,18 @@ import moment from 'moment'
 
 const store = useStore()
 const router = useRouter()
+const page = ref(1)
 const limit = ref(15)
-const user = computed(() => store.state.user)
-const notif = computed(() => store.state.notif)
-const notChats = computed(() => notif.value.filter((cur) => cur.type !== 'chat'))
-const notifs = computed(() =>
-  [...notChats.value].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, limit.value)
-)
+const hasMore = ref(true)
+// Utiliser les getters pour récupérer le vrai user (fusion auth/user)
+const currentUser = computed(() => store.getters.user)
+// Récupérer la liste des notifications depuis les getters (root state)
+const notif = computed(() => store.getters.notif)
+// Afficher TOUTES les notifications (y compris 'chat'), triées décroissant par date
+const notifs = computed(() => {
+  const arr = Array.isArray(notif.value) ? notif.value : []
+  return [...arr].sort((a, b) => new Date(b.date) - new Date(a.date))
+})
 const { fromNow, formatTime, getNotifMsg, getNotifIcon } = utility
 const base = import.meta.env.BASE_URL || '/'
 const defaultProfileTxt = `${base}default/defaut_profile.txt`
@@ -82,36 +85,48 @@ const entryImg = (img) =>
     ? utility.getFullPath(img)
     : defaultProfileTxt
 
-const increaseLimit = () => {
-  if (limit.value + 11 < notChats.value.length) {
-    limit.value += 10
-  } else {
-    limit.value = notChats.value.length - 1
-  }
+const loadMore = async () => {
+  page.value += 1
+  const items = await store.dispatch('getNotifPage', { limit: limit.value, page: page.value })
+  try {
+    console.log(
+      '[NotificationsView] loadMore page, limit, fetched:',
+      page.value,
+      limit.value,
+      Array.isArray(items) ? items.length : items,
+      items
+    )
+  } catch (_) {}
+  if (!Array.isArray(items) || items.length < limit.value) hasMore.value = false
 }
 
-const moreToLoad = computed(() => {
-  return limit.value < notChats.value.length - 1
-})
+// Compatibilité avec l'ancien template qui utilisait `increaseLimit`
+// On délègue simplement à la nouvelle pagination côté serveur
+const increaseLimit = () => {
+  return loadMore()
+}
+
+// Quand on utilise DISTINCT ON côté backend, la pagination renvoie d'autres expéditeurs
+// On ne peut pas savoir la fin côté client sans total; on garde le bouton tant que la page renvoie des items
+const moreToLoad = computed(() => hasMore.value)
 
 const logout = async (userId) => {
   try {
-    const url = `https://matcha-backend-t6dr.onrender.com/api/auth/logout`
-    const res = await axios.post(url, { userId })
-    if (res.data.ok) {
-      store.dispatch('logout')
-    } else {
-      console.error('err logout in frontend/NotificationsView.vue 1 ===> ', res.data.message)
-    }
+    const token = localStorage.getItem('token')
+    const url = `${import.meta.env.VITE_APP_API_URL}/api/auth/logout`
+    const headers = { 'x-auth-token': token }
+    await axios.get(url, { headers })
   } catch (err) {
     console.error('err logout in frontend/NotificationsView.vue 2 ===> ', err)
+  } finally {
+    store.dispatch('logout')
   }
 }
 
 watch(
-  user,
+  currentUser,
   async (newUser) => {
-    const token = newUser.token || localStorage.getItem('token')
+    const token = newUser?.token || localStorage.getItem('token')
     if (token) {
       try {
         const url = `${import.meta.env.VITE_APP_API_URL}/api/auth/isloggedin`
@@ -122,14 +137,46 @@ watch(
         console.error('err watch user in frontend/NotificationsView.vue ===> ', err)
       }
     }
-    await logout(newUser.id)
+    if (newUser?.id) await logout(newUser.id)
   },
   { immediate: true }
 )
 
-onMounted(() => {
-  store.dispatch('seenNotif', { id: user.value.id })
+onMounted(async () => {
+  // Récupère la page 1 au montage puis marque tout comme lu
+  const items = await store.dispatch('getNotifPage', { limit: limit.value, page: page.value })
+  try {
+    console.log(
+      '[NotificationsView] initial fetch page, limit, fetched:',
+      page.value,
+      limit.value,
+      Array.isArray(items) ? items.length : items,
+      items
+    )
+  } catch (_) {}
+  if (!Array.isArray(items) || items.length < limit.value) hasMore.value = false
+  if (currentUser.value?.id) store.dispatch('seenNotif', { id: currentUser.value.id })
+  // Diagnostic: tente un appel de debug pour afficher l'utilisateur et les compteurs côté serveur
+  try {
+    const dbg = await utility.notifDebug?.()
+    if (dbg && dbg.data) {
+      console.log('[NotificationsView] debug user/meta:', dbg.data)
+    }
+  } catch (e) {
+    // noop
+  }
 })
+
+const openNotification = async (entry) => {
+  try {
+    const senderId = entry.id_from ?? entry.from
+    if (!senderId) return
+    await store.dispatch('seenNotifFrom', { id_from: senderId, id_to: currentUser.value?.id })
+    router.push(`/user/${senderId}`)
+  } catch (e) {
+    console.error('openNotification error:', e)
+  }
+}
 </script>
 
 <style scoped>

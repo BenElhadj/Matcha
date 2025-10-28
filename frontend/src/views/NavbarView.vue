@@ -67,7 +67,7 @@
                       <span :class="getNotifIcon(item.type)"></span>&nbsp;
                     </q-icon>
                     &nbsp;<span class="ml-auto chat_time" style="font-size: 16px !important">{{
-                      formatNotifDate(item.last_update)
+                      formatNotifDate(item.date)
                     }}</span>
                   </q-item-label>
                 </q-item-section>
@@ -252,13 +252,16 @@ let convos = ref([])
 convos.value = store.getters.convos
 let notifs = ref([])
 notifs.value = Array.isArray(notif.value)
-  ? notif.value.sort((a, b) => {
-      if (a.is_read !== b.is_read) {
-        return a.is_read - b.is_read
-      }
-      return new Date(b.date) - new Date(a.date)
-    })
-  : [].slice(0, 5)
+  ? notif.value
+      .filter((n) => n.type !== 'chat')
+      .sort((a, b) => {
+        if (a.is_read !== b.is_read) {
+          return a.is_read - b.is_read
+        }
+        return new Date(b.date) - new Date(a.date)
+      })
+      .slice(0, 5)
+  : []
 
 let menuConvos = ref([])
 let newMessage = ref([])
@@ -324,19 +327,16 @@ const syncConvo = async (convo) => {
   }
 }
 
-const logout = async (userId) => {
+const logout = async () => {
   try {
-    const url = `https://matcha-backend-t6dr.onrender.com/api/auth/logout`
-    const headers = { 'x-auth-token': user.value.token }
-    const res = await axios.get(url, { headers })
-    if (res.data && res.data.msg) {
-      // Affiche le message d'erreur réel du backend si présent
-      alert(res.data.msg)
-    }
+    const token = user.value?.token || localStorage.getItem('token')
+    const url = `${import.meta.env.VITE_APP_API_URL}/api/auth/logout`
+    const headers = { 'x-auth-token': token }
+    await axios.get(url, { headers })
   } catch (err) {
     console.error('err logout in frontend/NavbarView.view ===> ', err)
   } finally {
-    await store.dispatch('logout', user.value.id)
+    await store.dispatch('logout', user.value?.id)
     router.push('/login').catch((err) => {
       console.error('err logout router.push in frontend/NavbarView.view ===> ', err)
     })
@@ -392,6 +392,7 @@ const updateNotifAndMsg = async () => {
     notif.value = store.getters.notif
     notifs.value = Array.isArray(notif.value)
       ? notif.value
+          .filter((n) => n.type !== 'chat')
           .sort((a, b) => {
             if (a.is_read !== b.is_read) {
               return a.is_read - b.is_read
