@@ -214,7 +214,8 @@ app.get('/allTags', async (req, res) => {
 app.get('/', (req, res) => res.sendFile(path.resolve(__dirname, 'index.html')));
 
 // Configuration Socket.io (durcie et modernisée)
-const { connectedUsers } = require('./src/controllers/auth');
+// Maintenir une liste locale des utilisateurs connectés (Set de string IDs)
+const connectedUsers = new Set()
 const server = http.createServer(app)
 
 const io = socketIo(server, {
@@ -298,10 +299,10 @@ io.on('connection', socket => {
     try {
       socket.data.userId = String(id)
       socket.join(userRoom(id))
-      connectedUsers.add(String(id))
+  connectedUsers.add(String(id))
 
       await pool.query('UPDATE users SET status = NOW() WHERE id = $1', [id]);
-      io.emit('online', Array.from(connectedUsers))
+  io.emit('online', Array.from(connectedUsers))
     } catch (err) {
       console.error('app.js auth error ===> ', err)
     }
@@ -310,7 +311,7 @@ io.on('connection', socket => {
   socket.on('logout', async (id) => {
     try {
       await pool.query('UPDATE users SET status = NOW() WHERE id = $1', [id]);
-      connectedUsers.delete(String(id))
+  connectedUsers.delete(String(id))
       io.emit('online', Array.from(connectedUsers))
     } catch (err) {
       console.error('app.js logout error ===> ', err)
