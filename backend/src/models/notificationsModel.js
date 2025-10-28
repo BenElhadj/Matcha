@@ -33,7 +33,7 @@ const getNotif = async (id, limit = 50, offset = 0, includeBlocked = false) => {
             WHERE id_to = $1
             ORDER BY id_from, created_at DESC
         ) n
-        JOIN users u ON n.id_from = u.id
+        LEFT JOIN users u ON n.id_from = u.id
         LEFT JOIN images i ON n.id_from = i.user_id AND i.profile = TRUE
         ORDER BY n.date DESC
         LIMIT $2 OFFSET $3
@@ -45,9 +45,9 @@ const getNotif = async (id, limit = 50, offset = 0, includeBlocked = false) => {
             WHERE id_to = $1
             ORDER BY id_from, created_at DESC
         ) n
-        JOIN users u ON n.id_from = u.id
+        LEFT JOIN users u ON n.id_from = u.id
         LEFT JOIN images i ON n.id_from = i.user_id AND i.profile = TRUE
-        WHERE u.id NOT IN (
+        WHERE n.id_from NOT IN (
             SELECT blocker FROM blocked WHERE blocked = $1
             UNION
             SELECT blocked FROM blocked WHERE blocker = $1
@@ -61,30 +61,30 @@ const getNotif = async (id, limit = 50, offset = 0, includeBlocked = false) => {
 
 // Get ALL notifications for a user (no collapsing), with pagination.
 const getNotifAll = async (id, limit = 50, offset = 0, includeBlocked = false) => {
-                const query = includeBlocked ? `
-                SELECT n.id, n.id_from, n.created_at as date, n.is_read, n.type, u.username,
-                             i.name as profile_image, i.profile, i.cover
-                FROM notifications n
-                JOIN users u ON n.id_from = u.id
-                LEFT JOIN images i ON n.id_from = i.user_id AND i.profile = TRUE
-                WHERE n.id_to = $1
-                ORDER BY n.created_at DESC
-                LIMIT $2 OFFSET $3
-                ` : `
-                SELECT n.id, n.id_from, n.created_at as date, n.is_read, n.type, u.username,
-                             i.name as profile_image, i.profile, i.cover
-                FROM notifications n
-                JOIN users u ON n.id_from = u.id
-                LEFT JOIN images i ON n.id_from = i.user_id AND i.profile = TRUE
-                WHERE n.id_to = $1
-                    AND u.id NOT IN (
-                        SELECT blocker FROM blocked WHERE blocked = $1
-                        UNION
-                        SELECT blocked FROM blocked WHERE blocker = $1
-                    )
-                ORDER BY n.created_at DESC
-                LIMIT $2 OFFSET $3
-                `
+                                const query = includeBlocked ? `
+                                SELECT n.id, n.id_from, n.created_at as date, n.is_read, n.type, u.username,
+                                                         i.name as profile_image, i.profile, i.cover
+                                FROM notifications n
+                                LEFT JOIN users u ON n.id_from = u.id
+                                LEFT JOIN images i ON n.id_from = i.user_id AND i.profile = TRUE
+                                WHERE n.id_to = $1
+                                ORDER BY n.created_at DESC
+                                LIMIT $2 OFFSET $3
+                                ` : `
+                                SELECT n.id, n.id_from, n.created_at as date, n.is_read, n.type, u.username,
+                                                         i.name as profile_image, i.profile, i.cover
+                                FROM notifications n
+                                LEFT JOIN users u ON n.id_from = u.id
+                                LEFT JOIN images i ON n.id_from = i.user_id AND i.profile = TRUE
+                                WHERE n.id_to = $1
+                                    AND n.id_from NOT IN (
+                                                SELECT blocker FROM blocked WHERE blocked = $1
+                                                UNION
+                                                SELECT blocked FROM blocked WHERE blocker = $1
+                                    )
+                                ORDER BY n.created_at DESC
+                                LIMIT $2 OFFSET $3
+                                `
                 const result = await db.query(query, [id, limit, offset])
                 return result.rows
 }
@@ -120,18 +120,17 @@ module.exports = {
         const res = await db.query(q, [id]);
         return res.rows?.[0]?.count || 0;
     },
-    countAllNotifFiltered: async (id) => {
-        const q = `
-            SELECT COUNT(*)::int AS count
-            FROM notifications n
-            JOIN users u ON n.id_from = u.id
-            WHERE n.id_to = $1
-              AND u.id NOT IN (
-                SELECT blocker FROM blocked WHERE blocked = $1
-                UNION
-                SELECT blocked FROM blocked WHERE blocker = $1
-              )
-        `;
+        countAllNotifFiltered: async (id) => {
+                const q = `
+                        SELECT COUNT(*)::int AS count
+                        FROM notifications n
+                        WHERE n.id_to = $1
+                            AND n.id_from NOT IN (
+                                SELECT blocker FROM blocked WHERE blocked = $1
+                                UNION
+                                SELECT blocked FROM blocked WHERE blocker = $1
+                            )
+                `;
         const res = await db.query(q, [id]);
         return res.rows?.[0]?.count || 0;
     }
