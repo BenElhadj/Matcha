@@ -3,78 +3,156 @@
     <div v-if="isComplete" class="discover">
       <q-page-container v-if="loaded" class="pt-5 px-0">
         <q-layout class="row wrap justify-center">
-
           <div class="col-2">
             <q-page-container class="px-5">
               <q-layout class="column">
                 <h4 class="title mb-4">Search</h4>
-                 <q-input
-                    v-model="recherche"
-                    class="location_input mb-5"
-                    color="primary"
-                    hide-details
-                    outlined
-                    solo
-                    text
-                    label="First/Last name or Nickname"
-                    placeholder="Recherche"
-                  >
-                    <template v-slot:append>
-                      <q-icon name="mdi-magnify"></q-icon>
-                    </template>
-                  </q-input>
+                <q-input
+                  v-model="recherche"
+                  class="location_input mb-5"
+                  color="primary"
+                  hide-details
+                  outlined
+                  solo
+                  text
+                  label="First/Last name or Nickname"
+                  placeholder="Recherche"
+                >
+                  <template v-slot:append>
+                    <q-icon name="mdi-magnify"></q-icon>
+                  </template>
+                </q-input>
                 <h4 class="title mb-4">Gender</h4>
-                <q-btn-toggle v-model="gender" spread no-caps toggle-color="blue" color="white" text-color="black" :options="[
+                <q-btn-toggle
+                  v-model="gender"
+                  spread
+                  no-caps
+                  toggle-color="blue"
+                  color="white"
+                  text-color="black"
+                  :options="[
                     { label: 'Man', value: 'male' },
-                    { label: 'Woman', value: 'female'},
+                    { label: 'Woman', value: 'female' },
                     { label: 'Other', value: 'other' },
-                    { label: 'All', value: 'all'}]"/>
+                    { label: 'All', value: 'all' }
+                  ]"
+                />
                 <h4 class="title mb-3">Distance</h4>
-                <q-range v-model="distance" :min="0" :max="maxDis" :step="step" label-always thumb-label="always" thumb-size="30" class="custom-slider mx-3 mb-5 pt-3"></q-range>
-                
+                <q-range
+                  v-model="distance"
+                  :min="0"
+                  :max="maxDis"
+                  :step="step"
+                  label-always
+                  thumb-label="always"
+                  thumb-size="30"
+                  class="custom-slider mx-3 mb-5 pt-3"
+                ></q-range>
+
                 <h4 class="title mb-3">Age</h4>
-                <q-range v-model="age" :min="18" :max="85" :step="1" label-always thumb-label="always" thumb-size="25" class="custom-slider mx-3 mb-4 pt-3"></q-range>
-                
+                <q-range
+                  v-model="age"
+                  :min="18"
+                  :max="85"
+                  :step="1"
+                  label-always
+                  thumb-label="always"
+                  thumb-size="25"
+                  class="custom-slider mx-3 mb-4 pt-3"
+                ></q-range>
+
                 <h4 class="title mb-3">Rating</h4>
-                <q-range v-model="rating" :min="0" :max="7" :step="0.1" label-always thumb-label="always" thumb-size="25" class="mx-3 mb-5 pt-3"></q-range>
-                
+                <q-range
+                  v-model="rating"
+                  :min="0"
+                  :max="7"
+                  :step="0.1"
+                  label-always
+                  thumb-label="always"
+                  thumb-size="25"
+                  class="mx-3 mb-5 pt-3"
+                ></q-range>
+
                 <h4 class="title mb-4">Location</h4>
-                <q-input v-model="location" class="location_input mb-5" label="City or Town" color="primary" hide-details outlined solo text>
+                <q-input
+                  v-model="location"
+                  class="location_input mb-5"
+                  label="City or Town"
+                  color="primary"
+                  hide-details
+                  outlined
+                  solo
+                  text
+                >
                   <template v-slot:append>
                     <q-icon name="mdi-map-marker" />
                   </template>
                 </q-input>
 
                 <h4 class="title mb-4">Interests</h4>
-                <q-select v-model="interests" :options="allTags" multiple hide-dropdown-icon label="Select tag" style="width: 250px" outlined/>
+                <q-select
+                  v-model="interests"
+                  :options="allTags"
+                  multiple
+                  hide-dropdown-icon
+                  label="Select tag"
+                  style="width: 250px"
+                  outlined
+                />
 
                 <div class="row justify-between mb-4">
                   <h4 class="title">Sort by</h4>
-                  <q-btn @click="changeSort" flat round style="width: 10px" color="primary" icon="mdi-sort" :class="`sort_icon ${sortDir < 0 ? 'flip' : ''}`" class="clear_btn"/>
+                  <q-btn
+                    @click="changeSort"
+                    flat
+                    round
+                    style="width: 10px"
+                    color="primary"
+                    icon="mdi-sort"
+                    :class="`sort_icon ${sortDir < 0 ? 'flip' : ''}`"
+                    class="clear_btn"
+                  />
                 </div>
-                <q-select v-model="sort" outlined solo hide-dropdown-icon :options="sortTypes" label="Sort by" class="sort_select"/>
-                
+                <q-select
+                  v-model="sort"
+                  outlined
+                  solo
+                  hide-dropdown-icon
+                  :options="sortTypes"
+                  label="Sort by"
+                  class="sort_select"
+                />
+
                 <div class="row justify-between mb-4">
                   <h4 class="title mb-4">Reset all</h4>
-                  <q-btn @click="reset" flat round style="width: 10px" class="clear_btn" color="primary" icon="mdi-refresh"/>
+                  <q-btn
+                    @click="reset"
+                    flat
+                    round
+                    style="width: 10px"
+                    class="clear_btn"
+                    color="primary"
+                    icon="mdi-refresh"
+                  />
                 </div>
-
               </q-layout>
             </q-page-container>
           </div>
 
           <div class="col-10 md9 sm12">
             <div class="row wrap justify-center">
-                <div v-for="user in sorted" :key="user.user_id" class="user col-xl-2 col-lg-3 col-sm-3 ma-3 grow">
+              <div
+                v-for="user in sorted"
+                :key="user.user_id"
+                class="user col-xl-2 col-lg-3 col-sm-3 ma-3 grow"
+              >
                 <router-link :to="{ name: 'userprofile', params: { id: user.user_id } }">
                   <user-card :user="user" />
                 </router-link>
               </div>
             </div>
           </div>
-
         </q-layout>
-
       </q-page-container>
       <LoaderView v-else />
     </div>
@@ -105,7 +183,7 @@ import countries from '@/nats.json'
 import utility from '@/utility'
 import { matMenu } from '@quasar/extras/material-icons'
 import { mdiAbTesting } from '@quasar/extras/mdi-v5'
-import { useRouter } from 'vue-router';
+import { useRouter } from 'vue-router'
 
 import io from 'socket.io-client'
 const socket = io(`${import.meta.env.VITE_APP_API_URL}`, {
@@ -120,7 +198,7 @@ socket.on('connect_error', (err) => {
 
 const connectedUsers = computed(() => store.state.connectedUsers)
 
-const router = useRouter();
+const router = useRouter()
 const store = useStore()
 const { user, allTags, status, online, blocked, blockedBy } = store.getters
 const userLocation = store.state.location
@@ -136,38 +214,41 @@ const location = ref(null)
 const hasBoth = ref(false)
 const hasAll = ref(false)
 const loaded = ref(false)
-const age = ref({min: 18, max: 85})
-const rating = ref({min: 0, max: 7})
-const distance = ref({min: 0, max: 0})
+const age = ref({ min: 18, max: 85 })
+const rating = ref({ min: 0, max: 7 })
+const distance = ref({ min: 0, max: 0 })
 const maxDis = ref(null)
 const sortTypes = ['age', 'distance', 'rating', 'interests']
 const nats = ref(countries)
-const recherche = ref('');
+const recherche = ref('')
 
 const filters = {
-  self: val => val.user_id !== user.id,
-  blocked: val => !blocked.includes(val.user_id),
-  blockedBy: val => !blockedBy.includes(val.user_id),
-  rating: val => val.rating >= rating.value.min && val.rating <= rating.value.max,
-  gender: val => {
+  self: (val) => val.user_id !== user.id,
+  blocked: (val) => !blocked.includes(val.user_id),
+  blockedBy: (val) => !blockedBy.includes(val.user_id),
+  rating: (val) => val.rating >= rating.value.min && val.rating <= rating.value.max,
+  gender: (val) => {
     // Check if gender.value is 'all' and return true, or apply the regular filter logic
-    return gender.value === 'all' || (!gender.value || val.gender === gender.value);
+    return gender.value === 'all' || !gender.value || val.gender === gender.value
   },
-  location: val => !location.value || [val.country, val.address, val.city].some(cur => cur && cur.includes(location.value)),
-  distance: val => {
+  location: (val) =>
+    !location.value ||
+    [val.country, val.address, val.city].some((cur) => cur && cur.includes(location.value)),
+  distance: (val) => {
     const d = typeof val.distanceKm === 'number' ? val.distanceKm : 0
     return d >= distance.value.min && d <= distance.value.max
   },
-  age: val => {
+  age: (val) => {
     const years = typeof val.ageYears === 'number' ? val.ageYears : 0
     return years >= age.value.min && years <= age.value.max
   },
-  interest: val => {
+  interest: (val) => {
     if (!interests.value.length) return true
     for (const interest of interests.value) if (val.tags.split(',').includes(interest)) return true
     return false
   },
-  search : val => !recherche.value ||
+  search: (val) =>
+    !recherche.value ||
     (val.username && val.username.toLowerCase().includes(recherche.value.toLowerCase())) ||
     (val.first_name && val.first_name.toLowerCase().includes(recherche.value.toLowerCase())) ||
     (val.last_name && val.last_name.toLowerCase().includes(recherche.value.toLowerCase()))
@@ -195,66 +276,76 @@ const ageCalc = (birthdate) => {
   const diff = Date.now() - bd.getTime()
   const ageDate = new Date(diff)
   return Math.abs(ageDate.getUTCFullYear() - 1970)
-};
+}
 
 const commonTags = (user, tags) => {
-  if (!tags || !tags.length) return 0;
-  const userTags = user.tags.split(',');
-  return tags.split(',').filter((val) => userTags.includes(val)).length;
-};
+  if (!tags || !tags.length) return 0
+  const userTags = user.tags.split(',')
+  return tags.split(',').filter((val) => userTags.includes(val)).length
+}
 
 const sorted = computed(() => {
-  const onlineUsers = filtered.value.filter((user) => user.isConnected);
-  const disconnectedUsers = filtered.value.filter((user) => !user.isConnected);
+  const onlineUsers = filtered.value.filter((user) => user.isConnected)
+  const disconnectedUsers = filtered.value.filter((user) => !user.isConnected)
 
   if (!sort.value || sort.value === 'distance') {
-    const sortedOnlineUsers = onlineUsers.slice();
-    const sortedDisconnectedUsers = disconnectedUsers.slice();
-    return [...sortedOnlineUsers, ...sortedDisconnectedUsers];
+    const sortedOnlineUsers = onlineUsers.slice()
+    const sortedDisconnectedUsers = disconnectedUsers.slice()
+    return [...sortedOnlineUsers, ...sortedDisconnectedUsers]
   }
 
-  let sortFunc;
+  let sortFunc
 
   switch (sort.value) {
     case 'age':
-      sortFunc = (a, b) => sortDir.value * ((a.ageYears||0) - (b.ageYears||0));
-      break;
+      sortFunc = (a, b) => sortDir.value * ((a.ageYears || 0) - (b.ageYears || 0))
+      break
     case 'rating':
-      sortFunc = (a, b) => sortDir.value * (b.rating - a.rating);
-      break;
+      sortFunc = (a, b) => sortDir.value * (b.rating - a.rating)
+      break
     case 'interests':
-      sortFunc = (a, b) => sortDir.value * (commonTags(b, a.tags) - commonTags(a, b.tags));
-      break;
+      sortFunc = (a, b) => sortDir.value * (commonTags(b, a.tags) - commonTags(a, b.tags))
+      break
   }
 
   if (onlineUsers.length > 0) {
-    onlineUsers.sort(sortFunc);
+    onlineUsers.sort(sortFunc)
   }
   if (disconnectedUsers.length > 0) {
-    disconnectedUsers.sort(sortFunc);
+    disconnectedUsers.sort(sortFunc)
   }
 
-  return [...onlineUsers, ...disconnectedUsers];
-});
+  return [...onlineUsers, ...disconnectedUsers]
+})
 
 const calculateMaxDistance = () => {
-  if (!users.value.length) { maxDis.value = 0; return }
-  const maxVal = users.value.reduce((acc, u) => Math.max(acc, typeof u.distanceKm === 'number' ? u.distanceKm : 0), 0)
+  if (!users.value.length) {
+    maxDis.value = 0
+    return
+  }
+  const maxVal = users.value.reduce(
+    (acc, u) => Math.max(acc, typeof u.distanceKm === 'number' ? u.distanceKm : 0),
+    0
+  )
   maxDis.value = Math.ceil(maxVal)
 }
 
-watch(users, () => {
-  calculateMaxDistance()
-}, { immediate: true })
+watch(
+  users,
+  () => {
+    calculateMaxDistance()
+  },
+  { immediate: true }
+)
 
 watch(user, (newUser, oldUser) => {
   // console.log(newUser.looking)
   if (newUser.looking && newUser.looking === 'other') {
     hasOther.value = true
   }
-  if(newUser.looking && newUser.looking === 'all') {
+  if (newUser.looking && newUser.looking === 'all') {
     // console.log('all');
-   hasAll.value = true;
+    hasAll.value = true
   }
 })
 
@@ -281,7 +372,7 @@ watch(distance, () => {
     distance.value[1] = temp
   }
 })
- 
+
 function whoIsUp() {
   users.value.forEach((user, i) => {
     if (connectedUsers.value.includes(user.user_id.toString())) {
@@ -301,9 +392,9 @@ function reset() {
   sortDir.value = 1
   sort.value = null
   gender.value = null
-  age.value = {min: 18, max: 85}
-  rating.value = {min: 0, max: 7}
-  distance.value = {min: 0, max: maxDis.value}
+  age.value = { min: 18, max: 85 }
+  rating.value = { min: 0, max: 7 }
+  distance.value = { min: 0, max: maxDis.value }
   location.value = null
 }
 function changeSort() {
@@ -312,7 +403,16 @@ function changeSort() {
 }
 
 const isComplete = computed(() => {
-  return user.gender && user.looking && user.biography && user.tags && user.images.length && user.city && user.country && user.postal_code
+  return (
+    user.gender &&
+    user.looking &&
+    user.biography &&
+    user.tags &&
+    user.images.length &&
+    user.city &&
+    user.country &&
+    user.postal_code
+  )
 })
 
 async function created() {
@@ -325,25 +425,28 @@ async function created() {
   const urlHistory = `${import.meta.env.VITE_APP_API_URL}/api/browse/allhistory`
   const resHistory = await axios.get(urlHistory, { headers })
   // console.log(res.data)
-  
-  if (!res.data.msg) {
-      users.value = res.data.slice(0, 1000).map(cur => {
-        const lat = Number(cur.lat)
-        const lng = Number(cur.lng)
-        const distanceKm = (isFinite(lat) && isFinite(lng)) ? utility.calculateDistance(userLocation, { lat, lng }) : 0
-        return {
-          ...cur,
-          rating: Number(cur.rating),
-          ageYears: ageCalc(cur.birthdate),
-          distanceKm
-        }
-      })
 
-  if (!resHistory.data.msg) {
-    const blockedHistory = resHistory.data.filter((item) => typesToFilter.includes(item.type))
-    const blockedUserIds = blockedHistory.map(item => item.his_id)
-    users.value = users.value.filter(user => !blockedHistory.some(historyItem => historyItem.his_id === user.user_id))
-  }
+  if (!res.data.msg) {
+    users.value = res.data.slice(0, 1000).map((cur) => {
+      const lat = Number(cur.lat)
+      const lng = Number(cur.lng)
+      const distanceKm =
+        isFinite(lat) && isFinite(lng) ? utility.calculateDistance(userLocation, { lat, lng }) : 0
+      return {
+        ...cur,
+        rating: Number(cur.rating),
+        ageYears: ageCalc(cur.birthdate),
+        distanceKm
+      }
+    })
+
+    if (!resHistory.data.msg) {
+      const blockedHistory = resHistory.data.filter((item) => typesToFilter.includes(item.type))
+      const blockedUserIds = blockedHistory.map((item) => item.his_id)
+      users.value = users.value.filter(
+        (user) => !blockedHistory.some((historyItem) => historyItem.his_id === user.user_id)
+      )
+    }
     calculateMaxDistance()
     whoIsUp()
     distance.value.max = maxDis.value
@@ -374,18 +477,19 @@ function refreshMethods() {
   whoIsUp()
 }
 
-const refreshInterval = setInterval(() => { whoIsUp() }, 5000)
+const refreshInterval = setInterval(() => {
+  whoIsUp()
+}, 5000)
 
 onBeforeUnmount(() => {
   socket.off('onlineUsers')
   socket.off('connectedUsers')
   clearInterval(refreshInterval)
 })
-
 </script>
 
 <style scoped>
-a{
+a {
   text-decoration: none;
   color: inherit;
 }
@@ -394,7 +498,7 @@ a{
   margin-left: 80px;
 }
 .v-slider {
-  opacity: .7;
+  opacity: 0.7;
 }
 
 .theme--light.v-input:not(.v-input--is-disabled) input,
@@ -404,7 +508,9 @@ a{
 
 .tags_menu > .v-input__control > .v-input__slot,
 .loaction_input > .v-input__control > .v-input__slot,
-.sort_select > .v-input__control > .v-input__slot { display: block; }
+.sort_select > .v-input__control > .v-input__slot {
+  display: block;
+}
 
 .v-slider.v-slider--is-active,
 .tags_menu.v-select--is-menu-active > .v-input__control > .v-input__slot,
@@ -421,9 +527,15 @@ a{
   color: var(--color-primary);
 }
 
-.v-select-list.v-card.theme--light > .v-list { padding: inherit; }
-.theme--light.q-btn-toggle { box-shadow: none; }
-.v-menu__content.menuable__content__active.v-autocomplete__content > .v-select-list > .v-list { padding: inherit; }
+.v-select-list.v-card.theme--light > .v-list {
+  padding: inherit;
+}
+.theme--light.q-btn-toggle {
+  box-shadow: none;
+}
+.v-menu__content.menuable__content__active.v-autocomplete__content > .v-select-list > .v-list {
+  padding: inherit;
+}
 
 .q-btn-toggle {
   display: flex;
@@ -462,7 +574,7 @@ a{
 }
 
 .v-slider__thumb-label > span {
-  font-size: .8em;
+  font-size: 0.8em;
 }
 .flip {
   transform: rotate(180deg);

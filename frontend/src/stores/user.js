@@ -78,12 +78,28 @@ export const user = {
     getNotif: (state, notif) => {
       state.notif = notif
     },
+    appendNotif: (state, items) => {
+      if (!Array.isArray(items) || !items.length) return
+      const byId = new Map(state.notif.map(n => [n.id, n]))
+      for (const it of items) {
+        if (!byId.has(it.id)) {
+          byId.set(it.id, it)
+        }
+      }
+      state.notif = Array.from(byId.values())
+    },
     getTags: (state, tags) => {
       state.tags = tags
     },
     seenNotif: state => {
       state.notif = state.notif.map(cur => {
         if (cur.type !== 'chat') cur.is_read = 1
+        return cur
+      })
+    },
+    seenNotifFrom: (state, id_from) => {
+      state.notif = state.notif.map(cur => {
+        if (cur.type !== 'chat' && String(cur.id_from) === String(id_from)) cur.is_read = 1
         return cur
       })
     },
@@ -266,10 +282,45 @@ export const user = {
     },
     getNotif: async ({ commit }) => {
       try {
-        const notif = await utility.syncNotif()
+        const notif = await utility.syncNotif({ limit: 50, page: 1, mode: 'all', includeBlocked: 1 })
+        try {
+          console.log('[store/user:getNotif] fetched notifications:', Array.isArray(notif) ? notif.length : notif, notif)
+        } catch (_) {}
         commit('getNotif', notif)
       } catch (err) {
         console.error('err getNotif in frontend/user.js ===> ', err)
+      }
+    },
+    getNotifPage: async ({ commit }, { limit = 15, page = 1 } = {}) => {
+      try {
+        // Try enhanced fetch with params (if supported by utility)
+        let items
+        try {
+          items = await utility.syncNotif({ limit, page, mode: 'all', includeBlocked: 1 })
+        } catch (_) {
+          items = null
+        }
+        // Fallback: if utility.syncNotif does not support params or returned empty, try legacy call without params
+        if (!Array.isArray(items) || items.length === 0) {
+          try {
+            const legacy = await utility.syncNotif()
+            if (Array.isArray(legacy) && legacy.length) {
+              console.warn('[store/user:getNotifPage] fallback used: legacy syncNotif() returned', legacy.length, 'items')
+              items = legacy
+            }
+          } catch (e) {
+            // keep original items
+          }
+        }
+        try {
+          console.log('[store/user:getNotifPage] page, limit, items:', page, limit, Array.isArray(items) ? items.length : items, items)
+        } catch (_) {}
+        if (page === 1) commit('getNotif', items)
+        else commit('appendNotif', items)
+        return items
+      } catch (err) {
+        console.error('err getNotifPage in frontend/user.js ===> ', err)
+        return []
       }
     },
     seenNotif: async ({ commit, state }) => {
@@ -288,6 +339,16 @@ export const user = {
         }
       } catch (err) {
         console.error('Error in seenNotif action:', err)
+      }
+    },
+    seenNotifFrom: async ({ commit, state }, { id_from, id_to }) => {
+      try {
+        // Met à jour côté serveur via utilitaire existant
+        await utility.updateOneNotif(id_from, id_to)
+        // Met à jour le state localement
+        commit('seenNotifFrom', id_from)
+      } catch (err) {
+        console.error('Error in seenNotifFrom action:', err)
       }
     },
     delImg: ({ commit }, id) => {

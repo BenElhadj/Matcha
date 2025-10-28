@@ -88,7 +88,7 @@ const location = computed(() => store.getters.location)
 const connectedUsers = computed(() => store.state.connectedUsers)
 const updateTimer = ref(null)
 const store = useStore()
-let likeIcon = ref('')
+let likeIcon = ref(getLikeIcon('default'))
 
 const props = defineProps({
   user: {
@@ -157,7 +157,7 @@ const getHistory = async () => {
     if (Array.isArray(result.data)) {
       latestInteraction = result.data
         .filter((item) => typesToFilter.includes(item.type))
-        .filter((item) => item.his_id === selectedUserId)
+        .filter((item) => String(item.his_id) === String(selectedUserId))
         .sort((a, b) => new Date(b.match_date) - new Date(a.match_date))[0]
     }
     likeIcon.value = latestInteraction
