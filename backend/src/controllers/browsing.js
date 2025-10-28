@@ -102,6 +102,18 @@ const showUserById = async (req, res) => {
 			}));
 			await historyModel.insertHistory(req.user.id, req.params.id)
 			await notifModel.insertNotifVis(req.user.id, req.params.id)
+			// Push a realtime notification to the visited user
+			try {
+				const io = req.app.get('io')
+				if (io) io.to(`user:${req.params.id}`).emit('notif:new', {
+					type: 'visit',
+					id_from: req.user.id,
+					id_to: parseInt(req.params.id, 10),
+					created_at: new Date().toISOString()
+				})
+			} catch (e) {
+				// non-fatal
+			}
 			res.json(user)
 		} else {
 			res.json({ msg: 'User doesnt exist' })

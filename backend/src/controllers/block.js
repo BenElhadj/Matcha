@@ -18,6 +18,16 @@ const blockUser = async (req, res) => {
 			await matchingModel.delMatche(req.user.id, req.body.id)
 			await notifModel.delNotif(req.user.id, req.body.id)
 			await chatModel.delConv(req.user.id, req.body.id)
+			// Informer les deux utilisateurs en temps réel
+			try {
+				const io = req.app.get('io')
+				if (io) {
+					io.to(`user:${req.body.id}`).emit('block', { by: req.user.id })
+					io.to(`user:${req.user.id}`).emit('block', { by: req.user.id, target: req.body.id })
+					io.to(`user:${req.user.id}`).emit('notif:clear', { with: req.body.id })
+					io.to(`user:${req.body.id}`).emit('notif:clear', { with: req.user.id })
+				}
+			} catch (_) {}
 			return res.json({ status: 'success', type: 'block', message: 'User blocked', data: null })
 		} else {
 			return res.json({ status: 'error', type: 'block', message: 'User already blocked', data: null })
@@ -42,6 +52,13 @@ const unblockUser = async (req, res) => {
 		if (stillBlocked) {
 			return res.json({ status: 'error', type: 'block', message: 'Cannot unblock user', data: null })
 		}
+		try {
+			const io = req.app.get('io')
+			if (io) {
+				io.to(`user:${req.body.id}`).emit('unblock', { by: req.user.id })
+				io.to(`user:${req.user.id}`).emit('unblock', { by: req.user.id, target: req.body.id })
+			}
+		} catch (_) {}
 		res.json({ status: 'success', type: 'block', message: 'User unblocked', data: null })
 	} catch (err) {
 		return res.json({ status: 'error', type: 'block', message: 'Fatal error', data: err })
