@@ -145,6 +145,27 @@ module.exports = {
 	getAllNotif,
 	updateOneNotif,
 	updateNotif,
+	// Mark a list of notification IDs as read for the current user
+	updateNotifByIds: async (req, res) => {
+		if (!req.user?.id)
+			return res.json({ status: 'error', type: 'notification', message: 'Not logged in', data: null })
+		try {
+			let { ids } = req.body || {}
+			if (!Array.isArray(ids) || !ids.length)
+				return res.json({ status: 'error', type: 'notification', message: 'Invalid request', data: null })
+			const clean = Array.from(new Set(ids.map(id => parseInt(id, 10)).filter(n => Number.isInteger(n))))
+			if (!clean.length)
+				return res.json({ status: 'error', type: 'notification', message: 'Invalid request', data: null })
+			const result = await notifModel.seenNotifByIds(req.user.id, clean)
+			try {
+				const io = req.app.get('io')
+				if (io) io.to(`user:${req.user.id}`).emit('notif:seenIds', { ids: clean })
+			} catch (_) {}
+			return res.json({ status: 'success', type: 'notification', message: 'Notifications updated', data: result })
+		} catch (err) {
+			return res.json({ status: 'error', type: 'notification', message: 'Fatal error', data: String(err?.message || err) })
+		}
+	},
 	// Lightweight debug endpoint to inspect auth + counts
 	debug: async (req, res) => {
 		if (!req.user?.id) return res.json({ status: 'error', type: 'notification', message: 'Not logged in', data: null })

@@ -7,6 +7,7 @@ const notif = require('../controllers/notification')
 routes.post('/add', authCheck, notif.insertChatNotif)
 routes.post('/update', authCheck, notif.updateNotif)
 routes.put('/updateOneNotif', authCheck, notif.updateOneNotif)
+routes.put('/updateByIds', authCheck, notif.updateNotifByIds)
 routes.get('/all', authCheck, notif.getAllNotif)
 routes.get('/debug', authCheck, notif.debug)
 
