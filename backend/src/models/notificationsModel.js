@@ -26,7 +26,7 @@ const insertNotifConv = async (type, id_from, id_to, id_conversation) => {
 // excluding blocked users. Returns rows ordered by notification date desc.
 const getNotif = async (id, limit = 50, offset = 0, includeBlocked = false) => {
         const query = includeBlocked ? `
-        SELECT n.id, n.id_from, n.date, n.is_read, n.type, u.username, i.name as profile_image, i.profile, i.cover
+    SELECT n.id, n.id_from, n.date, n.is_read, n.type, u.username, i.link as profile_image, i.profile, i.cover
         FROM (
             SELECT DISTINCT ON (id_from) id, id_from, created_at as date, is_read, type, id_conversation
             FROM notifications
@@ -38,7 +38,7 @@ const getNotif = async (id, limit = 50, offset = 0, includeBlocked = false) => {
         ORDER BY n.date DESC
         LIMIT $2 OFFSET $3
         ` : `
-        SELECT n.id, n.id_from, n.date, n.is_read, n.type, u.username, i.name as profile_image, i.profile, i.cover
+    SELECT n.id, n.id_from, n.date, n.is_read, n.type, u.username, i.link as profile_image, i.profile, i.cover
         FROM (
             SELECT DISTINCT ON (id_from) id, id_from, created_at as date, is_read, type, id_conversation
             FROM notifications
@@ -63,7 +63,7 @@ const getNotif = async (id, limit = 50, offset = 0, includeBlocked = false) => {
 const getNotifAll = async (id, limit = 50, offset = 0, includeBlocked = false) => {
                                 const query = includeBlocked ? `
                                 SELECT n.id, n.id_from, n.created_at as date, n.is_read, n.type, u.username,
-                                                         i.name as profile_image, i.profile, i.cover
+                                                         i.link as profile_image, i.profile, i.cover
                                 FROM notifications n
                                 LEFT JOIN users u ON n.id_from = u.id
                                 LEFT JOIN images i ON n.id_from = i.user_id AND i.profile = TRUE
@@ -72,7 +72,7 @@ const getNotifAll = async (id, limit = 50, offset = 0, includeBlocked = false) =
                                 LIMIT $2 OFFSET $3
                                 ` : `
                                 SELECT n.id, n.id_from, n.created_at as date, n.is_read, n.type, u.username,
-                                                         i.name as profile_image, i.profile, i.cover
+                                                         i.link as profile_image, i.profile, i.cover
                                 FROM notifications n
                                 LEFT JOIN users u ON n.id_from = u.id
                                 LEFT JOIN images i ON n.id_from = i.user_id AND i.profile = TRUE
