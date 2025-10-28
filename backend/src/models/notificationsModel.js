@@ -47,6 +47,27 @@ const getNotif = async (id, limit = 50, offset = 0) => {
         return result.rows
 }
 
+// Get ALL notifications for a user (no collapsing), with pagination.
+const getNotifAll = async (id, limit = 50, offset = 0) => {
+                const query = `
+                SELECT n.id, n.id_from, n.created_at as date, n.is_read, n.type, u.username,
+                             i.name as profile_image, i.profile, i.cover
+                FROM notifications n
+                JOIN users u ON n.id_from = u.id
+                LEFT JOIN images i ON n.id_from = i.user_id AND i.profile = TRUE
+                WHERE n.id_to = $1
+                    AND u.id NOT IN (
+                        SELECT blocker FROM blocked WHERE blocked = $1
+                        UNION
+                        SELECT blocked FROM blocked WHERE blocker = $1
+                    )
+                ORDER BY n.created_at DESC
+                LIMIT $2 OFFSET $3
+                `
+                const result = await db.query(query, [id, limit, offset])
+                return result.rows
+}
+
 const seenOneNotif = async (id_from, id_to) => {
     const query = `UPDATE notifications SET is_read = TRUE WHERE id_to = $1 AND id_from = $2`
     await db.query(query, [id_to, id_from])
@@ -68,7 +89,29 @@ module.exports = {
     delNotif,
     insertNotifConv,
     getNotif,
+    getNotifAll,
     seenOneNotif,
     seenNotif,
-    seenMsgNotif
+    seenMsgNotif,
+    // Debug/metrics helpers
+    countAllNotif: async (id) => {
+        const q = `SELECT COUNT(*)::int AS count FROM notifications WHERE id_to = $1`;
+        const res = await db.query(q, [id]);
+        return res.rows?.[0]?.count || 0;
+    },
+    countAllNotifFiltered: async (id) => {
+        const q = `
+            SELECT COUNT(*)::int AS count
+            FROM notifications n
+            JOIN users u ON n.id_from = u.id
+            WHERE n.id_to = $1
+              AND u.id NOT IN (
+                SELECT blocker FROM blocked WHERE blocked = $1
+                UNION
+                SELECT blocked FROM blocked WHERE blocker = $1
+              )
+        `;
+        const res = await db.query(q, [id]);
+        return res.rows?.[0]?.count || 0;
+    }
 }
