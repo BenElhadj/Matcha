@@ -114,6 +114,16 @@ module.exports = {
     seenOneNotif,
     seenNotif,
     seenMsgNotif,
+    // Mark specific notification IDs as read for a given recipient
+    seenNotifByIds: async (id_to, ids) => {
+        if (!Array.isArray(ids) || !ids.length) return { updated: 0 }
+        // Ensure numeric casting and dedupe
+        const clean = Array.from(new Set(ids.map(id => parseInt(id, 10)).filter(n => Number.isInteger(n))))
+        if (!clean.length) return { updated: 0 }
+        const query = `UPDATE notifications SET is_read = TRUE WHERE id_to = $1 AND id = ANY($2::int[])`
+        const res = await db.query(query, [id_to, clean])
+        return { updated: res.rowCount || 0 }
+    },
     // Debug/metrics helpers
     countAllNotif: async (id) => {
         const q = `SELECT COUNT(*)::int AS count FROM notifications WHERE id_to = $1`;
