@@ -209,11 +209,8 @@ export const user = {
         let blockedBy = []
         const res = await utility.sync('users/getblocked')
         if (Array.isArray(res.data)) {
-          console.log('res.data', res.data)
           blocked = res.data.filter(cur => cur.blocker === state.user.id).map(cur => cur.blocked)
           blockedBy = res.data.filter(cur => cur.blocked === state.user.id).map(cur => cur.blocker)
-          console.log('blocked', blocked)
-          console.log('blockedBy', blockedBy)
         }
         commit('syncBlocked', { blocked, blockedBy })
         if (blocked.length) dispatch('syncBlacklist', blocked)
@@ -283,9 +280,6 @@ export const user = {
     getNotif: async ({ commit }) => {
       try {
         const notif = await utility.syncNotif({ limit: 50, page: 1, mode: 'all', includeBlocked: 1 })
-        try {
-          console.log('[store/user:getNotif] fetched notifications:', Array.isArray(notif) ? notif.length : notif, notif)
-        } catch (_) {}
         commit('getNotif', notif)
       } catch (err) {
         console.error('err getNotif in frontend/user.js ===> ', err)
@@ -305,16 +299,12 @@ export const user = {
           try {
             const legacy = await utility.syncNotif()
             if (Array.isArray(legacy) && legacy.length) {
-              console.warn('[store/user:getNotifPage] fallback used: legacy syncNotif() returned', legacy.length, 'items')
               items = legacy
             }
           } catch (e) {
             // keep original items
           }
         }
-        try {
-          console.log('[store/user:getNotifPage] page, limit, items:', page, limit, Array.isArray(items) ? items.length : items, items)
-        } catch (_) {}
         if (page === 1) commit('getNotif', items)
         else commit('appendNotif', items)
         return items
@@ -388,7 +378,7 @@ export const user = {
         }
         commit('syncHistory', { visitor, visited })
       } catch (err) {
-        console.log('Got error here --> ', err)
+        console.error('Got error here --> ', err)
       }
     },
   }

@@ -183,7 +183,6 @@ const onProfileBtnClick = () => {
 }
 const onProfileChange = async (e) => {
   const token = localStorage.getItem('token')
-  console.log('Token utilisé pour upload profil:', token)
   const file = e.target.files[0]
   if (!file) return
   const formData = new FormData()
@@ -210,7 +209,6 @@ const onProfileChange = async (e) => {
 
 const onCoverChange = async (e) => {
   const token = localStorage.getItem('token')
-  console.log('Token utilisé pour upload cover:', token)
   const file = e.target.files[0]
   if (!file) return
   const formData = new FormData()
