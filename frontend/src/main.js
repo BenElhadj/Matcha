@@ -7,6 +7,18 @@ import router from '@/router/index'
 import { api } from '@/boot/axios' // Ajoutez cette ligne
 import 'quasar/src/css/index.sass' 
 import App from '@/App.vue'
+
+// Silence noisy console output in production (keep errors)
+if (import.meta.env.MODE === 'production') {
+	const noop = () => {}
+	try {
+		console.log = noop
+		console.debug = noop
+		console.warn = noop
+	} catch (_) {
+		// noop
+	}
+}
 import utility from '@/utility'
 
 const app = createApp(App)
