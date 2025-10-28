@@ -116,5 +116,20 @@ module.exports = {
 	insertChatNotif,
 	getAllNotif,
 	updateOneNotif,
-	updateNotif
+	updateNotif,
+	// Lightweight debug endpoint to inspect auth + counts
+	debug: async (req, res) => {
+		if (!req.user?.id) return res.json({ status: 'error', type: 'notification', message: 'Not logged in', data: null })
+		try {
+			const mode = (req.query.mode || '').toString().toLowerCase()
+			const includeBlocked = String(req.query.includeBlocked || '').toLowerCase() === '1' || String(req.query.includeBlocked || '').toLowerCase() === 'true'
+			const total = await notifModel.countAllNotif(req.user.id)
+			const totalAfterFilter = await notifModel.countAllNotifFiltered(req.user.id)
+			const user = { id: req.user.id, email: req.user.email, username: req.user.username }
+			res.json({ status: 'success', type: 'notification', message: 'Debug info', data: { user, meta: { total, totalAfterFilter }, params: { mode, includeBlocked } } })
+		} catch (e) {
+			console.error('[notif:debug] error:', e)
+			res.json({ status: 'error', type: 'notification', message: 'Fatal error', data: String(e?.message || e) })
+		}
+	}
 }
