@@ -28,16 +28,35 @@ const getAllNotif = async (req, res) => {
 		return res.json({ status: 'error', type: 'notification', message: 'Not logged in', data: null })
 	try {
 		// Support pagination via query params: ?limit=20&page=1
-		const limit = Math.min(parseInt(req.query.limit) || 50, 200) // cap to avoid huge responses
-		const page = Math.max(parseInt(req.query.page) || 1, 1)
+			const limit = Math.min(parseInt(req.query.limit) || 50, 200) // cap to avoid huge responses
+			const page = Math.max(parseInt(req.query.page) || 1, 1)
 		const offset = (page - 1) * limit
 
-		let result = await notifModel.getNotif(req.user.id, limit, offset)
+			const mode = (req.query.mode || '').toString().toLowerCase()
+			const useAll = mode === 'all'
+		// Fetch items
+		let result = useAll
+				? await notifModel.getNotifAll(req.user.id, limit, offset)
+				: await notifModel.getNotif(req.user.id, limit, offset)
+
+		// Lightweight diagnostics to help understand empty sets in prod
+		let rawCount = 0, filteredCount = 0
+		try {
+			rawCount = await notifModel.countAllNotif(req.user.id)
+			filteredCount = await notifModel.countAllNotifFiltered(req.user.id)
+		} catch (e) {
+			// non-fatal
+		}
+
+		console.log('[notif:getAllNotif] user:', req.user.id, 'mode:', useAll ? 'all' : 'latest', 'page:', page, 'limit:', limit,
+			'rows:', Array.isArray(result) ? result.length : null,
+			'rawCount:', rawCount, 'filteredCount:', filteredCount)
 
 		// Normalise/clean results before sending
 		result = result.map(r => ({
 			id: r.id,
-			from: r.id_from,
+			id_from: r.id_from, // compat ancien front
+			from: r.id_from,    // compat éventuelle
 			type: r.type,
 			username: r.username,
 			date: r.date,
@@ -46,8 +65,15 @@ const getAllNotif = async (req, res) => {
 			cover: r.cover || null
 		}))
 
-		res.json({ status: 'success', type: 'notification', message: 'Notifications fetched', data: { items: result, page, limit } })
+		res.json({ status: 'success', type: 'notification', message: 'Notifications fetched', data: {
+			items: result,
+			page,
+			limit,
+			mode: useAll ? 'all' : 'latest-per-sender',
+			meta: { total: rawCount, totalAfterFilter: filteredCount }
+		} })
 	} catch (err) {
+		console.error('[notif:getAllNotif] error:', err)
 		return res.json({ status: 'error', type: 'notification', message: 'Fatal error', data: err })
 	}
 }
