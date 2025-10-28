@@ -10,6 +10,7 @@ export const user = {
     visitor: [],
     visited: [],
     notif: [],
+    localSeenNotifIds: [],
     tags: [],
     followers: [],
     following: [],
@@ -23,6 +24,30 @@ export const user = {
         state.user = {}
       }
       state.user.email = email
+    },
+    // Marquer un ensemble précis d'IDs comme lus localement (sans toucher le backend)
+    seenNotifIds: (state, ids = []) => {
+      if (!Array.isArray(state.notif) || !Array.isArray(ids) || !ids.length) return
+      const set = new Set(ids.map((x) => String(x)))
+      state.notif = state.notif.map((n) => {
+        if (n && set.has(String(n.id))) return { ...n, is_read: 1 }
+        return n
+      })
+    },
+    // Mémoriser les IDs marqués localement pour les réappliquer après un rafraîchissement
+    markNotifIdsLocally: (state, ids = []) => {
+      if (!Array.isArray(ids) || !ids.length) return
+      if (!Array.isArray(state.localSeenNotifIds)) state.localSeenNotifIds = []
+      const set = new Set([...(state.localSeenNotifIds || []).map(String)])
+      for (const id of ids) set.add(String(id))
+      state.localSeenNotifIds = Array.from(set)
+    },
+    // Réappliquer l'overlay local (utile après un fetch qui remplace state.notif)
+    applyLocalSeen: (state) => {
+      const ids = Array.isArray(state.localSeenNotifIds) ? state.localSeenNotifIds : []
+      if (!ids.length || !Array.isArray(state.notif)) return
+      const set = new Set(ids.map(String))
+      state.notif = state.notif.map((n) => (n && set.has(String(n.id)) ? { ...n, is_read: 1 } : n))
     },
     updateTags: (state, tags) => (state.user.tags = tags.map(cur => cur.text.toLowerCase()).join(',')),
 

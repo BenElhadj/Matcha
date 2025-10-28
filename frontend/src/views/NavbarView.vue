@@ -31,8 +31,8 @@
               alt="notifMenu"
               class="icon-size"
             />
-            <q-badge v-if="notifNum" :value="!!notifNum" color="primary" floating>
-              <span>{{ notifNum }}</span>
+            <q-badge v-if="unreadNotifCount" :value="!!unreadNotifCount" color="primary" floating>
+              <span>{{ unreadNotifLabel }}</span>
             </q-badge>
           </q-btn>
           <q-menu
@@ -194,6 +194,7 @@ import { ref, onMounted, onUnmounted, onBeforeUnmount, computed, watch } from 'v
 import { useStore } from 'vuex'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
+// Realtime sockets disabled here (server rejects WS); using lightweight polling instead
 
 import acceilImage from '@/assets/Navbar/acceil.png'
 import decouvrirImage from '@/assets/Navbar/decouvrir.png'
@@ -240,7 +241,12 @@ const links = [
 ]
 let notifMenu = ref(false)
 let msgMenu = ref(false)
-let notifNum = ref(0)
+// Unread notifications (excluding chat) badge count
+const unreadNotifCount = computed(() => {
+  const arr = store.getters.notif
+  if (!Array.isArray(arr)) return 0
+  return arr.filter((n) => n && n.type !== 'chat' && !n.is_read).length
+})
 let newMsgNum = ref(0)
 const user = computed(() => store.getters.user)
 const connected = computed(() => store.getters.status)
@@ -251,17 +257,21 @@ notif.value = store.getters.notif
 let convos = ref([])
 convos.value = store.getters.convos
 let notifs = ref([])
-notifs.value = Array.isArray(notif.value)
-  ? notif.value
-      .filter((n) => n.type !== 'chat')
-      .sort((a, b) => {
-        if (a.is_read !== b.is_read) {
-          return a.is_read - b.is_read
-        }
-        return new Date(b.date) - new Date(a.date)
-      })
-      .slice(0, 5)
-  : []
+const computeMenuNotifs = (src) => {
+  if (!Array.isArray(src)) return []
+  return src
+    .filter((n) => n && n.type !== 'chat')
+    .sort((a, b) => {
+      if (a.is_read !== b.is_read) return a.is_read - b.is_read
+      return new Date(b.date) - new Date(a.date)
+    })
+    .slice(0, 5)
+}
+notifs.value = computeMenuNotifs(notif.value)
+const unreadNotifLabel = computed(() => {
+  const n = unreadNotifCount.value || 0
+  return n > 99 ? '99+' : String(n)
+})
 
 let menuConvos = ref([])
 let newMessage = ref([])
@@ -388,31 +398,29 @@ const getNewMsg = async () => {
 
 const updateNotifAndMsg = async () => {
   if (connected.value !== null) {
+    // Poll latest notifications (page 1) to keep badge/menu updated
+    try {
+      await store.dispatch('getNotifPage', { limit: 50, page: 1 })
+      // Réappliquer l'overlay des notifications vues localement (ne pas dépasser 5 à chaque ouverture)
+      try {
+        store.commit('applyLocalSeen')
+      } catch (_) {}
+    } catch (_) {
+      /* silent */
+    }
     convos.value = store.getters.convos
     notif.value = store.getters.notif
-    notifs.value = Array.isArray(notif.value)
-      ? notif.value
-          .filter((n) => n.type !== 'chat')
-          .sort((a, b) => {
-            if (a.is_read !== b.is_read) {
-              return a.is_read - b.is_read
-            }
-            return new Date(b.date) - new Date(a.date)
-          })
-          .slice(0, 5)
-      : []
+    // Ne pas faire défiler pendant que le menu est ouvert
+    if (!notifMenu.value) {
+      notifs.value = computeMenuNotifs(notif.value)
+    }
     newMessage.value = await getNewMsg()
     if (Array.isArray(newMessage.value)) {
       menuConvos.value = sortAndFilterMessages(newMessage.value)
       newMsgNum.value = newMessage.value.filter((cur) => !cur.is_read).length
-      const newNotif = computed(() => store.getters.notif)
-      notifNum.value = Array.isArray(newNotif.value)
-        ? newNotif.value.filter((cur) => !cur.is_read).length
-        : 0
     } else {
       menuConvos.value = []
       newMsgNum.value = 0
-      notifNum.value = 0
     }
   }
 }
@@ -421,11 +429,43 @@ function refreshMethods() {
   updateNotifAndMsg()
 }
 
-const refreshInterval = setInterval(refreshMethods, 2000)
+const refreshInterval = setInterval(refreshMethods, 3000)
 
 onBeforeUnmount(() => {
   clearInterval(refreshInterval)
 })
+
+// No local socket; polling keeps the UI in sync when server WS is unavailable
+
+// Quand le menu des notifications s'ouvre, marquer les notifs visibles (max 5) comme lues
+watch(
+  notifMenu,
+  async (isOpen) => {
+    try {
+      if (!isOpen) return
+      const uid = user.value?.id
+      if (!uid) return
+      // Fixer l'instantané des 5 visibles à l'ouverture
+      notifs.value = computeMenuNotifs(store.getters.notif)
+      // Notifications affichées (max 5) et non lues (hors chat)
+      const visible = Array.isArray(notifs.value)
+        ? notifs.value.filter((n) => n && n.type !== 'chat' && !n.is_read).slice(0, 5)
+        : []
+      if (!visible.length) return
+
+      // IDs réellement visibles (donc <= 5)
+      const ids = visible.map((v) => v.id).filter(Boolean)
+      // 1) Marquage local exact: ne baisse que ce qui est affiché
+      try {
+        store.commit('seenNotifIds', ids)
+        store.commit('markNotifIdsLocally', ids)
+      } catch (_) {}
+
+      // 2) Pas d'appel backend ici: on reste 100% local à l'ouverture du menu
+    } catch (_) {}
+  },
+  { immediate: false }
+)
 </script>
 
 <style scoped>
