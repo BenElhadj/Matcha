@@ -50,10 +50,14 @@ const getAllNotif = async (req, res) => {
 		}
 
 		console.log('[notif:getAllNotif] user:', req.user.id, 'mode:', useAll ? 'all' : 'latest', 'includeBlocked:', includeBlocked, 'page:', page, 'limit:', limit,
-			'rows:', Array.isArray(result) ? result.length : null,
+			'rows:', Array.isArray(result) ? result.length : (result == null ? 'null' : typeof result),
 			'rawCount:', rawCount, 'filteredCount:', filteredCount)
 
 		// Normalise/clean results before sending
+		if (!Array.isArray(result)) {
+			console.warn('[notif:getAllNotif] unexpected result type, coercing to []')
+			result = []
+		}
 		result = result.map(r => ({
 			id: r.id,
 			id_from: r.id_from, // compat ancien front
@@ -75,8 +79,12 @@ const getAllNotif = async (req, res) => {
 			meta: { total: rawCount, totalAfterFilter: filteredCount }
 		} })
 	} catch (err) {
-		console.error('[notif:getAllNotif] error:', err)
-		return res.json({ status: 'error', type: 'notification', message: 'Fatal error', data: err })
+		console.error('[notif:getAllNotif] error:', err && err.stack ? err.stack : err)
+		const message = `Fatal error: ${err && err.message ? err.message : String(err)}`
+		return res.json({ status: 'error', type: 'notification', message, data: {
+			error: err && err.message ? err.message : String(err),
+			stack: process.env.NODE_ENV === 'production' ? undefined : (err && err.stack ? String(err.stack) : undefined)
+		} })
 	}
 }
 
