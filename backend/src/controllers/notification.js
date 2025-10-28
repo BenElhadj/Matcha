@@ -14,8 +14,19 @@ const insertChatNotif = async (req, res) => {
 	if (!req.body.type)
 		return res.json({ status: 'error', type: 'notification', message: 'Invalid request', data: null })
 	try {
-		await notifModel.insertNotifConv(req.body.type, req.body.id_from, req.body.id_to, req.body.id_conversation)
-		res.json({ status: 'success', type: 'notification', message: 'Notification inserted', data: null })
+			await notifModel.insertNotifConv(req.body.type, req.body.id_from, req.body.id_to, req.body.id_conversation)
+			// Realtime push to recipient
+			try {
+				const io = req.app.get('io')
+				if (io) io.to(`user:${req.body.id_to}`).emit('notif:new', {
+					type: req.body.type,
+					id_from: req.body.id_from,
+					id_to: req.body.id_to,
+					id_conversation: req.body.id_conversation,
+					created_at: new Date().toISOString()
+				})
+			} catch (_) {}
+			res.json({ status: 'success', type: 'notification', message: 'Notification inserted', data: null })
 	} catch (err) {
 		return res.json({ status: 'error', type: 'notification', message: 'Fatal error', data: err })
 	}
@@ -95,7 +106,12 @@ const updateNotif = async (req, res) => {
 		return res.json({ status: 'error', type: 'notification', message: 'Not logged in', data: null })
 	try {
 		await notifModel.seenNotif(req.user.id)
-		res.json({ status: 'success', type: 'notification', message: 'Notification updated', data: null })
+			// sync other tabs for same user
+			try {
+				const io = req.app.get('io')
+				if (io) io.to(`user:${req.user.id}`).emit('notif:seenAll')
+			} catch (_) {}
+			res.json({ status: 'success', type: 'notification', message: 'Notification updated', data: null })
 	} catch (err) {
 		return res.json({ status: 'error', type: 'notification', message: 'Fatal error', data: err })
 	}
@@ -114,7 +130,11 @@ const updateOneNotif = async (req, res) => {
 
 	try {
 		await notifModel.seenOneNotif(id_from, id_to)
-		res.json({ status: 'success', type: 'notification', message: 'Notification updated', data: null })
+			try {
+				const io = req.app.get('io')
+				if (io) io.to(`user:${id_to}`).emit('notif:seenFrom', { id_from })
+			} catch (_) {}
+			res.json({ status: 'success', type: 'notification', message: 'Notification updated', data: null })
 	} catch (err) {
 		return res.json({ status: 'error', type: 'notification', message: 'Fatal error', data: err })
 	}

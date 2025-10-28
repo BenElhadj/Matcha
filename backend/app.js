@@ -213,42 +213,41 @@ app.get('/allTags', async (req, res) => {
 // Route racine
 app.get('/', (req, res) => res.sendFile(path.resolve(__dirname, 'index.html')));
 
-// Configuration Socket.io
+// Configuration Socket.io (durcie et modernisée)
 const { connectedUsers } = require('./src/controllers/auth');
 const server = http.createServer(app)
 
 const io = socketIo(server, {
+  // Autoriser l'origine du front en dev/prod; on accepte toute origine pour éviter les 400 de Render,
+  // et on ne s'appuie pas sur les cookies (credentials false)
   cors: {
-    origin: [
-      'https://benelhadj.github.io',
-      'https://benelhadj.github.io/Matcha/',
-      'http://localhost:5173',
-      'https://matcha-backend-t6dr.onrender.com/'
-    ],
+    origin: (origin, callback) => callback(null, true),
     methods: ["GET", "POST"],
-    credentials: true
-  }
+    credentials: false
+  },
+  transports: ['websocket', 'polling'],
+  path: '/socket.io'
 });
 
-let users = {}
+app.set('io', io)
+
 io.setMaxListeners(5000)
+
+// Rooms par utilisateur pour adresser tous ses onglets
+const userRoom = id => `user:${String(id)}`
 
 io.on('connection', socket => {
   console.log('✅ New socket connection');
 
+  // Chat message -> transmettre au destinataire et persister
   socket.on('chat', async (data) => {
     try {
-      const id = users[data.id_to]
-      if (id) {
-        io.sockets.connected[id].emit('chat', data);
-        
-        // Sauvegarder le message en base de données
-        const { convo_id, id_from, id_to, message } = data;
-        await pool.query(
-          'INSERT INTO chat (convo_id, id_from, id_to, message) VALUES ($1, $2, $3, $4)',
-          [convo_id, id_from, id_to, message]
-        );
-      }
+      io.to(userRoom(data.id_to)).emit('chat', data)
+      const { convo_id, id_from, id_to, message } = data;
+      await pool.query(
+        'INSERT INTO chat (convo_id, id_from, id_to, message) VALUES ($1, $2, $3, $4)',
+        [convo_id, id_from, id_to, message]
+      );
     } catch (err) {
       console.error('app.js chat error ===> ', err);
     }
@@ -256,8 +255,7 @@ io.on('connection', socket => {
 
   socket.on('typing', data => {
     try {
-      const id = users[data.id_to]
-      if (id) io.sockets.connected[id].emit('typing', data)
+      io.to(userRoom(data.id_to)).emit('typing', data)
     } catch (err) {
       console.error('app.js typing error ===> ', err)
     }
@@ -265,8 +263,7 @@ io.on('connection', socket => {
 
   socket.on('seenConvo', data => {
     try {
-      const id = users[data.user]
-      if (id) io.sockets.connected[id].emit('seenConvo', data.convo)
+      io.to(userRoom(data.user)).emit('seenConvo', data.convo)
     } catch (err) {
       console.error('app.js seenConvo error ===> ', err)
     }
@@ -274,8 +271,7 @@ io.on('connection', socket => {
 
   socket.on('match', data => {
     try {
-      const id = users[data.id_to]
-      if (id) io.sockets.connected[id].emit('match', data)
+      io.to(userRoom(data.id_to)).emit('match', data)
     } catch (err) {
       console.error('app.js match error ===> ', err)
     }
@@ -283,8 +279,7 @@ io.on('connection', socket => {
 
   socket.on('visit', data => {
     try {
-      const id = users[data.id_to]
-      if (id) io.sockets.connected[id].emit('visit', data)
+      io.to(userRoom(data.id_to)).emit('visit', data)
     } catch (err) {
       console.error('app.js visit error ===> ', err)
     }
@@ -292,22 +287,21 @@ io.on('connection', socket => {
 
   socket.on('block', data => {
     try {
-      const id = users[data.id_to]
-      if (id) io.sockets.connected[id].emit('block', data.id_from)
+      io.to(userRoom(data.id_to)).emit('block', data.id_from)
     } catch (err) {
       console.error('app.js block error ===> ', err)
     }
   })
 
+  // Authentifier et inscrire le socket dans la room utilisateur
   socket.on('auth', async (id) => {
     try {
-      users[id] = socket.id
-      connectedUsers.add(id)
-      
-      // Mettre à jour le statut de l'utilisateur
+      socket.data.userId = String(id)
+      socket.join(userRoom(id))
+      connectedUsers.add(String(id))
+
       await pool.query('UPDATE users SET status = NOW() WHERE id = $1', [id]);
-      
-      io.emit('online', Object.keys(users))
+      io.emit('online', Array.from(connectedUsers))
     } catch (err) {
       console.error('app.js auth error ===> ', err)
     }
@@ -316,27 +310,27 @@ io.on('connection', socket => {
   socket.on('logout', async (id) => {
     try {
       await pool.query('UPDATE users SET status = NOW() WHERE id = $1', [id]);
-      delete users[id]
-      connectedUsers.delete(id)
-      io.emit('online', Object.keys(users))
+      connectedUsers.delete(String(id))
+      io.emit('online', Array.from(connectedUsers))
     } catch (err) {
       console.error('app.js logout error ===> ', err)
     }
   })
 
   socket.on('disconnect', async () => {
-    for (let key of Object.keys(users)) {
-      if (users[key] === socket.id) {
-        try {
-          await pool.query('UPDATE users SET status = NOW() WHERE id = $1', [key]);
-          delete users[key]
-          io.emit('online', Object.keys(users))
-            io.emit('user-status-changed', { userId: key, status: 'offline' })
-          socket.disconnect()
-        } catch (err) {
-          console.error('app.js disconnect error ===> ', err)
-        }
+    const id = socket.data?.userId
+    if (!id) return
+    try {
+      await pool.query('UPDATE users SET status = NOW() WHERE id = $1', [id]);
+      // Un socket de moins: vérifier s'il reste d'autres sockets dans la room
+      const room = io.sockets.adapter.rooms.get(userRoom(id))
+      if (!room || room.size === 0) {
+        connectedUsers.delete(String(id))
+        io.emit('user-status-changed', { userId: id, status: 'offline' })
       }
+      io.emit('online', Array.from(connectedUsers))
+    } catch (err) {
+      console.error('app.js disconnect error ===> ', err)
     }
   })
 })
