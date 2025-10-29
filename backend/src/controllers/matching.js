@@ -33,11 +33,25 @@ const match = async (req, res) => {
 				// N'envoyer like_back que si on vient de créer le lien forward (éviter le spam)
 				if (!hasForward.length) {
 					await notifModel.insertNotif('like_back', req.user.id, targetId)
+					// Realtime push for like_back so clients listening to notif:new can update instantly
+					try {
+						const io = req.app.get('io')
+						if (io) io.to(`user:${targetId}`).emit('notif:new', {
+							type: 'like_back', id_from: req.user.id, id_to: targetId, created_at: new Date().toISOString()
+						})
+					} catch (_) {}
 				}
 			} else {
 				// Premier like → notifier seulement à la création
 				if (!hasForward.length) {
 					await notifModel.insertNotif('like', req.user.id, targetId)
+					// Realtime push so recipient updates icons without refresh
+					try {
+						const io = req.app.get('io')
+						if (io) io.to(`user:${targetId}`).emit('notif:new', {
+							type: 'like', id_from: req.user.id, id_to: targetId, created_at: new Date().toISOString()
+						})
+					} catch (_) {}
 				}
 			}
 			return res.json({ ok: true })
@@ -46,6 +60,13 @@ const match = async (req, res) => {
 			await matchModel.delMatche(req.user.id, targetId)
 			await chatModel.disallowConv(req.user.id, targetId)
 			await notifModel.insertNotif('unlike', req.user.id, targetId)
+			// Realtime push to recipient for instant UI update
+			try {
+				const io = req.app.get('io')
+				if (io) io.to(`user:${targetId}`).emit('notif:new', {
+					type: 'unlike', id_from: req.user.id, id_to: targetId, created_at: new Date().toISOString()
+				})
+			} catch (_) {}
 			return res.json({ ok: true })
 		}
 	} catch (err) {
