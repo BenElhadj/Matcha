@@ -199,27 +199,18 @@ const getBlocked = async (req, res) => {
 // Get matches
 
 const getMatches = async (req, res) => {
-  if (!req.user.id)
-    return res.json({ msg: 'not logged in' })
-  try {
-    let following = await matchingModel.getFollowing(req.user.id)
-    let followers = await matchingModel.getFollowers(req.user.id)
-    // Fusionner les deux listes
-    let all = [...following, ...followers]
-    // Grouper par username, garder l'entrée avec profile=true si possible
-    const unique = {}
-    for (const user of all) {
-      if (!unique[user.username]) {
-        unique[user.username] = user
-      } else if (user.profile) {
-        unique[user.username] = user
-      }
-    }
-    // Retourner la liste unique
-    res.json(Object.values(unique))
-  } catch (err) {
-    return res.json({ msg: 'Fatal error', err })
-  }
+	if (!req.user.id)
+		return res.json({ msg: 'not logged in' })
+	try {
+		// Important: ne pas dédupliquer ici pour préserver l'information directionnelle
+		// attendue par le front (entries avec matched_id vs matcher_id)
+		const following = await matchingModel.getFollowing(req.user.id)
+		const followers = await matchingModel.getFollowers(req.user.id)
+		// Retourner la concaténation brute: le front séparera suivant/suiveurs
+		res.json([...following, ...followers])
+	} catch (err) {
+		return res.json({ msg: 'Fatal error', err })
+	}
 }
 
 // const connectedUsers = {
