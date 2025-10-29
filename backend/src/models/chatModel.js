@@ -52,7 +52,7 @@ const getConvAll = async (user1) => {
             u.first_name,
             u.last_name,
             u.status,
-            i.name as profile_image,
+            COALESCE(i.link, i.data, '') as profile_image,
             ch.message,
             ch.id_from as message_from,
             i.profile
@@ -70,7 +70,7 @@ const getConvAll = async (user1) => {
             u.first_name,
             u.last_name,
             u.status,
-            i.name as profile_image,
+            COALESCE(i.link, i.data, '') as profile_image,
             ch.message,
             ch.id_from as message_from,
             i.profile
@@ -131,5 +131,22 @@ module.exports = {
     seenMsg,
     getConversation,
     insertMsg,
-    updateConv
+    updateConv,
+    // Return conversations that have unread messages for this user
+    getInChat: async (userId) => {
+        const q = `SELECT DISTINCT id_conversation FROM chat WHERE id_from != $1 AND is_read = FALSE`;
+        const res = await db.query(q, [userId]);
+        return res.rows;
+    },
+    // Return counts of not-seen messages per conversation for this user
+    getNotSeenMsgModel: async (userId) => {
+        const q = `
+            SELECT id_conversation, COUNT(*)::int AS count
+            FROM chat
+            WHERE id_from != $1 AND is_read = FALSE
+            GROUP BY id_conversation
+        `;
+        const res = await db.query(q, [userId]);
+        return res.rows;
+    }
 }

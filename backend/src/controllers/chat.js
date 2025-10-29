@@ -125,11 +125,20 @@ const sendMsg = async (req, res) => {
 		}
 		if (msg.message.length > 2048)
 			return res.json({ status: 'error', type: 'chat', message: 'Message too long', data: null })
-		let result = await chatModel.getConversation(msg.id_conversation, msg.id_from, msg.id_from)
-		if (!result.length)
+		let convRows = await chatModel.getConversation(msg.id_conversation, msg.id_from, msg.id_from)
+		if (!convRows.length)
 			return res.json({ status: 'error', type: 'chat', message: 'Bad conversation', data: null })
-		await chatModel.insertMsg(msg)
-		await chatModel.updateConv(msg.date, result.insertId, msg.id_conversation)
+		// Insert message and update conversation last_msg/last_update
+		const inserted = await chatModel.insertMsg(msg)
+		await chatModel.updateConv(msg.date, inserted.id, msg.id_conversation)
+		// Create a chat notification for the other participant
+		try {
+			const conv = convRows[0]
+			const id_to = (conv.id_user1 === msg.id_from) ? conv.id_user2 : conv.id_user1
+			await notifModel.insertNotifConv('chat', msg.id_from, id_to, msg.id_conversation)
+		} catch (e) {
+			console.error('sendMsg notif error:', e?.message || e)
+		}
 		res.json({ status: 'success', type: 'chat', message: 'Message sent', data: null })
 	} catch (err) {
 		return res.json({ status: 'error', type: 'chat', message: 'Fatal error', data: err })
