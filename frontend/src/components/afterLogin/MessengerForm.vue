@@ -1,18 +1,41 @@
 <template>
-  <q-layout v-if="selectedConvo" align="center" justify="center" class="messenger_form px-3 chat_layout">
-    <q-input class="custom-q-input" rows="1" outlined bottom-slots filled dense @click:append="sendMsg" label="Type a message..." v-model="msg" @keyup.enter="sendMsg">
-      <q-btn @click="sendMsg" @keyup.enter="sendMsg" flat round style="width: 10px" color="primary" icon="mdi-send"/>
+  <q-layout
+    v-if="selectedConvo"
+    align="center"
+    justify="center"
+    class="messenger_form px-3 chat_layout"
+  >
+    <q-input
+      class="custom-q-input"
+      rows="1"
+      outlined
+      bottom-slots
+      filled
+      dense
+      @click:append="sendMsg"
+      label="Type a message..."
+      v-model="msg"
+      @keyup.enter="sendMsg"
+    >
+      <q-btn
+        @click="sendMsg"
+        @keyup.enter="sendMsg"
+        flat
+        round
+        style="width: 10px"
+        color="primary"
+        icon="mdi-send"
+      />
     </q-input>
   </q-layout>
 </template>
 
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch } from 'vue'
 import { useStore } from 'vuex'
 import { useQuasar } from 'quasar'
 import axios from 'axios'
-import { io } from 'socket.io-client'
-
+import { getSocket, connectSocket } from '@/boot/socketClient'
 
 const props = defineProps({
   toId: {
@@ -21,7 +44,12 @@ const props = defineProps({
   }
 })
 
-const socket = io(`${import.meta.env.VITE_APP_API_URL}`)
+let socket = getSocket()
+if (!socket) {
+  // Ensure a single shared connection; will also emit 'auth' in connectSocket
+  const userId = useStore().getters?.user?.id || null
+  socket = connectSocket(userId)
+}
 const store = useStore()
 const $q = useQuasar()
 const msg = ref(null)
@@ -34,7 +62,7 @@ const selectedConvo = store.getters['selectedConvo']
 // })
 
 watch(msg, () => {
-  if (msg.value.length) {
+  if (msg.value && msg.value.length) {
     const data = {
       id_conversation: selectedConvo,
       id_from: user.id,
@@ -57,7 +85,7 @@ const sendMsg = async (e) => {
           message: msg.value
         }
         const result = await axios.post(url, data, { headers })
-        if (result.data.ok) {
+        if (result?.data?.status === 'success') {
           msg.value = ''
           store.dispatch('updateConvos', data)
           socket.emit('chat', data)
@@ -83,15 +111,14 @@ const sendMsg = async (e) => {
   margin-top: 5px;
 }
 .custom-q-input {
-    position: fixed;
-    bottom: 140px;
-    left: 24%;
-    right: 10%;
-    z-index: 10;
-    border-radius: 10px;
-    padding: 10px;
-    border: 5% solid white !important;
-    background: white;
+  position: fixed;
+  bottom: 140px;
+  left: 24%;
+  right: 10%;
+  z-index: 10;
+  border-radius: 10px;
+  padding: 10px;
+  border: 5% solid white !important;
+  background: white;
 }
-
 </style>

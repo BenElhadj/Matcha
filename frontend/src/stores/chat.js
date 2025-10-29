@@ -76,7 +76,9 @@ export const chat = {
         const url = `${import.meta.env.VITE_APP_API_URL}/api/chat/all`
         const headers = { 'x-auth-token': token }
         const result = await axios.get(url, { headers })
-        if (!result.data.msg) commit('syncConvoAll', result.data)
+        // API renvoie { status, type, message, data: [...] }
+        const list = Array.isArray(result?.data?.data) ? result.data.data : []
+        commit('syncConvoAll', list)
       } catch (err) {
         console.error('err syncConvoAll in frontend/chat.js ===> ', err)
       }
