@@ -10,41 +10,42 @@ const { pool } = require('../config/database')
 
 const match = async (req, res) => {
 	if (!req.user.id) return res.json({ msg: 'Not logged in' })
-	if (typeof req.body.liked !== 'boolean' || !req.body.id || isNaN(req.body.id))
+	const targetId = parseInt(req.body.id, 10)
+	if (typeof req.body.liked !== 'boolean' || !targetId || isNaN(targetId))
 		return res.json({ msg: 'Invalid request' })
 	try {
-		let result = await matchModel.getMatche(req.user.id, req.body.id)
+		const hasForward = await matchModel.getMatche(req.user.id, targetId)
+		const hasReverse = await matchModel.getMatche(targetId, req.user.id)
+
 		if (req.body.liked) {
-			// LIKE: on veut créer un match
-			if (result.length) {
-				// Déjà matché
-				return res.json({ msg: 'User already Matched' })
+			// LIKE: idempotent → si déjà présent, retourner ok
+			if (!hasForward.length) {
+				await matchModel.insertMatche(req.user.id, targetId)
 			}
-			await matchModel.insertMatche(req.user.id, req.body.id)
-			// Vérifier si l'autre a déjà liké (match réciproque)
-			const reverse = await matchModel.getMatche(req.body.id, req.user.id)
-			if (reverse.length) {
-				// Conversation
-				let conv = await chatModel.getConv(req.user.id, req.body.id)
+			// Mutual like → s'assurer que la conv existe et est autorisée
+			if (hasReverse.length) {
+				let conv = await chatModel.getConv(req.user.id, targetId)
 				if (!conv.length) {
-					await chatModel.insertConv(req.user.id, req.body.id)
+					await chatModel.insertConv(req.user.id, targetId)
 				} else if (conv[0].allowed === false || conv[0].allowed === 0) {
 					await chatModel.allowConv(conv[0].id_conversation)
 				}
-				await notifModel.insertNotif('like_back', req.user.id, req.body.id)
+				// N'envoyer like_back que si on vient de créer le lien forward (éviter le spam)
+				if (!hasForward.length) {
+					await notifModel.insertNotif('like_back', req.user.id, targetId)
+				}
 			} else {
-				await notifModel.insertNotif('like', req.user.id, req.body.id)
+				// Premier like → notifier seulement à la création
+				if (!hasForward.length) {
+					await notifModel.insertNotif('like', req.user.id, targetId)
+				}
 			}
 			return res.json({ ok: true })
 		} else {
-			// UNLIKE: on veut supprimer un match
-			if (!result.length) {
-				// Pas matché
-				return res.json({ msg: 'User not matched' })
-			}
-			await matchModel.delMatche(req.user.id, req.body.id)
-			await chatModel.disallowConv(req.user.id, req.body.id)
-			await notifModel.insertNotif('unlike', req.user.id, req.body.id)
+			// UNLIKE: idempotent → supprimer les 2 sens si existants
+			await matchModel.delMatche(req.user.id, targetId)
+			await chatModel.disallowConv(req.user.id, targetId)
+			await notifModel.insertNotif('unlike', req.user.id, targetId)
 			return res.json({ ok: true })
 		}
 	} catch (err) {
