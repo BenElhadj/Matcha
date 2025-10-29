@@ -15,6 +15,7 @@ const corsConfig = {
     'https://benelhadj.github.io',
     'https://benelhadj.github.io/Matcha',
     'http://localhost:5173',
+    'http://localhost:5174',
     'https://matcha-backend-t6dr.onrender.com'
   ],
   credentials: true,

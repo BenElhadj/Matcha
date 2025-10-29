@@ -116,6 +116,10 @@ const sendMsg = async (req, res) => {
 		return res.json({ status: 'error', type: 'chat', message: 'Invalid request', data: null })
 	if (!validator(req.body.message, 'msg'))
 		return res.json({ status: 'error', type: 'chat', message: 'Invalid message', data: null })
+	// Security: enforce sender identity matches the authenticated user
+	if (Number(req.body.id_from) !== Number(req.user.id)) {
+		return res.status(403).json({ status: 'error', type: 'chat', message: 'Forbidden: wrong sender', data: null })
+	}
 	try {
 		const msg = {
 			id_conversation: req.body.id_conversation,
@@ -128,6 +132,9 @@ const sendMsg = async (req, res) => {
 		let convRows = await chatModel.getConversation(msg.id_conversation, msg.id_from, msg.id_from)
 		if (!convRows.length)
 			return res.json({ status: 'error', type: 'chat', message: 'Bad conversation', data: null })
+		if (convRows[0].allowed === false || convRows[0].allowed === 0) {
+			return res.json({ status: 'error', type: 'chat', message: 'Conversation not allowed', data: null })
+		}
 		// Insert message and update conversation last_msg/last_update
 		const inserted = await chatModel.insertMsg(msg)
 		await chatModel.updateConv(msg.date, inserted.id, msg.id_conversation)
