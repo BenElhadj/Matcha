@@ -70,8 +70,8 @@
             <div class="row q-mb-md" style="flex: 1; width: 100%">
               <q-separator style="margin-left: 50px"></q-separator>
 
-              <q-btn flat @click="matchFunction">
-                <img class="icon-size" :src="likeIcon" />
+              <q-btn flat @click="onLikeClick">
+                <img class="icon-size" :class="{ 'pop-like': animateLike }" :src="likeIcon" />
               </q-btn>
 
               <q-btn flat>
@@ -287,11 +287,14 @@ const followers = store.state.followers
 const convos = store.state.convos
 const blockDialog = ref(false)
 
-let likeIcon = ref('')
-let likedAlert = ref('')
+let likeIcon = ref(getLikeIcon('default'))
+let likedAlert = ref('default')
 let lastHistory = ref('')
 let allHistory = ref([])
 let liked = ref(false)
+const animateLike = ref(false)
+// Avoid re-syncing matches multiple times per mount
+const matchesSynced = ref(false)
 
 const profileImage = computed(() => {
   // Select image where profile is true/1 and cover is not true/1
@@ -351,12 +354,17 @@ const getHistory = async () => {
     const headers = { 'x-auth-token': token }
     const userId = String(route.params.id)
     const typesToFilter = [
+      // Legacy detailed types (directional)
       'he_like',
       'you_like',
       'he_like_back',
       'you_like_back',
       'he_unlike',
-      'you_unlike'
+      'you_unlike',
+      // Backend canonical history types
+      'like',
+      'like_back',
+      'unlike'
     ]
     const result = await axios.get(url, { headers })
 
@@ -366,7 +374,16 @@ const getHistory = async () => {
       // Latest event first
       filteredByHisId.sort((a, b) => new Date(b.match_date) - new Date(a.match_date))
       const last = filteredByHisId[0]
-      const t = last ? last.type : 'default'
+      // Map canonical types to directional ones (this endpoint returns events where other acted on you)
+      const raw = last ? last.type : 'default'
+      const t =
+        raw === 'like'
+          ? 'he_like'
+          : raw === 'like_back'
+          ? 'he_like_back'
+          : raw === 'unlike'
+          ? 'he_unlike'
+          : raw
       likeIcon.value = getLikeIcon(t)
       userCanChat.value = t === 'he_like_back' || t === 'you_like_back'
       likedAlert.value = t
@@ -406,6 +423,15 @@ watch(
     }
   },
   { immediate: true }
+)
+
+// Recalculer l’icône/état dès que les listes de relations arrivent/évoluent
+watch(
+  () => [store.state.followers, store.state.following, route.params.id],
+  () => {
+    computeLocalRelation()
+  },
+  { deep: false }
 )
 
 const distance = computed(() => {
@@ -467,21 +493,138 @@ function actionForType(type) {
   }
 }
 
+// Calcul immédiat depuis le store pour afficher l'icône selon l'état actuel
+function computeLocalRelation() {
+  try {
+    const userId = route.params.id ? String(route.params.id) : ''
+    if (!userId) return
+    const youLike =
+      Array.isArray(store.state.following) &&
+      store.state.following.some((p) => String(p.id) === userId)
+    const heLike =
+      Array.isArray(store.state.followers) &&
+      store.state.followers.some((p) => String(p.id) === userId)
+
+    let t = 'default'
+    if (youLike && heLike) t = 'you_like_back'
+    else if (youLike) t = 'you_like'
+    else if (heLike) t = 'he_like'
+    else t = 'default'
+
+    likedAlert.value = t
+    likeIcon.value = getLikeIcon(t)
+    userCanChat.value = t === 'you_like_back' || t === 'he_like_back'
+  } catch (e) {
+    // En cas de souci, conserver l'icône par défaut
+    likedAlert.value = 'default'
+    likeIcon.value = getLikeIcon('default')
+    userCanChat.value = false
+  }
+}
+
+// Lire l'état directement depuis la DB: matches + conversations
+async function fetchRelationFromDB() {
+  try {
+    const token = store.getters?.user?.token || localStorage.getItem('token')
+    const headers = { 'x-auth-token': token }
+    const base = import.meta.env.VITE_APP_API_URL
+    const [m, c] = await Promise.all([
+      axios.get(`${base}/api/getmatches`, { headers }).catch(() => ({ data: [] })),
+      axios.get(`${base}/api/chat/all`, { headers }).catch(() => ({ data: [] }))
+    ])
+    const targetId = String(route.params.id)
+    // Conversations autorisées -> mutual match garanti
+    const convs = Array.isArray(c.data) ? c.data : Array.isArray(c.data?.body) ? c.data.body : []
+    const convAllowed = convs.some(
+      (v) => String(v.user_id) === targetId && (v.allowed === true || v.allowed === 1)
+    )
+
+    // Matches: unique par username, on distingue les directions via matched_id/matcher_id
+    const arr = Array.isArray(m.data) ? m.data : Array.isArray(m.data?.body) ? m.data.body : []
+    const youLike = arr.some((it) => String(it.matched_id) === targetId)
+    const heLike = arr.some((it) => String(it.matcher_id) === targetId)
+
+    let t = 'default'
+    if (convAllowed || (youLike && heLike)) t = 'you_like_back'
+    else if (youLike) t = 'you_like'
+    else if (heLike) t = 'he_like'
+    else t = 'default'
+
+    likedAlert.value = t
+    likeIcon.value = getLikeIcon(t)
+    userCanChat.value = t === 'you_like_back' || t === 'he_like_back'
+    return t
+  } catch (e) {
+    return 'default'
+  }
+}
+
+// Lire l'état le plus récent depuis les notifications (like / like_back / unlike)
+async function fetchRelationFromNotif() {
+  try {
+    const items = await utility.syncNotif({ limit: 100, page: 1, mode: 'all', includeBlocked: 1 })
+    const targetId = String(route.params.id)
+    const arr = Array.isArray(items) ? items : []
+    const valid = ['like', 'like_back', 'unlike']
+    // Filtrer les notifs du profil cible
+    const related = arr.filter((it) => String(it.id_from) === targetId && valid.includes(it.type))
+    // Trier par date descendante si dispo, sinon par id
+    related.sort(
+      (a, b) =>
+        new Date(b.date || b.created_at || 0) - new Date(a.date || a.created_at || 0) ||
+        Number(b.id) - Number(a.id)
+    )
+    const last = related[0]
+    let t = 'default'
+    if (last) {
+      t =
+        last.type === 'like'
+          ? 'he_like'
+          : last.type === 'like_back'
+          ? 'he_like_back'
+          : last.type === 'unlike'
+          ? 'he_unlike'
+          : 'default'
+    }
+    likedAlert.value = t
+    likeIcon.value = getLikeIcon(t)
+    userCanChat.value = t === 'you_like_back' || t === 'he_like_back'
+    return t
+  } catch (_) {
+    return 'default'
+  }
+}
+
 const matchFunction = async () => {
   const url = `${import.meta.env.VITE_APP_API_URL}/api/match`
   const token = store.state.user?.token || localStorage.getItem('token')
   const headers = { 'x-auth-token': token }
   try {
-    // Determine current relation type and appropriate action
-    const type = likedAlert.value || (await getHistory()) || 'default'
-    const likedBool = actionForType(type)
-    const body = { id: route.params.id, liked: likedBool }
+    // Déterminer l'état courant en priorité depuis la DB (source de vérité)
+    let currentType = likedAlert.value || 'default'
+    try {
+      const t = await fetchRelationFromDB()
+      if (t && typeof t === 'string' && t !== 'default') currentType = t
+    } catch (_) {}
+    const likedBool = actionForType(currentType)
+    const body = { id: Number(route.params.id), liked: likedBool }
+
+    // Optimistic UI update
+    const prevType = likedAlert.value
+    const optimisticType = likedBool
+      ? currentType === 'he_like'
+        ? 'you_like_back'
+        : 'you_like'
+      : 'you_unlike'
+    likedAlert.value = optimisticType
+    likeIcon.value = getLikeIcon(optimisticType)
+    userCanChat.value = optimisticType === 'you_like_back' || optimisticType === 'he_like_back'
+
     const res = await axios.post(url, body, { headers })
     if (!res.data?.msg) {
-      // Success: update UI hints based on intended action
+      // Success: user feedback
       if (likedBool) {
-        // Sent like or like_back
-        if (type === 'he_like') {
+        if (currentType === 'he_like') {
           alert.value = {
             state: true,
             color: 'green',
@@ -495,7 +638,6 @@ const matchFunction = async () => {
           }
         }
       } else {
-        // Unlike / unmatch
         alert.value = {
           state: true,
           color: 'red',
@@ -503,10 +645,21 @@ const matchFunction = async () => {
         }
       }
       socket && socket.emit('match', body)
-      // Refresh local history status to update icon/chat
-      await getHistory()
+      // Rafraîchir l'état depuis la DB et les notifications
+      fetchRelationFromDB().then(() => fetchRelationFromNotif())
+    } else {
+      // Server returned an error message: revert optimistic UI
+      likedAlert.value = prevType
+      likeIcon.value = getLikeIcon(prevType)
+      userCanChat.value = prevType === 'you_like_back' || prevType === 'he_like_back'
+      alert.value = { state: true, color: 'red', text: res.data.msg }
     }
   } catch (error) {
+    // Revert optimistic UI on error
+    const prevType = 'default'
+    likedAlert.value = prevType
+    likeIcon.value = getLikeIcon(prevType)
+    userCanChat.value = false
     if (error.response && error.response.status === 404) {
       alert.value = {
         state: true,
@@ -522,6 +675,14 @@ const matchFunction = async () => {
     }
     console.error('matchFunction error:', error)
   }
+}
+
+const onLikeClick = () => {
+  try {
+    animateLike.value = true
+    setTimeout(() => (animateLike.value = false), 300)
+  } catch (_) {}
+  matchFunction()
 }
 
 const block = async () => {
@@ -576,18 +737,20 @@ const syncConvo = async (convo) => {
 }
 
 const goToChat = async () => {
-  if (!userCanChat.value)
+  if (!userCanChat.value) {
     alert.value = {
       state: true,
       color: 'red',
       text: `You will need to add ${user.value.first_name} ${user.value.last_name} to your friends list to be able to chat with him`
     }
-  return
+    return
+  }
 
   const conversation = store.getters.convos.filter((obj) => obj.user_id == route.params.id)
-
-  if (conversation) {
+  if (conversation && conversation.length) {
     syncConvo(conversation)
+  } else {
+    router.push('/chat').catch((err) => console.error('goToChat push error', err))
   }
 }
 
@@ -630,6 +793,8 @@ const prefetched = route?.meta?.prefetchedUser
 if (prefetched) {
   user.value = { ...prefetched, rating: Number(prefetched.rating) }
   loading.value = false
+  // Dès que l'utilisateur est prêt, tenter d'afficher l'icône correcte
+  computeLocalRelation()
 }
 
 function updateConnectedUsers() {
@@ -650,22 +815,37 @@ function updateConnectedUsers() {
       .catch((error) => {
         console.error('Erreur lors de la récupération des données :', error)
       })
-
-    getHistory()
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   // Validate route param and start lightweight polling only
   if (isNaN(route.params.id) || !route.params.id) {
     router.push('/404')
     return
   }
-  liked.value = getLikeValue(lastHistory) ? true : false
+  // Sync matches once (followers/following) for DB-driven local derivation
+  if (!matchesSynced.value) {
+    try {
+      await store.dispatch('syncMatches')
+    } catch (_) {}
+    matchesSynced.value = true
+  }
+  // Relation init: prefer DB, then notif, then local store as last fallback
+  try {
+    const t = await fetchRelationFromDB()
+    if (t === 'default') {
+      const n = await fetchRelationFromNotif()
+      if (n === 'default') computeLocalRelation()
+    }
+  } catch (_) {
+    computeLocalRelation()
+  }
   // Start polling for connected users at a lower frequency
   refreshInterval = setInterval(() => {
     updateConnectedUsers()
-  }, 5000) // every 5 seconds instead of 1s
+  }, 5000)
+  // No history-based override here to avoid icon flicker/double-loading
 })
 
 function refreshMethods() {
@@ -698,6 +878,21 @@ onBeforeUnmount(() => {
 }
 .icon-size {
   width: 42px;
+  transition: transform 120ms ease;
+}
+.icon-size.pop-like {
+  animation: pop-like 260ms ease-out;
+}
+@keyframes pop-like {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 .q-tabs__content {
   display: flex;

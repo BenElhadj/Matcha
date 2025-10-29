@@ -73,11 +73,10 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useStore } from 'vuex'
 import moment from 'moment'
 import utility from '@/utility'
-import axios from 'axios'
 import { getImageSrc } from '@/utility.js'
 // import io from 'socket.io-client'
 // const socket = io(`${import.meta.env.VITE_APP_API_URL}`)
@@ -88,7 +87,6 @@ const location = computed(() => store.getters.location)
 const connectedUsers = computed(() => store.state.connectedUsers)
 const updateTimer = ref(null)
 const store = useStore()
-let likeIcon = ref(getLikeIcon('default'))
 
 const props = defineProps({
   user: {
@@ -96,6 +94,37 @@ const props = defineProps({
     default: () => ({})
   }
 })
+
+// DB-driven relationship state using store (followers/following + convos)
+const followers = computed(() => store.getters.followers || [])
+const following = computed(() => store.getters.following || [])
+const convos = computed(() => store.getters.convos || [])
+
+const relationType = computed(() => {
+  try {
+    const targetId = String(props.user.user_id)
+    if (!targetId) return 'default'
+    const youLike = Array.isArray(following.value)
+      ? following.value.some((it) => String(it.id) === targetId)
+      : false
+    const heLike = Array.isArray(followers.value)
+      ? followers.value.some((it) => String(it.id) === targetId)
+      : false
+    const convAllowed = Array.isArray(convos.value)
+      ? convos.value.some(
+          (v) => String(v.user_id) === targetId && (v.allowed === true || v.allowed === 1)
+        )
+      : false
+    if (convAllowed || (youLike && heLike)) return 'you_like_back'
+    if (youLike) return 'you_like'
+    if (heLike) return 'he_like'
+    return 'default'
+  } catch (_) {
+    return 'default'
+  }
+})
+
+const likeIcon = computed(() => getLikeIcon(relationType.value))
 
 const age = computed(() => {
   return new Date().getFullYear() - new Date(props.user.birthdate).getFullYear()
@@ -137,36 +166,7 @@ const getProfileImage = computed(() => {
 // Deprecated helper kept for reference; prefer computed getProfileImage using getImageSrc
 // const profileImage = (image) => utility.getImageSrc(image, utility.getCachedDefault?.('profile') || `${import.meta.env.BASE_URL || '/' }default/defaut_profile.txt`)
 
-const getHistory = async () => {
-  try {
-    const selectedUserId = props.user.user_id
-    const token = store.getters.user.token || localStorage.getItem('token')
-    const url = `${import.meta.env.VITE_APP_API_URL}/api/browse/allhistory`
-    const headers = { 'x-auth-token': token }
-    const typesToFilter = [
-      'he_like',
-      'you_like',
-      'he_like_back',
-      'you_like_back',
-      'he_unlike',
-      'you_unlike'
-    ]
-    const result = await axios.get(url, { headers })
-
-    let latestInteraction = null
-    if (Array.isArray(result.data)) {
-      latestInteraction = result.data
-        .filter((item) => typesToFilter.includes(item.type))
-        .filter((item) => String(item.his_id) === String(selectedUserId))
-        .sort((a, b) => new Date(b.match_date) - new Date(a.match_date))[0]
-    }
-    likeIcon.value = latestInteraction
-      ? getLikeIcon(latestInteraction.type)
-      : getLikeIcon('default')
-  } catch (err) {
-    console.error('Error in frontend/ProfileHistory.vue:', err)
-  }
-}
+// Deprecated: history-based icon fetching removed; state is derived from DB-backed store
 
 // function updateConnectedUsers() {
 //   utility.getConnectedUsers()
@@ -188,8 +188,7 @@ const getHistory = async () => {
 // }
 
 onMounted(() => {
-  // updateConnectedUsers()
-  getHistory()
+  // Like icon reacts via store updates (syncMatches and sockets)
 })
 
 // function refreshMethods() {

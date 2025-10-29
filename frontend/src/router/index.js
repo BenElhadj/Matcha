@@ -63,9 +63,16 @@ const router = createRouter({
           return '/404'
         } catch (e) {
           console.error('[router] prefetch /user failed', e)
-          return '/404'
+          // If backend is sleeping/unavailable, redirect to server waking page instead of 404
+          const redirect = encodeURIComponent(`/user/${id}`)
+          return `/server-waking?redirect=${redirect}`
         }
       }
+    },
+    {
+      path: '/server-waking',
+      name: 'server-waking',
+      component: () => import('@/views/ServerWakingView.vue')
     },
     {
       path: '/',
