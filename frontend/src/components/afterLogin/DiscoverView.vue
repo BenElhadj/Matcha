@@ -411,7 +411,14 @@ async function created() {
   const token = localStorage.getItem('token')
   const url = `${import.meta.env.VITE_APP_API_URL}/api/users/show`
   const headers = { 'x-auth-token': token }
-  const res = await axios.post(url, { filter: true }, { headers })
+  let res
+  try {
+    res = await axios.post(url, { filter: true }, { headers })
+  } catch (e) {
+    // If backend is sleeping/unavailable, redirect to server waking page
+    router.push(`/server-waking?redirect=${encodeURIComponent('/discover')}`)
+    return
+  }
 
   const typesToFilter = ['he_block', 'you_block']
   const urlHistory = `${import.meta.env.VITE_APP_API_URL}/api/browse/allhistory`
@@ -464,6 +471,13 @@ onMounted(() => {
 })
 
 onMounted(created)
+
+// Ensure matches (followers/following) are synced so UserCard icons can compute state from DB
+onMounted(async () => {
+  try {
+    await store.dispatch('syncMatches')
+  } catch (_) {}
+})
 
 function refreshMethods() {
   calculateMaxDistance()

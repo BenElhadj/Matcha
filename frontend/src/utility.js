@@ -301,11 +301,30 @@ const getConnectedUsers = async () => {
   }
 }
 
+// Lightweight availability probe for backend (Render cold start friendly)
+// Returns true if server responds (any 2xx) to a public endpoint
+async function pingServer(timeoutMs = 4000) {
+  const source = axios.CancelToken.source()
+  const timeout = setTimeout(() => source.cancel('ping timeout'), timeoutMs)
+  try {
+    const url = `${import.meta.env.VITE_APP_API_URL}/connectedUsers`
+    const headers = { 'X-Requested-With': 'XMLHttpRequest' }
+    const res = await axios.get(url, { headers, cancelToken: source.token })
+    return !!res && (res.status >= 200 && res.status < 300)
+  } catch (e) {
+    return false
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
 import match from '@/assets/match/match-ok.png'
 import confirm from '@/assets/match/match-to-confirm.png'
 import receive from '@/assets/match/receive-match.png'
 import dislike from '@/assets/match/dislike.png'
 import defaultIcon from '@/assets/match/heart-default.png'
+import chatAvailable from '@/assets/chat/chat.png'
+import chatUnavailable from '@/assets/chat/chatUnavailable.png'
 
 // Upload helpers alignés avec le backend (champ 'image' et token dans header)
 export async function uploadProfileImage(file) {
@@ -359,6 +378,8 @@ export default {
   updateOneNotif,
   getAllTags,
   getConnectedUsers,
+  pingServer,
+  pingServer,
   syncLocation,
   getLocationFromIp,
   getDefaultTxtImage,
@@ -582,14 +603,22 @@ export default {
     }
   },
 
+  // Like icon mapping aligned to spec
+  // default -> heart-default.png
+  // he_like -> match-to-confirm.png
+  // you_like -> match-to-confirm.png
+  // he_like_back -> receive-match.png
+  // you_like_back -> match-ok.png
+  // he_unlike/you_unlike -> dislike.png
   getLikeIcon(liked) {
     switch (liked) {
       case 'he_like':
-        return `${receive}`
+        return `${confirm}`
       case 'you_like':
         return `${confirm}`
-      case 'you_like_back':
       case 'he_like_back':
+        return `${receive}`
+      case 'you_like_back':
         return `${match}`
       case 'he_unlike':
       case 'you_unlike':
@@ -598,6 +627,23 @@ export default {
       case null:
       default:
         return `${defaultIcon}`
+    }
+  },
+
+  // Chat icon mapping aligned to spec
+  // chat available on mutual like (he_like_back or you_like_back), otherwise unavailable
+  getChatIcon(type) {
+    switch (type) {
+      case 'he_like_back':
+      case 'you_like_back':
+        return `${chatAvailable}`
+      case 'default':
+      case 'he_like':
+      case 'you_like':
+      case 'he_unlike':
+      case 'you_unlike':
+      default:
+        return `${chatUnavailable}`
     }
   },
 
