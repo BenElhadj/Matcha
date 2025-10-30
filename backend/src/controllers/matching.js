@@ -5,8 +5,54 @@ const matchModel = require('../models/matchingModel')
 
 const { pool } = require('../config/database')
 
-// Match action 
+// Match action and intent (confirmation messages originate from backend)
 
+
+// Returns the current relation state between requester (req.user.id) and target (body.id)
+// and what action/confirmation the client should present.
+const intent = async (req, res) => {
+    if (!req.user.id) return res.json({ msg: 'Not logged in' })
+    const targetId = parseInt(req.body.id, 10)
+    if (!targetId || isNaN(targetId)) return res.json({ msg: 'Invalid request' })
+    try {
+        const youLike = await matchModel.getMatche(req.user.id, targetId) // forward
+        const heLike = await matchModel.getMatche(targetId, req.user.id) // reverse
+        const conv = await chatModel.getConv(req.user.id, targetId)
+        const convAllowed = Array.isArray(conv) && conv.length && (conv[0].allowed === true || conv[0].allowed === 1)
+
+        let state = 'default'
+        if (convAllowed || (youLike.length && heLike.length)) state = 'you_like_back'
+        else if (youLike.length) state = 'you_like'
+        else if (heLike.length) state = 'he_like'
+
+        // Determine next action and confirmation message (FR as requested)
+        let intent = { kind: 'like', confirm: false, message: "Envoyer une demande d'amitié ?" }
+        if (state === 'you_like') {
+            intent = {
+                kind: 'cancel_like',
+                confirm: true,
+                message: "Voulez-vous annuler votre demande d'amitié ?"
+            }
+        } else if (state === 'he_like') {
+            intent = {
+                kind: 'respond',
+                confirm: true,
+                message: "Accepter la demande d'amitié ou la refuser ?",
+                options: ['accept', 'decline']
+            }
+        } else if (state === 'you_like_back') {
+            intent = {
+                kind: 'unmatch',
+                confirm: true,
+                message: "Confirmer la suppression de l'amitié ?"
+            }
+        }
+
+        return res.json({ ok: true, state, intent })
+    } catch (err) {
+        return res.json({ msg: 'Fatal error', err })
+    }
+}
 
 const match = async (req, res) => {
 	if (!req.user.id) return res.json({ msg: 'Not logged in' })
@@ -41,6 +87,7 @@ const match = async (req, res) => {
 						})
 					} catch (_) {}
 				}
+				return res.json({ ok: true, message: "Demande acceptée, vous pouvez discuter ensemble." })
 			} else {
 				// Premier like → notifier seulement à la création
 				if (!hasForward.length) {
@@ -53,8 +100,8 @@ const match = async (req, res) => {
 						})
 					} catch (_) {}
 				}
+				return res.json({ ok: true, message: "Votre demande d'amitié a été envoyée." })
 			}
-			return res.json({ ok: true })
 		} else {
 			// UNLIKE: idempotent → supprimer les 2 sens si existants
 			await matchModel.delMatche(req.user.id, targetId)
@@ -67,7 +114,11 @@ const match = async (req, res) => {
 					type: 'unlike', id_from: req.user.id, id_to: targetId, created_at: new Date().toISOString()
 				})
 			} catch (_) {}
-			return res.json({ ok: true })
+			// Distinguish message based on prior state
+			const msg = hasForward.length && !hasReverse.length
+				? "Votre demande d'amitié a été annulée."
+				: "Vous n'êtes plus amis."
+			return res.json({ ok: true, message: msg })
 		}
 	} catch (err) {
 		return res.json({ msg: 'Fatal error', err })
@@ -75,5 +126,6 @@ const match = async (req, res) => {
 }
 
 module.exports = {
-	match
+	match,
+	intent
 }
