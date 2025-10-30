@@ -4,6 +4,9 @@ import axios from 'axios'
 export const user = {
   state: {
     user: {},
+    // relation flags per other user id
+    // unlike: { [otherId: string]: 'you_unlike' | 'he_unlike' }
+    relation: { unlike: {} },
     history: [],
     syncHistory: false,
     location: {},
@@ -66,6 +69,51 @@ export const user = {
     syncMatches: (state, matches) => {
       state.followers = matches.followers.filter(cur => !utility.isBlocked(state, cur.id))
       state.following = matches.following.filter(cur => !utility.isBlocked(state, cur.id))
+    },
+    markUnlike: (state, payload) => {
+      try {
+        const { id, dir } = payload || {}
+        if (!id || !dir) return
+        if (!state.user) state.user = {}
+        if (!state.user.relation) state.user.relation = { unlike: {} }
+        if (!state.user.relation.unlike) state.user.relation.unlike = {}
+        state.user.relation.unlike[String(id)] = dir === 'you_unlike' ? 'you_unlike' : 'he_unlike'
+      } catch (_) {}
+    },
+    clearUnlike: (state, id) => {
+      try {
+        if (!id) return
+        if (state.user && state.user.relation && state.user.relation.unlike) {
+          delete state.user.relation.unlike[String(id)]
+        }
+      } catch (_) {}
+    },
+    // Lightweight, socket-driven deltas to reflect match state instantly
+    addFollower: (state, id) => {
+      if (!id) return
+      const sid = String(id)
+      if (utility.isBlocked(state, id)) return
+      const exists = Array.isArray(state.followers) && state.followers.some(it => String(it.id) === sid)
+      if (!exists) {
+        state.followers = Array.isArray(state.followers) ? state.followers.slice() : []
+        state.followers.push({ id: Number(id), match_date: new Date().toISOString() })
+      }
+    },
+    addFollowing: (state, id) => {
+      if (!id) return
+      const sid = String(id)
+      if (utility.isBlocked(state, id)) return
+      const exists = Array.isArray(state.following) && state.following.some(it => String(it.id) === sid)
+      if (!exists) {
+        state.following = Array.isArray(state.following) ? state.following.slice() : []
+        state.following.push({ id: Number(id), match_date: new Date().toISOString() })
+      }
+    },
+    removeMatchEdges: (state, id) => {
+      if (!id) return
+      const sid = String(id)
+      state.followers = Array.isArray(state.followers) ? state.followers.filter(it => String(it.id) !== sid) : []
+      state.following = Array.isArray(state.following) ? state.following.filter(it => String(it.id) !== sid) : []
     },
     syncBlocked: (state, blacklist) => {
       state.blocked = blacklist.blocked
