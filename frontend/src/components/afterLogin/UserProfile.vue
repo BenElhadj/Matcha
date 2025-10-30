@@ -232,15 +232,7 @@ const onCoverChange = async (e) => {
     alert.value = { state: true, color: 'red', text: 'Erreur upload cover' }
   }
 }
-onMounted(() => {
-  socket.on('user-status-changed', () => {
-    updateConnectedUsers()
-  })
-})
-
-onBeforeUnmount(() => {
-  if (socket) socket.off('user-status-changed')
-})
+// Presence handled via store getters; no HTTP polling or ad-hoc socket events needed
 import AlertView from '@/views/AlertView.vue'
 import LoaderView from '@/views/LoaderView.vue'
 import utility from '@/utility.js'
@@ -280,14 +272,26 @@ const user = ref({})
 const data = ref(null)
 const lastSeen = ref('Unavailable')
 const activeTab = ref('tab-profile')
-const userCanChat = ref(false)
+// Chat availability derived from relationType
+const userCanChat = computed(() => relationType.value === 'you_like_back')
 
 const loggedIn = store.state.loggedIn
 const followers = store.state.followers
 const convos = store.state.convos
 const blockDialog = ref(false)
 
-let likeIcon = ref(getLikeIcon('default'))
+const relationType = computed(() =>
+  utility.deriveRelationState({
+    selfId: store.getters.user?.id,
+    targetId: route.params.id,
+    followers: store.getters.followers || [],
+    following: store.getters.following || [],
+    convos: store.getters.convos || [],
+    flags: store.state.user?.relation || { unlike: {} }
+  })
+)
+
+const likeIcon = computed(() => getLikeIcon(relationType.value))
 let likedAlert = ref('default')
 let lastHistory = ref('')
 let allHistory = ref([])
@@ -426,13 +430,7 @@ watch(
 )
 
 // Recalculer l’icône/état dès que les listes de relations arrivent/évoluent
-watch(
-  () => [store.state.followers, store.state.following, route.params.id],
-  () => {
-    computeLocalRelation()
-  },
-  { deep: false }
-)
+// reactive derivation handled by relationType computed
 
 const distance = computed(() => {
   const from = store.state.location
@@ -477,16 +475,13 @@ const getProfileImage = () => {
 }
 
 function actionForType(type) {
-  // Return liked boolean to send to backend
+  // DB-only: default/he_like -> like; you_like/you_like_back -> unlike
   switch (type) {
     case 'default':
-    case 'he_unlike':
-    case 'you_unlike':
-    case 'he_like': // like back to confirm
+    case 'he_like':
       return true
-    case 'you_like': // cancel your like
-    case 'he_like_back': // unmatch
-    case 'you_like_back': // unmatch
+    case 'you_like':
+    case 'you_like_back':
       return false
     default:
       return true
@@ -495,31 +490,7 @@ function actionForType(type) {
 
 // Calcul immédiat depuis le store pour afficher l'icône selon l'état actuel
 function computeLocalRelation() {
-  try {
-    const userId = route.params.id ? String(route.params.id) : ''
-    if (!userId) return
-    const youLike =
-      Array.isArray(store.state.following) &&
-      store.state.following.some((p) => String(p.id) === userId)
-    const heLike =
-      Array.isArray(store.state.followers) &&
-      store.state.followers.some((p) => String(p.id) === userId)
-
-    let t = 'default'
-    if (youLike && heLike) t = 'you_like_back'
-    else if (youLike) t = 'you_like'
-    else if (heLike) t = 'he_like'
-    else t = 'default'
-
-    likedAlert.value = t
-    likeIcon.value = getLikeIcon(t)
-    userCanChat.value = t === 'you_like_back' || t === 'he_like_back'
-  } catch (e) {
-    // En cas de souci, conserver l'icône par défaut
-    likedAlert.value = 'default'
-    likeIcon.value = getLikeIcon('default')
-    userCanChat.value = false
-  }
+  /* replaced by relationType computed */
 }
 
 // Lire l'état directement depuis la DB: matches + conversations
@@ -551,138 +522,44 @@ async function fetchRelationFromDB() {
     else t = 'default'
 
     likedAlert.value = t
-    likeIcon.value = getLikeIcon(t)
-    userCanChat.value = t === 'you_like_back' || t === 'he_like_back'
     return t
   } catch (e) {
     return 'default'
   }
 }
 
-// Lire l'état le plus récent depuis les notifications (like / like_back / unlike)
-async function fetchRelationFromNotif() {
-  try {
-    const items = await utility.syncNotif({ limit: 100, page: 1, mode: 'all', includeBlocked: 1 })
-    const targetId = String(route.params.id)
-    const arr = Array.isArray(items) ? items : []
-    const valid = ['like', 'like_back', 'unlike']
-    // Filtrer les notifs du profil cible
-    const related = arr.filter((it) => String(it.id_from) === targetId && valid.includes(it.type))
-    // Trier par date descendante si dispo, sinon par id
-    related.sort(
-      (a, b) =>
-        new Date(b.date || b.created_at || 0) - new Date(a.date || a.created_at || 0) ||
-        Number(b.id) - Number(a.id)
-    )
-    const last = related[0]
-    let t = 'default'
-    if (last) {
-      t =
-        last.type === 'like'
-          ? 'he_like'
-          : last.type === 'like_back'
-          ? 'he_like_back'
-          : last.type === 'unlike'
-          ? 'he_unlike'
-          : 'default'
-    }
-    likedAlert.value = t
-    likeIcon.value = getLikeIcon(t)
-    userCanChat.value = t === 'you_like_back' || t === 'he_like_back'
-    return t
-  } catch (_) {
-    return 'default'
-  }
-}
+// Notifications are not used to derive relation for icons anymore
 
-const matchFunction = async () => {
-  const url = `${import.meta.env.VITE_APP_API_URL}/api/match`
-  const token = store.state.user?.token || localStorage.getItem('token')
-  const headers = { 'x-auth-token': token }
-  try {
-    // Déterminer l'état courant en priorité depuis la DB (source de vérité)
-    let currentType = likedAlert.value || 'default'
-    try {
-      const t = await fetchRelationFromDB()
-      if (t && typeof t === 'string' && t !== 'default') currentType = t
-    } catch (_) {}
-    const likedBool = actionForType(currentType)
-    const body = { id: Number(route.params.id), liked: likedBool }
-
-    // Optimistic UI update
-    const prevType = likedAlert.value
-    const optimisticType = likedBool
-      ? currentType === 'he_like'
-        ? 'you_like_back'
-        : 'you_like'
-      : 'you_unlike'
-    likedAlert.value = optimisticType
-    likeIcon.value = getLikeIcon(optimisticType)
-    userCanChat.value = optimisticType === 'you_like_back' || optimisticType === 'he_like_back'
-
-    const res = await axios.post(url, body, { headers })
-    if (!res.data?.msg) {
-      // Success: user feedback
-      if (likedBool) {
-        if (currentType === 'he_like') {
-          alert.value = {
-            state: true,
-            color: 'green',
-            text: `You have just accepted the friend request from ${user.value.first_name} ${user.value.last_name}`
-          }
-        } else {
-          alert.value = {
-            state: true,
-            color: 'green',
-            text: `Your friendship request has been sent to ${user.value.first_name} ${user.value.last_name} successfully`
-          }
-        }
-      } else {
-        alert.value = {
-          state: true,
-          color: 'red',
-          text: `You just removed ${user.value.first_name} ${user.value.last_name} from your friend list`
-        }
-      }
-      socket && socket.emit('match', body)
-      // Rafraîchir l'état depuis la DB et les notifications
-      fetchRelationFromDB().then(() => fetchRelationFromNotif())
-    } else {
-      // Server returned an error message: revert optimistic UI
-      likedAlert.value = prevType
-      likeIcon.value = getLikeIcon(prevType)
-      userCanChat.value = prevType === 'you_like_back' || prevType === 'he_like_back'
-      alert.value = { state: true, color: 'red', text: res.data.msg }
-    }
-  } catch (error) {
-    // Revert optimistic UI on error
-    const prevType = 'default'
-    likedAlert.value = prevType
-    likeIcon.value = getLikeIcon(prevType)
-    userCanChat.value = false
-    if (error.response && error.response.status === 404) {
-      alert.value = {
-        state: true,
-        color: 'red',
-        text: "Erreur : la route /api/match n'existe pas sur le serveur. Veuillez contacter l'administrateur."
-      }
-    } else {
-      alert.value = {
-        state: true,
-        color: 'red',
-        text: "Une erreur s'est produite : " + (error.message || 'Erreur inconnue')
-      }
-    }
-    console.error('matchFunction error:', error)
-  }
-}
-
-const onLikeClick = () => {
+const onLikeClick = async () => {
   try {
     animateLike.value = true
     setTimeout(() => (animateLike.value = false), 300)
   } catch (_) {}
-  matchFunction()
+  try {
+    const likedBool = actionForType(relationType.value)
+    const url = `${import.meta.env.VITE_APP_API_URL}/api/match`
+    const token = store.state.user?.token || localStorage.getItem('token')
+    const headers = { 'x-auth-token': token }
+    const body = { id: Number(route.params.id), liked: !!likedBool }
+    const res = await axios.post(url, body, { headers })
+    if (res.data?.msg && !res.data?.ok) {
+      alert.value = { state: true, color: 'red', text: res.data.msg }
+      return
+    }
+    // Light success alert (no confirm flow)
+    const msg = res.data?.message || 'Action effectuée.'
+    alert.value = { state: true, color: 'green', text: msg }
+    // Persist dislike locally if action is unlike, clear otherwise
+    if (!likedBool) {
+      store.commit('markUnlike', { id: Number(route.params.id), dir: 'you_unlike' })
+    } else {
+      store.commit('clearUnlike', Number(route.params.id))
+    }
+    // Refresh from DB so icons reflect server state immediately
+    await Promise.allSettled([store.dispatch('syncMatches'), store.dispatch('syncConvoAll')])
+  } catch (e) {
+    alert.value = { state: true, color: 'red', text: e?.message || 'Erreur inconnue' }
+  }
 }
 
 const block = async () => {
@@ -797,26 +674,27 @@ if (prefetched) {
   computeLocalRelation()
 }
 
-function updateConnectedUsers() {
-  if (user.value && route.params.id) {
-    utility
-      .getConnectedUsers()
-      .then((data) => {
-        const connectedUserIds = data
-        const userId = route.params.id ? route.params.id.toString() : ''
-        if (userId && connectedUserIds.includes(userId)) {
-          lastSeen.value = 'online'
-        } else {
-          lastSeen.value = user.value.status
-            ? moment(user.value.status).utc().fromNow()
-            : 'Unavailable'
-        }
-      })
-      .catch((error) => {
-        console.error('Erreur lors de la récupération des données :', error)
-      })
+// Presence via store (socket online list)
+const isOnline = computed(() => {
+  try {
+    const ids = store.getters.connectedUsers || []
+    const id = route.params.id ? String(route.params.id) : ''
+    return id && Array.isArray(ids) ? ids.includes(id) : false
+  } catch (_) {
+    return false
   }
-}
+})
+watch(
+  isOnline,
+  (val) => {
+    lastSeen.value = val
+      ? 'online'
+      : user.value.status
+      ? moment(user.value.status).utc().fromNow()
+      : 'Unavailable'
+  },
+  { immediate: true }
+)
 
 onMounted(async () => {
   // Validate route param and start lightweight polling only
@@ -831,32 +709,20 @@ onMounted(async () => {
     } catch (_) {}
     matchesSynced.value = true
   }
-  // Relation init: prefer DB, then notif, then local store as last fallback
+  // Relation init: prefer DB/notif to warm store; rendering follows relationType computed
   try {
-    const t = await fetchRelationFromDB()
-    if (t === 'default') {
-      const n = await fetchRelationFromNotif()
-      if (n === 'default') computeLocalRelation()
-    }
+    await fetchRelationFromDB()
   } catch (_) {
     computeLocalRelation()
   }
-  // Start polling for connected users at a lower frequency
-  refreshInterval = setInterval(() => {
-    updateConnectedUsers()
-  }, 5000)
-  // No history-based override here to avoid icon flicker/double-loading
+  // No HTTP presence polling
 })
 
 function refreshMethods() {
   updateConnectedUsers()
 }
 
-let refreshInterval = null
-
-onBeforeUnmount(() => {
-  if (refreshInterval) clearInterval(refreshInterval)
-})
+onBeforeUnmount(() => {})
 </script>
 
 <style scoped>

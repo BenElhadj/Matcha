@@ -7,12 +7,12 @@
           <q-tooltip bottom class="status_container">
             <span>{{ lastSeen }}</span>
           </q-tooltip>
-          <q-badge small rounded :color="`${user.isConnected ? 'green' : 'grey'}`" />
+          <q-badge small rounded :color="isOnline ? 'green' : 'grey'" />
         </q-item-section>
       </div>
 
       <q-avatar class="justify-center" size="150px">
-        <img class="icon-avatar" square :src="likeIcon" />
+        <img class="icon-avatar" square :src="likeIcon" @click.stop="onLikeIconClick" />
         <img :src="getProfileImage" />
       </q-avatar>
       <span justify-center class="name headline text-capitalize mt-2">{{ user.username }}</span>
@@ -70,6 +70,7 @@
       </div>
     </div>
   </q-card>
+  <AlertView :alert="alert" />
 </template>
 
 <script setup>
@@ -78,6 +79,8 @@ import { useStore } from 'vuex'
 import moment from 'moment'
 import utility from '@/utility'
 import { getImageSrc } from '@/utility.js'
+import AlertView from '@/views/AlertView.vue'
+import axios from 'axios'
 // import io from 'socket.io-client'
 // const socket = io(`${import.meta.env.VITE_APP_API_URL}`)
 
@@ -95,36 +98,67 @@ const props = defineProps({
   }
 })
 
-// DB-driven relationship state using store (followers/following + convos)
+// Centralized relation state using DB-backed store data only
 const followers = computed(() => store.getters.followers || [])
 const following = computed(() => store.getters.following || [])
 const convos = computed(() => store.getters.convos || [])
-
-const relationType = computed(() => {
-  try {
-    const targetId = String(props.user.user_id)
-    if (!targetId) return 'default'
-    const youLike = Array.isArray(following.value)
-      ? following.value.some((it) => String(it.id) === targetId)
-      : false
-    const heLike = Array.isArray(followers.value)
-      ? followers.value.some((it) => String(it.id) === targetId)
-      : false
-    const convAllowed = Array.isArray(convos.value)
-      ? convos.value.some(
-          (v) => String(v.user_id) === targetId && (v.allowed === true || v.allowed === 1)
-        )
-      : false
-    if (convAllowed || (youLike && heLike)) return 'you_like_back'
-    if (youLike) return 'you_like'
-    if (heLike) return 'he_like'
-    return 'default'
-  } catch (_) {
-    return 'default'
-  }
-})
+const selfId = computed(() => store.getters.user?.id)
+const relationType = computed(() =>
+  utility.deriveRelationState({
+    selfId: selfId.value,
+    targetId: props.user?.user_id,
+    followers: followers.value,
+    following: following.value,
+    convos: convos.value,
+    flags: store.state.user?.relation || { unlike: {} }
+  })
+)
 
 const likeIcon = computed(() => getLikeIcon(relationType.value))
+
+// Lightweight alert holder
+const alert = ref({ state: false, color: '', text: '' })
+
+function nextLikedFromState(type) {
+  // DB-only: default/he_like -> like; you_like/you_like_back -> unlike
+  switch (type) {
+    case 'default':
+    case 'he_like':
+      return true
+    case 'you_like':
+    case 'you_like_back':
+      return false
+    default:
+      return true
+  }
+}
+
+async function onLikeIconClick() {
+  const targetId = props.user?.user_id
+  if (!targetId) return
+  try {
+    const likedBool = nextLikedFromState(relationType.value)
+    const url = `${import.meta.env.VITE_APP_API_URL}/api/match`
+    const token = store.state.user?.token || localStorage.getItem('token')
+    const headers = { 'x-auth-token': token }
+    const body = { id: Number(targetId), liked: !!likedBool }
+    const res = await axios.post(url, body, { headers })
+    if (res.data?.msg && !res.data?.ok) {
+      alert.value = { state: true, color: 'red', text: res.data.msg }
+      return
+    }
+    alert.value = { state: true, color: 'green', text: res.data?.message || 'Action effectuée.' }
+    // Persist dislike locally if action is unlike, clear otherwise
+    if (!likedBool) {
+      store.commit('markUnlike', { id: Number(targetId), dir: 'you_unlike' })
+    } else {
+      store.commit('clearUnlike', Number(targetId))
+    }
+    await Promise.allSettled([store.dispatch('syncMatches'), store.dispatch('syncConvoAll')])
+  } catch (e) {
+    alert.value = { state: true, color: 'red', text: e?.message || 'Erreur inconnue' }
+  }
+}
 
 const age = computed(() => {
   return new Date().getFullYear() - new Date(props.user.birthdate).getFullYear()
@@ -148,6 +182,13 @@ const lastSeen = computed(() => {
   } else {
     return (props.user.lastSeen = moment(props.user.status).utc().fromNow())
   }
+})
+
+// Presence derived from store (socket-driven)
+const isOnline = computed(() => {
+  const ids = store.getters.connectedUsers || []
+  const targetId = props.user?.user_id != null ? String(props.user.user_id) : ''
+  return targetId && Array.isArray(ids) ? ids.includes(String(targetId)) : false
 })
 
 const getProfileImage = computed(() => {

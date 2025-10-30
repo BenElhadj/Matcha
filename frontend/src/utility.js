@@ -326,6 +326,31 @@ import defaultIcon from '@/assets/match/heart-default.png'
 import chatAvailable from '@/assets/chat/chat.png'
 import chatUnavailable from '@/assets/chat/chatUnavailable.png'
 
+// Derive relation state strictly from DB-backed arrays (no notifications)
+// Inputs: followers, following, convos (allowed)
+// Returns one of: default | you_like | he_like | you_like_back
+export function deriveRelationState({ selfId, targetId, followers = [], following = [], convos = [], flags = {} }) {
+  try {
+    if (!selfId || !targetId) return 'default'
+    const other = String(targetId)
+    // Persisted unlike takes precedence for UI (both sides show dislike)
+    const unlikeMap = flags && flags.unlike ? flags.unlike : {}
+    const unlikeDir = unlikeMap && unlikeMap[other]
+    if (unlikeDir === 'you_unlike' || unlikeDir === 'he_unlike') return unlikeDir
+    const hasYouLike = Array.isArray(following) && following.some((it) => String(it.id) === other)
+    const hasHeLike = Array.isArray(followers) && followers.some((it) => String(it.id) === other)
+    const convAllowed = Array.isArray(convos) && convos.some((c) => String(c.user_id) === other && (c.allowed === true || c.allowed === 1))
+
+    // Mutual like or allowed conversation → like_back state (chat enabled)
+    if (convAllowed || (hasYouLike && hasHeLike)) return 'you_like_back'
+    if (hasYouLike) return 'you_like'
+    if (hasHeLike) return 'he_like'
+    return 'default'
+  } catch (_) {
+    return 'default'
+  }
+}
+
 // Upload helpers alignés avec le backend (champ 'image' et token dans header)
 export async function uploadProfileImage(file) {
   try {
@@ -385,6 +410,7 @@ export default {
   getDefaultTxtImage,
   warmDefaultTxtImages,
   getCachedDefault,
+  deriveRelationState,
   // eslint-disable-next-line
   getFullPath,
   // consoleLog: ('utility.js getFullPath => ', getFullPath),
@@ -590,11 +616,15 @@ export default {
   getLikeValue (type) {
     switch(type) {
       case 'you_like_back':
+        return true
       case 'he_like_back':
+        return true
       case 'you_like':
+        return true
       case 'he_like':
         return true
       case 'you_unlike':
+        return false
       case 'he_unlike':
         return false
       case null:
@@ -603,24 +633,24 @@ export default {
     }
   },
 
-  // Like icon mapping aligned to spec
-  // default -> heart-default.png
-  // he_like -> match-to-confirm.png
-  // you_like -> match-to-confirm.png
-  // he_like_back -> receive-match.png
-  // you_like_back -> match-ok.png
-  // he_unlike/you_unlike -> dislike.png
+  // Like icon mapping (single source of truth)
+  // default       -> heart-default.png
+  // he_like       -> receive-match.png
+  // you_like      -> match-to-confirm.png
+  // *_like_back   -> match-ok.png
+  // *_unlike      -> dislike.png
   getLikeIcon(liked) {
     switch (liked) {
       case 'he_like':
-        return `${confirm}`
+        return `${receive}`
       case 'you_like':
         return `${confirm}`
       case 'he_like_back':
-        return `${receive}`
+        return `${match}`
       case 'you_like_back':
         return `${match}`
       case 'he_unlike':
+        return `${dislike}`
       case 'you_unlike':
         return `${dislike}`
       case 'default':
@@ -635,13 +665,19 @@ export default {
   getChatIcon(type) {
     switch (type) {
       case 'he_like_back':
+        return `${chatAvailable}`
       case 'you_like_back':
         return `${chatAvailable}`
       case 'default':
+        return `${chatUnavailable}`
       case 'he_like':
+        return `${chatUnavailable}`
       case 'you_like':
+        return `${chatUnavailable}`
       case 'he_unlike':
+        return `${chatUnavailable}`
       case 'you_unlike':
+        return `${chatUnavailable}`
       default:
         return `${chatUnavailable}`
     }
