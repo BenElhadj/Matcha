@@ -276,7 +276,8 @@ async function discover(req, res) {
 				}
 			} catch (_) {}
 			return {
-				user_id: u.id || u.user_id, // normalize
+				// Prefer images.user_id (FK) over images.id to ensure we reference the actual user id
+				user_id: Number(u.user_id || u.id),
 				username: u.username,
 				first_name: u.first_name,
 				last_name: u.last_name,
@@ -333,6 +334,9 @@ async function discover(req, res) {
 			} catch (_) {}
 			return { ...u, distanceKm: d }
 		})
+		// Compute global max distance BEFORE applying distance filter
+		const maxDistance = rows.length ? Math.ceil(rows.reduce((acc, u) => Math.max(acc, Number(u.distanceKm) || 0), 0)) : 0
+		// Now apply distance filter
 		rows = rows.filter((u) => u.distanceKm >= 0 && u.distanceKm <= distanceMax)
 		rows = rows.filter((u) => u.ageYears >= ageMin && u.ageYears <= ageMax)
 		rows = rows.filter((u) => u.rating >= ratingMin && u.rating <= ratingMax)
@@ -378,12 +382,12 @@ async function discover(req, res) {
 		rows.sort(cmp)
 
 		// Pagination
-		const total = rows.length
+	const total = rows.length
 		const start = (page - 1) * limit
 		const items = rows.slice(start, start + limit)
 
 		// Minimal payload; no heavy images array
-		return res.json({ page, limit, total, items })
+	return res.json({ page, limit, total, maxDistance, items })
 	} catch (err) {
 		return res.json({ msg: 'Fatal error', err: String(err && err.message ? err.message : err) })
 	}
