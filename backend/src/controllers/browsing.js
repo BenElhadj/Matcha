@@ -258,12 +258,13 @@ async function discover(req, res) {
 		let rows = await userModel.getUserBrow()
 
 		// Filter out sensitive columns and shape base objects
+		const isValid = (v) => v && v !== 'false' && String(v).trim() !== ''
 		rows = rows.map((u) => {
 			// profile image from images.* (link or data)
 			let profile_image = ''
 			try {
-				if (u.link) profile_image = u.link
-				else if (u.data) profile_image = `data:image/png;base64,${u.data}`
+				if (isValid(u.link)) profile_image = u.link
+				else if (isValid(u.data)) profile_image = `data:image/png;base64,${u.data}`
 			} catch (_) {}
 			// Compute ageYears server-side once
 			let ageYears = 0
@@ -275,7 +276,7 @@ async function discover(req, res) {
 				}
 			} catch (_) {}
 			return {
-				user_id: u.id || u.user_id || u.user_id, // normalize
+				user_id: u.id || u.user_id, // normalize
 				username: u.username,
 				first_name: u.first_name,
 				last_name: u.last_name,
@@ -285,6 +286,7 @@ async function discover(req, res) {
 				tags: u.tags || '',
 				city: u.city,
 				country: u.country,
+				address: u.address,
 				lat: Number(u.lat),
 				lng: Number(u.lng),
 				rating: Number(u.rating) || 0,
@@ -299,7 +301,9 @@ async function discover(req, res) {
 		// others block me
 		const blk2 = await db.query('SELECT blocker FROM blocked WHERE blocked = $1', [me.id])
 		const blockedBySet = new Set(blk2.rows.map((r) => String(r.blocker)))
-		rows = rows.filter((u) => !myBlockedSet.has(String(u.user_id)) && !blockedBySet.has(String(u.user_id)))
+	rows = rows.filter((u) => !myBlockedSet.has(String(u.user_id)) && !blockedBySet.has(String(u.user_id)))
+	// Exclude self
+	rows = rows.filter((u) => String(u.user_id) !== String(me.id))
 
 		// Filters
 		if (gender) rows = rows.filter((u) => u.gender === gender)
