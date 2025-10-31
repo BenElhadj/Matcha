@@ -238,6 +238,9 @@ io.setMaxListeners(5000)
 // Rooms par utilisateur pour adresser tous ses onglets
 const userRoom = id => `user:${String(id)}`
 
+// Expose connected users set on app for controllers needing online-first ordering
+app.set('connectedUsers', connectedUsers)
+
 io.on('connection', socket => {
   console.log('✅ New socket connection');
 
