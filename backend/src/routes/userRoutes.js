@@ -28,6 +28,9 @@ routes.post('/changepassword', authCheck, userProfile.changePassword)
 routes.post('/show', authCheck, browsing.showUsers)
 routes.get('/show/:id', authCheck, browsing.showUserById)
 
+// New, optimized discover endpoint with pagination and server-side filters
+routes.get('/discover', authCheck, browsing.discover)
+
 routes.post('/report', authCheck, block.reportUser)
 // routes.get('/connectedUsers', authCheck, browsing.connectedUsers)
 routes.post('/block', authCheck, block.blockUser)

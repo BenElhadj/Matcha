@@ -6,6 +6,7 @@ const historyModel = require('../models/historyModel')
 
 const matchingModel = require('../models/matchingModel')
 const distance = require('../utility/distance')
+const db = require('../config/database')
 
 
 // Show users (Global)
@@ -224,5 +225,162 @@ module.exports = {
 	getTags,
 	getBlocked,
 	getMatches,
-	getAllHistory
+	getAllHistory,
+	discover
+}
+
+// New optimized Discover with pagination and server-side filters
+async function discover(req, res) {
+	try {
+		const me = req.user
+		if (!me || !me.id) return res.json({ msg: 'Not logged in' })
+
+		// Parse query params
+		const q = req.query || {}
+		const page = Math.max(parseInt(q.page || '1', 10), 1)
+		const limit = Math.min(Math.max(parseInt(q.limit || '50', 10), 1), 100)
+		const onlineFirst = String(q.onlineFirst || '1') === '1'
+		const gender = q.gender && q.gender !== 'all' ? String(q.gender) : null
+		const search = q.search ? String(q.search).toLowerCase() : ''
+		const ageMin = isFinite(q.ageMin) ? Number(q.ageMin) : 18
+		const ageMax = isFinite(q.ageMax) ? Number(q.ageMax) : 85
+		const ratingMin = isFinite(q.ratingMin) ? Number(q.ratingMin) : 0
+		const ratingMax = isFinite(q.ratingMax) ? Number(q.ratingMax) : 7
+		const distanceMax = isFinite(q.distanceMax) ? Number(q.distanceMax) : 10000
+		const lat = isFinite(q.lat) ? Number(q.lat) : me.lat
+		const lng = isFinite(q.lng) ? Number(q.lng) : me.lng
+		const tags = q.tags ? String(q.tags).split(',').filter(Boolean) : []
+		const sortBy = q.sortBy || 'distance' // distance | age | rating | interests
+		const sortDir = (q.sortDir || 'asc').toLowerCase() === 'desc' ? -1 : 1
+
+		// Base dataset: users with profile image and computed rating
+		// Note: getUserBrow already joins images.profile = TRUE and computes get_rating(users.id)
+		let rows = await userModel.getUserBrow()
+
+		// Filter out sensitive columns and shape base objects
+		rows = rows.map((u) => {
+			// profile image from images.* (link or data)
+			let profile_image = ''
+			try {
+				if (u.link) profile_image = u.link
+				else if (u.data) profile_image = `data:image/png;base64,${u.data}`
+			} catch (_) {}
+			// Compute ageYears server-side once
+			let ageYears = 0
+			try {
+				const bd = u.birthdate ? new Date(u.birthdate) : null
+				if (bd && !isNaN(bd)) {
+					const diff = Date.now() - bd.getTime()
+					ageYears = Math.abs(new Date(diff).getUTCFullYear() - 1970)
+				}
+			} catch (_) {}
+			return {
+				user_id: u.id || u.user_id || u.user_id, // normalize
+				username: u.username,
+				first_name: u.first_name,
+				last_name: u.last_name,
+				gender: u.gender,
+				birthdate: u.birthdate,
+				ageYears,
+				tags: u.tags || '',
+				city: u.city,
+				country: u.country,
+				lat: Number(u.lat),
+				lng: Number(u.lng),
+				rating: Number(u.rating) || 0,
+				profile_image
+			}
+		})
+
+		// Exclude blocked both ways
+		// me blocks others
+		const blk1 = await db.query('SELECT blocked FROM blocked WHERE blocker = $1', [me.id])
+		const myBlockedSet = new Set(blk1.rows.map((r) => String(r.blocked)))
+		// others block me
+		const blk2 = await db.query('SELECT blocker FROM blocked WHERE blocked = $1', [me.id])
+		const blockedBySet = new Set(blk2.rows.map((r) => String(r.blocker)))
+		rows = rows.filter((u) => !myBlockedSet.has(String(u.user_id)) && !blockedBySet.has(String(u.user_id)))
+
+		// Filters
+		if (gender) rows = rows.filter((u) => u.gender === gender)
+		if (search) {
+			rows = rows.filter((u) => {
+				const s1 = (u.username || '').toLowerCase()
+				const s2 = (u.first_name || '').toLowerCase()
+				const s3 = (u.last_name || '').toLowerCase()
+				return s1.includes(search) || s2.includes(search) || s3.includes(search)
+			})
+		}
+		if (tags.length) {
+			rows = rows.filter((u) => {
+				if (!u.tags) return false
+				const arr = String(u.tags).split(',')
+				return tags.some((t) => arr.includes(t))
+			})
+		}
+		// Distance compute on demand; memoize
+		const meLoc = { lat: Number(lat), lng: Number(lng) }
+		rows = rows.map((u) => {
+			let d = 0
+			try {
+				if (isFinite(u.lat) && isFinite(u.lng) && isFinite(meLoc.lat) && isFinite(meLoc.lng)) {
+					d = distance(meLoc, { lat: Number(u.lat), lng: Number(u.lng) })
+				}
+			} catch (_) {}
+			return { ...u, distanceKm: d }
+		})
+		rows = rows.filter((u) => u.distanceKm >= 0 && u.distanceKm <= distanceMax)
+		rows = rows.filter((u) => u.ageYears >= ageMin && u.ageYears <= ageMax)
+		rows = rows.filter((u) => u.rating >= ratingMin && u.rating <= ratingMax)
+
+		// Interests count for sort if needed
+		const myTags = (me.tags || '').split(',')
+		const interestsCount = (u) => {
+			if (!u.tags) return 0
+			const arr = String(u.tags).split(',')
+			return myTags.filter((t) => arr.includes(t)).length
+		}
+
+		// Online-first using app-scoped Set
+		let onlineIds = []
+		if (onlineFirst) {
+			try {
+				const set = req.app.get('connectedUsers')
+				if (set && typeof set.has === 'function') onlineIds = Array.from(set)
+			} catch (_) {}
+		}
+		const onlineSet = new Set(onlineIds.map((x) => String(x)))
+
+		// Sorting
+		const cmp = (a, b) => {
+			// Online first
+			if (onlineFirst) {
+				const ao = onlineSet.has(String(a.user_id)) ? 0 : 1
+				const bo = onlineSet.has(String(b.user_id)) ? 0 : 1
+				if (ao !== bo) return ao - bo
+			}
+			switch (sortBy) {
+				case 'age':
+					return sortDir * ((a.ageYears || 0) - (b.ageYears || 0))
+				case 'rating':
+					return sortDir * ((b.rating || 0) - (a.rating || 0))
+				case 'interests':
+					return sortDir * (interestsCount(b) - interestsCount(a))
+				case 'distance':
+				default:
+					return sortDir * ((a.distanceKm || 0) - (b.distanceKm || 0))
+			}
+		}
+		rows.sort(cmp)
+
+		// Pagination
+		const total = rows.length
+		const start = (page - 1) * limit
+		const items = rows.slice(start, start + limit)
+
+		// Minimal payload; no heavy images array
+		return res.json({ page, limit, total, items })
+	} catch (err) {
+		return res.json({ msg: 'Fatal error', err: String(err && err.message ? err.message : err) })
+	}
 }
