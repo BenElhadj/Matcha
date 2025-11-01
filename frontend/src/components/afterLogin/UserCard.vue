@@ -13,7 +13,7 @@
 
       <q-avatar class="justify-center" size="150px">
         <img class="icon-avatar" square :src="likeIcon" @click.stop="onLikeIconClick" />
-        <img :src="getProfileImage" />
+        <img :src="getProfileImage" loading="lazy" />
       </q-avatar>
       <span justify-center class="name headline text-capitalize mt-2">{{ user.username }}</span>
       <span justify-center class="name headline text-capitalize mt-2"
@@ -196,6 +196,14 @@ const getProfileImage = computed(() => {
   const defaultTxt = `${base}default/defaut_profile.txt`
   const cachedDefault = utility.getCachedDefault ? utility.getCachedDefault('profile') : null
   const fallback = cachedDefault || defaultTxt
+  // Prefer lightweight field from discover endpoint
+  if (
+    props.user.profile_image &&
+    typeof props.user.profile_image === 'string' &&
+    props.user.profile_image.length > 0
+  ) {
+    return props.user.profile_image
+  }
   if (props.user.images && props.user.images.length > 0) {
     const profileImg = props.user.images.find((img) => img.profile)
     const img = profileImg || props.user.images[0]

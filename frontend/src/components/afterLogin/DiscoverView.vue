@@ -3,8 +3,8 @@
     <div v-if="isComplete" class="discover">
       <q-page-container v-if="loaded" class="pt-5 px-0">
         <q-layout class="row wrap justify-center">
-          <div class="col-2">
-            <q-page-container class="px-5">
+          <div class="col-2 md3 sm12 filters-panel">
+            <div class="px-5">
               <q-layout class="column">
                 <h4 class="title mb-4">Search</h4>
                 <q-input
@@ -136,19 +136,47 @@
                   />
                 </div>
               </q-layout>
-            </q-page-container>
+            </div>
           </div>
 
-          <div class="col-10 md9 sm12">
-            <div class="row wrap justify-center">
-              <div
-                v-for="user in sorted"
-                :key="user.user_id"
-                class="user col-xl-2 col-lg-3 col-sm-3 ma-3 grow"
-              >
-                <router-link :to="{ name: 'userprofile', params: { id: user.user_id } }">
-                  <user-card :user="user" />
-                </router-link>
+          <div class="col-10 md9 sm12 position-relative">
+            <div class="row items-center q-px-md q-mb-md">
+              <div class="text-subtitle2">Online: {{ onlineCount }}</div>
+              <div class="q-ml-md text-caption">Showing: {{ sorted.length }}</div>
+            </div>
+            <div class="q-px-md">
+              <div class="grid-wrapper position-relative">
+                <div class="row wrap justify-center q-col-gutter-md">
+                  <div
+                    v-for="user in sorted"
+                    :key="user.user_id"
+                    class="user col-xl-2 col-lg-3 col-sm-3 ma-3 grow"
+                  >
+                    <router-link :to="{ name: 'userprofile', params: { id: user.user_id } }">
+                      <user-card :user="user" />
+                    </router-link>
+                  </div>
+                </div>
+                <q-infinite-scroll
+                  :offset="300"
+                  @load="onInfiniteLoad"
+                  :disable="isFetching || users.length >= total"
+                >
+                  <div style="height: 1px"></div>
+                </q-infinite-scroll>
+
+                <!-- Overlay limited to the grid area only -->
+                <div class="loader-overlay" v-show="isFetching">
+                  <LoaderView />
+                </div>
+
+                <!-- No results placeholder -->
+                <div
+                  v-if="loaded && !isFetching && total === 0"
+                  class="no-results q-pa-lg text-center text-grey-7"
+                >
+                  Aucun résultat
+                </div>
               </div>
             </div>
           </div>
@@ -208,11 +236,29 @@ const hasAll = ref(false)
 const loaded = ref(false)
 const age = ref({ min: 18, max: 85 })
 const rating = ref({ min: 0, max: 7 })
-const distance = ref({ min: 0, max: 0 })
-const maxDis = ref(null)
+const distance = ref({ min: 0, max: 10000 })
+const maxDis = ref(10000)
+const programmaticUpdate = ref(false)
+const distanceTouched = ref(false)
 const sortTypes = ['age', 'distance', 'rating', 'interests']
 const nats = ref(countries)
 const recherche = ref('')
+
+// Apply default gender from user's "looking" preference on first load
+try {
+  const looking = user && user.looking ? String(user.looking) : 'all'
+  // looking can be 'all' | 'male' | 'female' | 'other'
+  gender.value = ['male', 'female', 'other', 'all'].includes(looking) ? looking : 'all'
+} catch (_) {}
+
+// Server-driven pagination
+const page = ref(1)
+const limit = ref(50)
+const total = ref(0)
+const isFetching = ref(false)
+// const isRefreshing = ref(false)
+let abortController = null
+
 
 const filters = {
   self: (val) => val.user_id !== user.id,
@@ -246,18 +292,27 @@ const filters = {
     (val.last_name && val.last_name.toLowerCase().includes(recherche.value.toLowerCase()))
 }
 
-const filtered = computed(() => {
+// Display list is server-filtered/sorted; we only apply location string locally for now
+const displayed = computed(() => {
+  const meId = String(user.id)
+  const q = (location.value || '').toLowerCase().trim()
+  const s = (recherche.value || '').toLowerCase().trim()
   return users.value
-    .filter(filters.self)
-    .filter(filters.blocked)
-    .filter(filters.blockedBy)
-    .filter(filters.rating)
-    .filter(filters.gender)
-    .filter(filters.location)
-    .filter(filters.age)
-    .filter(filters.distance)
-    .filter(filters.interest)
-    .filter(filters.search)
+    .filter((val) => String(val.user_id) !== meId)
+    .filter(
+      (val) =>
+        !q ||
+        [val.country, val.city]
+          .map((s) => (s || '').toLowerCase())
+          .some((cur) => cur && cur.includes(q))
+    )
+    .filter(
+      (val) =>
+        !s ||
+        (val.username && val.username.toLowerCase().includes(s)) ||
+        (val.first_name && val.first_name.toLowerCase().includes(s)) ||
+        (val.last_name && val.last_name.toLowerCase().includes(s))
+    )
 })
 
 // search handled reactively via filters.search
@@ -270,100 +325,31 @@ const ageCalc = (birthdate) => {
   return Math.abs(ageDate.getUTCFullYear() - 1970)
 }
 
-const commonTags = (user, tags) => {
-  if (!tags || !tags.length) return 0
-  const userTags = user.tags.split(',')
-  return tags.split(',').filter((val) => userTags.includes(val)).length
-}
+// const commonTags = (user, tags) => {
+//   if (!tags || !tags.length) return 0
+//   const userTags = user.tags.split(',')
+//   return tags.split(',').filter((val) => userTags.includes(val)).length
+// }
 
+// Server provides sorted results with online-first; keep ordering and only group by live presence if needed
 const sorted = computed(() => {
-  const onlineUsers = filtered.value.filter((user) => user.isConnected)
-  const disconnectedUsers = filtered.value.filter((user) => !user.isConnected)
-
-  if (!sort.value || sort.value === 'distance') {
-    const sortedOnlineUsers = onlineUsers.slice()
-    const sortedDisconnectedUsers = disconnectedUsers.slice()
-    return [...sortedOnlineUsers, ...sortedDisconnectedUsers]
-  }
-
-  let sortFunc
-
-  switch (sort.value) {
-    case 'age':
-      sortFunc = (a, b) => sortDir.value * ((a.ageYears || 0) - (b.ageYears || 0))
-      break
-    case 'rating':
-      sortFunc = (a, b) => sortDir.value * (b.rating - a.rating)
-      break
-    case 'interests':
-      sortFunc = (a, b) => sortDir.value * (commonTags(b, a.tags) - commonTags(a, b.tags))
-      break
-  }
-
-  if (onlineUsers.length > 0) {
-    onlineUsers.sort(sortFunc)
-  }
-  if (disconnectedUsers.length > 0) {
-    disconnectedUsers.sort(sortFunc)
-  }
-
-  return [...onlineUsers, ...disconnectedUsers]
+  const onlineUsers = displayed.value.filter((u) => u.isConnected)
+  const offlineUsers = displayed.value.filter((u) => !u.isConnected)
+  // Preserve incoming order from server; do not re-sort beyond online grouping
+  const orderMap = new Map()
+  users.value.forEach((u, idx) => orderMap.set(u.user_id, idx))
+  const byOrder = (a, b) => (orderMap.get(a.user_id) ?? 0) - (orderMap.get(b.user_id) ?? 0)
+  return [...onlineUsers.sort(byOrder), ...offlineUsers.sort(byOrder)]
 })
 
-const calculateMaxDistance = () => {
-  if (!users.value.length) {
-    maxDis.value = 0
-    return
-  }
-  const maxVal = users.value.reduce(
-    (acc, u) => Math.max(acc, typeof u.distanceKm === 'number' ? u.distanceKm : 0),
-    0
-  )
-  maxDis.value = Math.ceil(maxVal)
-}
+// Server-side distance filter uses a fixed cap; no need to recompute max from client data
 
-watch(
-  users,
-  () => {
-    calculateMaxDistance()
-  },
-  { immediate: true }
-)
+// Online users counter (reacts to presence updates)
+const onlineCount = computed(() => displayed.value.filter((u) => !!u.isConnected).length)
 
-watch(user, (newUser, oldUser) => {
-  // console.log(newUser.looking)
-  if (newUser.looking && newUser.looking === 'other') {
-    hasOther.value = true
-  }
-  if (newUser.looking && newUser.looking === 'all') {
-    // console.log('all');
-    hasAll.value = true
-  }
-})
+// Removed unused/buggy watcher that referenced an undefined ref (hasOther)
 
-watch(age, () => {
-  if (age.value[0] > age.value[1]) {
-    const temp = age.value[0]
-    age.value[0] = age.value[1]
-    age.value[1] = temp
-  }
-})
-
-watch(rating, () => {
-  if (rating.value[0] > rating.value[1]) {
-    const temp = rating.value[0]
-    rating.value[0] = rating.value[1]
-    rating.value[1] = temp
-  }
-})
-
-watch(distance, () => {
-  if (distance.value[0] > distance.value[1]) {
-    const temp = distance.value[0]
-    distance.value[0] = distance.value[1]
-    distance.value[1] = temp
-  }
-})
+// Remove legacy array-based min/max correction watchers; we use {min,max} objects now
 
 function whoIsUp() {
   users.value.forEach((user, i) => {
@@ -383,15 +369,20 @@ const shouldReset = ref(false)
 function reset() {
   sortDir.value = 1
   sort.value = null
-  gender.value = null
+  // Reset gender to 'all' explicitly
+  gender.value = 'all'
   age.value = { min: 18, max: 85 }
   rating.value = { min: 0, max: 7 }
-  distance.value = { min: 0, max: maxDis.value }
+  distance.value = { min: 0, max: 10000 }
   location.value = null
+  recherche.value = ''
+  interests.value = []
+  page.value = 1
+  users.value = []
+  fetchDiscover({ resetPage: true })
 }
 function changeSort() {
   sortDir.value = -sortDir.value
-  users.value.reverse()
 }
 
 const isComplete = computed(() => {
@@ -407,70 +398,114 @@ const isComplete = computed(() => {
   )
 })
 
-async function created() {
+async function fetchDiscover({ resetPage = false } = {}) {
   const token = localStorage.getItem('token')
-  const url = `${import.meta.env.VITE_APP_API_URL}/api/users/show`
   const headers = { 'x-auth-token': token }
-  let res
-  try {
-    res = await axios.post(url, { filter: true }, { headers })
-  } catch (e) {
-    // If backend is sleeping/unavailable, redirect to server waking page
-    router.push(`/server-waking?redirect=${encodeURIComponent('/discover')}`)
-    return
+  // Abort any in-flight request
+  if (abortController) {
+    try {
+      abortController.abort()
+    } catch (_) {}
   }
-
-  const typesToFilter = ['he_block', 'you_block']
-  const urlHistory = `${import.meta.env.VITE_APP_API_URL}/api/browse/allhistory`
-  const resHistory = await axios.get(urlHistory, { headers })
-  // console.log(res.data)
-
-  if (!res.data.msg) {
-    users.value = res.data.slice(0, 1000).map((cur) => {
-      const lat = Number(cur.lat)
-      const lng = Number(cur.lng)
-      const distanceKm =
-        isFinite(lat) && isFinite(lng) ? utility.calculateDistance(userLocation, { lat, lng }) : 0
-      return {
+  abortController = new AbortController()
+  if (resetPage) page.value = 1
+  // If we already have data, keep it visible while fetching
+  if (users.value.length > 0) loaded.value = true
+  const params = {
+    page: page.value,
+    limit: limit.value,
+    onlineFirst: 1,
+    sortBy: sort.value || 'distance',
+    sortDir: sortDir.value >= 0 ? 'asc' : 'desc',
+    search: recherche.value || undefined,
+    gender: gender.value && gender.value !== 'all' ? gender.value : undefined,
+    ageMin: age.value?.min ?? 18,
+    ageMax: age.value?.max ?? 85,
+    ratingMin: rating.value?.min ?? 0,
+    ratingMax: rating.value?.max ?? 7,
+    distanceMax:
+      distance.value && typeof distance.value.max === 'number' && distance.value.max > 0
+        ? distance.value.max
+        : maxDis.value || 10000,
+    lat: userLocation?.lat,
+    lng: userLocation?.lng,
+    tags: interests.value && interests.value.length ? interests.value.join(',') : undefined
+  }
+  const url = `${import.meta.env.VITE_APP_API_URL}/api/users/discover`
+  isFetching.value = true
+  // Show a unified overlay via isFetching; no separate isRefreshing flag
+  try {
+    const res = await axios.get(url, { headers, params, signal: abortController.signal })
+    if (res.data && !res.data.msg) {
+      const { items = [], total: t = 0, maxDistance: md = null } = res.data
+      total.value = t
+      const shaped = items.map((cur) => ({
         ...cur,
+        // ensure numeric types
         rating: Number(cur.rating),
-        ageYears: ageCalc(cur.birthdate),
-        distanceKm
+        ageYears: typeof cur.ageYears === 'number' ? cur.ageYears : ageCalc(cur.birthdate),
+        distanceKm: Number(cur.distanceKm) || 0
+      }))
+      if (page.value === 1) users.value = shaped
+      else users.value = [...users.value, ...shaped]
+      // update presence flags
+      whoIsUp()
+      // Update slider max from server-provided maxDistance on first page
+      if (page.value === 1 && md != null) {
+        const nextMax = Math.max(0, Math.ceil(md))
+        if (nextMax !== maxDis.value) {
+          maxDis.value = nextMax
+        }
+        // Only override selection if user hasn't touched the slider yet
+        if (!distanceTouched.value) {
+          programmaticUpdate.value = true
+          distance.value = { min: 0, max: nextMax }
+          setTimeout(() => (programmaticUpdate.value = false), 0)
+        } else {
+          // Clamp to bounds if needed without causing fetch loop
+          const cur = distance.value || { min: 0, max: nextMax }
+          const clamped = {
+            min: Math.max(0, Math.min(cur.min ?? 0, nextMax)),
+            max: Math.max(0, Math.min(cur.max ?? nextMax, nextMax))
+          }
+          programmaticUpdate.value = true
+          distance.value = clamped
+          setTimeout(() => (programmaticUpdate.value = false), 0)
+        }
       }
-    })
-
-    if (!resHistory.data.msg) {
-      const blockedHistory = resHistory.data.filter((item) => typesToFilter.includes(item.type))
-      const blockedUserIds = blockedHistory.map((item) => item.his_id)
-      users.value = users.value.filter(
-        (user) => !blockedHistory.some((historyItem) => historyItem.his_id === user.user_id)
-      )
+      // Mark loaded on first successful fetch so cards render
+      loaded.value = true
+    } else if (res.data && res.data.msg === 'Not logged in') {
+      router.push('/login')
     }
-    calculateMaxDistance()
-    whoIsUp()
-    distance.value.max = maxDis.value
-    loaded.value = true
-  } else {
-    router.push('/login')
+  } catch (e) {
+    // Ignore abort/cancel errors from rapid filter changes
+    const msg = e && (e.message || '')
+    const code = e && e.code
+    const name = e && e.name
+    const isCanceled =
+      code === 'ERR_CANCELED' || name === 'CanceledError' || /abort|cancel/i.test(msg || '')
+    if (!isCanceled) {
+      // Redirect only if we have no data to show
+      if ((users.value?.length || 0) === 0) {
+        router.push(`/server-waking?redirect=${encodeURIComponent('/discover')}`)
+      }
+    }
+  } finally {
+    isFetching.value = false
   }
 }
 
-// Auth is bootstrapped in main.js; only wire sockets here
-onMounted(() => {
-  if (!socket) return
-  socket.on('onlineUsers', (users) => {
-    // update connectivity flags efficiently
-    if (Array.isArray(users) && users.length && Array.isArray(users.value)) {
-      whoIsUp()
-    }
-  })
-  socket.on('connectedUsers', (ids) => {
-    // store.dispatch('connectedUsers', ids) // assuming an action exists
+// Presence is driven globally in main.js; react here to store changes for instant UI updates
+watch(
+  connectedUsers,
+  () => {
     whoIsUp()
-  })
-})
+  },
+  { immediate: true }
+)
 
-onMounted(created)
+onMounted(() => fetchDiscover({ resetPage: true }))
 
 // Ensure matches (followers/following) are synced so UserCard icons can compute state from DB
 onMounted(async () => {
@@ -479,22 +514,41 @@ onMounted(async () => {
   } catch (_) {}
 })
 
-function refreshMethods() {
-  calculateMaxDistance()
-  whoIsUp()
-}
+onBeforeUnmount(() => {})
 
-const refreshInterval = setInterval(() => {
-  whoIsUp()
-}, 5000)
+// Debounce filter changes to refetch from server
+let debounceTimer = null
+watch(
+  [recherche, gender, age, rating, distance, interests, sort, sortDir],
+  () => {
+    if (programmaticUpdate.value) return
+    if (debounceTimer) clearTimeout(debounceTimer)
+    debounceTimer = setTimeout(() => {
+      fetchDiscover({ resetPage: true })
+    }, 300)
+  },
+  { deep: true }
+)
 
-onBeforeUnmount(() => {
-  if (socket) {
-    socket.off('onlineUsers')
-    socket.off('connectedUsers')
+// Detect manual changes to distance
+watch(
+  distance,
+  () => {
+    if (!programmaticUpdate.value) distanceTouched.value = true
+  },
+  { deep: true }
+)
+
+// Infinite scroll handler with LoaderView overlay via isFetching
+async function onInfiniteLoad(index, done) {
+  if (isFetching.value || users.value.length >= total.value) {
+    done()
+    return
   }
-  clearInterval(refreshInterval)
-})
+  page.value += 1
+  await fetchDiscover()
+  done()
+}
 </script>
 
 <style scoped>
@@ -590,9 +644,79 @@ a {
 }
 .user {
   margin: 16px;
+  min-width: 260px; /* ensure room for 7 rating hearts side-by-side */
+  max-width: 100%;
 }
 
 .filters-container {
   margin-bottom: 32px;
+}
+
+.position-relative {
+  position: relative;
+}
+
+/* Removed split-row fixed height; page scrolls naturally */
+
+.loader-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.6);
+  z-index: 2;
+  /* Overlay now only covers the grid area, so it can block clicks on cards while leaving filters clickable */
+  pointer-events: auto;
+}
+
+.filters-panel {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
+  min-width: 260px; /* don't let controls shrink too much */
+}
+
+.grid-wrapper {
+  position: relative;
+  min-height: 200px; /* ensure some visible height before data arrives */
+  overflow-x: hidden; /* prevent negative row margins from causing horizontal overflow */
+}
+
+/* Removed independent scroll areas; let the page scroll */
+
+/* Ensure toggle buttons remain usable on narrow widths */
+.filters-panel .q-btn-toggle {
+  display: flex;
+  flex-wrap: wrap;
+}
+.filters-panel .q-btn-toggle .q-btn {
+  min-width: 80px; /* stop shrinking past readability */
+  flex: 1 1 auto;
+}
+
+/* Prevent inputs/selects from shrinking below a reasonable width on larger viewports */
+.filters-panel .q-input,
+.filters-panel .q-select {
+  min-width: 240px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1023px) {
+  .filters-panel {
+    min-width: 240px;
+  }
+}
+@media (max-width: 767px) {
+  .filters-panel {
+    min-width: 100%; /* full width on small screens */
+  }
+  .filters-panel .q-input,
+  .filters-panel .q-select {
+    min-width: 100%;
+  }
 }
 </style>
