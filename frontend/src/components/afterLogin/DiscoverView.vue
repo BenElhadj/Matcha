@@ -2,8 +2,8 @@
   <q-page>
     <div v-if="isComplete" class="discover">
       <q-page-container v-if="loaded" class="pt-5 px-0">
-        <q-layout class="row wrap justify-center">
-          <div class="col-2 md3 sm12 filters-panel">
+        <q-layout class="row wrap justify-start">
+          <div class="col-auto filters-panel">
             <div class="px-5">
               <q-layout class="column">
                 <h4 class="title mb-4">Search</h4>
@@ -139,19 +139,15 @@
             </div>
           </div>
 
-          <div class="col-10 md9 sm12 position-relative">
+          <div class="col-grow position-relative grid-column">
             <div class="row items-center q-px-md q-mb-md">
               <div class="text-subtitle2">Online: {{ onlineCount }}</div>
               <div class="q-ml-md text-caption">Showing: {{ sorted.length }}</div>
             </div>
             <div class="q-px-md">
               <div class="grid-wrapper position-relative">
-                <div class="row wrap justify-center q-col-gutter-md">
-                  <div
-                    v-for="user in sorted"
-                    :key="user.user_id"
-                    class="user col-xl-2 col-lg-3 col-sm-3 ma-3 grow"
-                  >
+                <div class="cards-grid">
+                  <div v-for="user in sorted" :key="user.user_id" class="user">
                     <router-link :to="{ name: 'userprofile', params: { id: user.user_id } }">
                       <user-card :user="user" />
                     </router-link>
@@ -258,7 +254,6 @@ const total = ref(0)
 const isFetching = ref(false)
 // const isRefreshing = ref(false)
 let abortController = null
-
 
 const filters = {
   self: (val) => val.user_id !== user.id,
@@ -644,8 +639,8 @@ a {
 }
 .user {
   margin: 16px;
-  min-width: 260px; /* ensure room for 7 rating hearts side-by-side */
-  max-width: 100%;
+  width: 260px; /* taille fixe pour éviter l'étirement en 1 colonne */
+  max-width: 260px; /* garde la taille initiale */
 }
 
 .filters-container {
@@ -678,12 +673,28 @@ a {
   z-index: 1;
   flex: 0 0 auto;
   min-width: 260px; /* don't let controls shrink too much */
+  max-width: 320px; /* garde une largeur raisonnable même quand il est seul */
 }
 
 .grid-wrapper {
   position: relative;
   min-height: 200px; /* ensure some visible height before data arrives */
   overflow-x: hidden; /* prevent negative row margins from causing horizontal overflow */
+}
+
+/* Ensure the cards column can stay beside filters until there's truly no room */
+.grid-column {
+  min-width: 320px; /* >= user card min (260) + gutters/padding */
+  flex: 1 1 auto;
+}
+
+/* Fluid cards grid: reduces columns as width shrinks, min 260px per card */
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 260px); /* colonnes fixes: pas d'étirement en pleine largeur */
+  gap: 16px;
+  align-items: start;
+  justify-content: center; /* centrer la grille quand il reste de l'espace */
 }
 
 /* Removed independent scroll areas; let the page scroll */
@@ -711,12 +722,17 @@ a {
   }
 }
 @media (max-width: 767px) {
+  /* Centre les paramètres sans les étirer quand ils sont seuls */
   .filters-panel {
-    min-width: 100%; /* full width on small screens */
+    min-width: 260px;
+    max-width: 320px;
+    margin-left: auto;
+    margin-right: auto;
   }
   .filters-panel .q-input,
   .filters-panel .q-select {
-    min-width: 100%;
+    width: 100%;
+    min-width: 0;
   }
 }
 </style>
