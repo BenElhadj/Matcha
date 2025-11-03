@@ -18,7 +18,7 @@
               <span>{{ unRead(convo) }}</span>
             </template>
             <q-avatar>
-              <img :src="utility.getFullPath(convo.profile_image)">
+              <img :src="getConvoAvatar(convo)">
             </q-avatar>
         </q-item-section>
         
@@ -47,6 +47,7 @@
 
 <script setup>
 import utility from '@/utility.js'
+import axios from 'axios'
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useStore, mapActions  } from 'vuex'
 import moment from 'moment'
@@ -61,6 +62,44 @@ const lastSeen = ref([])
 const updateTimer = ref(null)
 const connectedUsers = computed(() => store.state.connectedUsers)
 const selectedConvo = ref(null)
+
+// Avatar resolution
+const base = import.meta.env.BASE_URL || '/'
+const defaultProfileTxt = `${base}default/defaut_profile.txt`
+const profilePhotosById = ref({})
+
+const fetchUserProfileImage = async (id) => {
+  try {
+    const token = localStorage.getItem('token')
+    const headers = { 'x-auth-token': token }
+    const url = `${import.meta.env.VITE_APP_API_URL}/api/users/show/${id}`
+    const res = await axios.get(url, { headers })
+    const images = Array.isArray(res.data?.images) ? res.data.images : []
+    const profileImg = images.find((img) => img && (img.profile === 1 || img.profile === true)) || images[0]
+    if (!profileImg) return ''
+    const fallback = utility.getCachedDefault?.('profile') || defaultProfileTxt
+    const src = utility.getImageSrc
+      ? utility.getImageSrc(profileImg, fallback)
+      : (utility.getFullPath ? utility.getFullPath(profileImg?.name || profileImg?.link || profileImg?.data || '') : fallback)
+    return src || ''
+  } catch (_) {
+    return ''
+  }
+}
+
+const getConvoAvatar = (convo) => {
+  try {
+    const id = convo?.user_id
+    const cached = id ? profilePhotosById.value[id] : ''
+    if (cached) return cached
+    // fallback to whatever the convo carries
+    return utility.getImageSrc
+      ? utility.getImageSrc(convo?.profile_image, utility.getCachedDefault?.('profile') || defaultProfileTxt)
+      : (utility.getFullPath ? utility.getFullPath(convo?.profile_image) : defaultProfileTxt)
+  } catch (_) {
+    return defaultProfileTxt
+  }
+}
 
 const syncConvo = (convo) => {
   store.dispatch('syncConvo', convo)
@@ -112,9 +151,35 @@ onMounted(async () => {
       selectedConvo.value = convo
     }
   })
+  // Prefetch avatars for visible convos
+  try {
+    const ids = Array.from(new Set(sortedConvos.value.map(c => c && c.user_id).filter(Boolean)))
+    for (const id of ids) {
+      if (!profilePhotosById.value[id]) {
+        const src = await fetchUserProfileImage(id)
+        if (src) profilePhotosById.value = { ...profilePhotosById.value, [id]: src }
+      }
+    }
+  } catch (_) {}
 })
 
 watch([online, convos], updateConnectedUsers,{ immediate: true })
+// Also prefetch when convos change
+watch(
+  () => convos.value,
+  async () => {
+    try {
+      const ids = Array.from(new Set(sortedConvos.value.map(c => c && c.user_id).filter(Boolean)))
+      for (const id of ids) {
+        if (!profilePhotosById.value[id]) {
+          const src = await fetchUserProfileImage(id)
+          if (src) profilePhotosById.value = { ...profilePhotosById.value, [id]: src }
+        }
+      }
+    } catch (_) {}
+  },
+  { deep: true }
+)
 
 const sortByLastSeen = (a, b) => {
   if (lastSeen.value[a.user_id] === 'online' && lastSeen.value[b.user_id] !== 'online') {

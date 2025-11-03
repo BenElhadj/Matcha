@@ -56,7 +56,7 @@
               >
                 <q-item-section avatar>
                   <q-avatar>
-                    <img :src="resolveImg(item.profile_image)" />
+                    <img :src="getNotifProfileSrc(item)" />
                   </q-avatar>
                 </q-item-section>
                 <q-item-section>
@@ -120,12 +120,15 @@
                 style="align-items: initial !important"
               >
                 <q-item-section avatar>
-                  <q-avatar>
-                    <img :src="resolveImg(item.profile_image)" />
-                  </q-avatar>
+                  <div class="avatar-presence">
+                    <q-avatar>
+                      <img :src="getMsgProfileSrc(item)" />
+                    </q-avatar>
+                    <span :class="['presence-dot', presenceClass(item)]"></span>
+                  </div>
                 </q-item-section>
-                <div>
-                  <q-badge small :color="item.is_read == 0 ? 'blue' : 'grey'" />
+                <div class="ml-auto q-mr-sm">
+                  <q-badge v-if="unreadCount(item) > 0" color="primary" :label="unreadCount(item)" />
                 </div>
                 <q-item-section>
                   <q-item-label class="notif_msg">
@@ -217,7 +220,6 @@ import parametreImage from '@/assets/Navbar/parametre.png'
 
 const store = useStore()
 const router = useRouter()
-const searchText = ref('')
 const drawer = ref(false)
 const notifBtnEl = ref(null)
 const msgBtnEl = ref(null)
@@ -234,6 +236,9 @@ const links = [
 let notifMenu = ref(false)
 let msgMenu = ref(false)
 
+// Cache of profile photos for users shown in notifications
+const profilePhotosById = ref({})
+
 // Unread notifications (excluding chat) badge count
 const unreadNotifCount = computed(() => {
   try {
@@ -248,7 +253,6 @@ const unreadNotifCount = computed(() => {
 let newMsgNum = ref(0)
 const user = computed(() => store.getters.user)
 const connected = computed(() => store.getters.status)
-const profileImage = computed(() => store.getters.profileImage)
 
 let notif = ref([])
 notif.value = store.getters.notif
@@ -272,6 +276,8 @@ const unreadNotifLabel = computed(() => {
 
 let menuConvos = ref([])
 let newMessage = ref([])
+// Track unread counts per conversation for the messages list and total badge
+const unreadCountsByConv = ref({})
 
 const base = import.meta.env.BASE_URL || '/'
 const defaultProfileTxt = `${base}default/defaut_profile.txt`
@@ -294,11 +300,25 @@ const toUserProfile = (id_from) => {
   }
 }
 
-const toUserChat = (convo) => {
+const toUserChat = async (convo) => {
   try {
+    // Mark conversation as read immediately to update counters
+    const token = localStorage.getItem('token')
+    const headers = { 'x-auth-token': token }
+    const url = `${import.meta.env.VITE_APP_API_URL}/api/chat/update`
+    await axios.post(url, { id: convo?.id_conversation }, { headers })
+    // Optimistically zero local unread count for this convo and recompute total
+    if (convo?.id_conversation) {
+      const map = { ...unreadCountsByConv.value }
+      map[convo.id_conversation] = 0
+      unreadCountsByConv.value = map
+      newMsgNum.value = Object.values(unreadCountsByConv.value).reduce((a, b) => a + (Number(b) || 0), 0)
+    }
     syncConvo(convo)
   } catch (err) {
     console.error('err toUserChat in frontend/NavbarView.view ===> ', err)
+    // Still navigate to chat on error
+    try { syncConvo(convo) } catch (_) {}
   }
 }
 
@@ -352,6 +372,125 @@ onMounted(() => {
   if (connected.value) updateNotifAndMsg()
 })
 
+// Fetch the profile image for a given user id using the same approach as UserProfile
+const fetchUserProfileImage = async (id) => {
+  try {
+    const token = user.value?.token || localStorage.getItem('token')
+    const headers = { 'x-auth-token': token }
+    const url = `${import.meta.env.VITE_APP_API_URL}/api/users/show/${id}`
+    const res = await axios.get(url, { headers })
+    const images = Array.isArray(res.data?.images) ? res.data.images : []
+    // Prefer the image marked as profile
+    const profileImg =
+      images.find((img) => img && (img.profile === 1 || img.profile === true)) || images[0]
+    if (!profileImg) return ''
+    // Use same resolver as elsewhere so it supports data:, external URLs, or backend filenames
+    const fallback =
+      utility.getCachedDefault?.('profile') ||
+      `${import.meta.env.BASE_URL || '/'}default/defaut_profile.txt`
+    const src = utility.getImageSrc
+      ? utility.getImageSrc(profileImg, fallback)
+      : getFullPath(profileImg?.name || profileImg?.link || profileImg?.data || '')
+    return src || ''
+  } catch (e) {
+    return ''
+  }
+}
+
+// (removed static prefetch of user 1 and 3 avatars)
+
+// Prefer fetched profile image per notification author; fallback to resolveImg
+const getNotifProfileSrc = (item) => {
+  try {
+    const id = item?.id_from
+    const cached = id ? profilePhotosById.value[id] : ''
+    return cached || resolveImg(item?.profile_image)
+  } catch (_) {
+    return resolveImg(item?.profile_image)
+  }
+}
+
+// Prefetch profile images for users appearing in current top notifs (avoid duplicates)
+const prefetchNotifProfilePhotos = async () => {
+  const arr = Array.isArray(notifs.value) ? notifs.value : []
+  const ids = Array.from(new Set(arr.map((n) => n && n.id_from).filter(Boolean)))
+  for (const id of ids) {
+    if (!profilePhotosById.value[id]) {
+      try {
+        const src = await fetchUserProfileImage(id)
+        if (src) profilePhotosById.value = { ...profilePhotosById.value, [id]: src }
+      } catch (_) {}
+    }
+  }
+}
+
+// Kick off prefetch when notifications list changes or when menu opens
+watch(
+  () => notifs.value,
+  () => {
+    prefetchNotifProfilePhotos()
+  },
+  { deep: true, immediate: true }
+)
+watch(
+  () => notifMenu.value,
+  (opened) => {
+    if (opened) prefetchNotifProfilePhotos()
+  }
+)
+
+// Derive the other participant id for message items (best effort)
+const deriveOtherId = (it) => {
+  try {
+    const me = user.value?.id
+    const uid = it?.user_id
+    const mf = it?.message_from
+    if (uid && uid !== me) return uid
+    if (mf && mf !== me) return mf
+    return uid || mf || null
+  } catch (_) {
+    return null
+  }
+}
+
+// Prefer fetched profile image for messages menu items
+const getMsgProfileSrc = (item) => {
+  try {
+    const id = deriveOtherId(item)
+    const cached = id ? profilePhotosById.value[id] : ''
+    return cached || resolveImg(item?.profile_image)
+  } catch (_) {
+    return resolveImg(item?.profile_image)
+  }
+}
+
+const prefetchMsgProfilePhotos = async () => {
+  const arr = Array.isArray(menuConvos.value) ? menuConvos.value : []
+  const ids = Array.from(new Set(arr.map((n) => deriveOtherId(n)).filter(Boolean)))
+  for (const id of ids) {
+    if (!profilePhotosById.value[id]) {
+      try {
+        const src = await fetchUserProfileImage(id)
+        if (src) profilePhotosById.value = { ...profilePhotosById.value, [id]: src }
+      } catch (_) {}
+    }
+  }
+}
+
+watch(
+  () => menuConvos.value,
+  () => {
+    prefetchMsgProfilePhotos()
+  },
+  { deep: true, immediate: true }
+)
+watch(
+  () => msgMenu.value,
+  (opened) => {
+    if (opened) prefetchMsgProfilePhotos()
+  }
+)
+
 const syncConvo = async (convo) => {
   try {
     store.dispatch('syncConvo', convo)
@@ -379,42 +518,54 @@ const logout = async () => {
   }
 }
 
-function sortAndFilterMessages(messages) {
-  if (!Array.isArray(messages)) messages = []
-  messages.sort((a, b) => {
-    if (a.is_read !== b.is_read) return a.is_read - b.is_read
-    else if (a.id_conversation === b.id_conversation) {
-      const dateA = new Date(a.last_update)
-      const dateB = new Date(b.last_update)
-      return dateB - dateA
-    } else {
-      return b.id_conversation - a.id_conversation
-    }
-  })
-
-  const uniqueConversations = new Set()
-  const uniqueMessages = []
-  for (const message of messages) {
-    if (!uniqueConversations.has(message.id_conversation)) {
-      uniqueMessages.push(message)
-      uniqueConversations.add(message.id_conversation)
-    }
-  }
-  return uniqueMessages.slice(0, 5)
+// Build the list of the last 5 conversations by last update (newest first)
+function buildMenuMessages(messages) {
+  const arr = Array.isArray(messages) ? messages.slice() : []
+  arr.sort(
+    (a, b) => new Date(b.last_update || b.created_at || 0) - new Date(a.last_update || a.created_at || 0)
+  )
+  return arr.slice(0, 5)
 }
 
-menuConvos.value = sortAndFilterMessages(newMessage.value)
+menuConvos.value = buildMenuMessages(newMessage.value)
 
-const getNewMsg = async () => {
+// Fetch all conversations with last message details for the menu
+const getAllConvos = async () => {
   try {
     const token = localStorage.getItem('token')
-    const url = `${import.meta.env.VITE_APP_API_URL}/api/chat/getInChat`
+    const url = `${import.meta.env.VITE_APP_API_URL}/api/chat/all`
     const headers = { 'x-auth-token': token }
     const result = await axios.get(url, { headers })
-    return result.data
+    return Array.isArray(result?.data?.data) ? result.data.data : []
   } catch (err) {
-    console.error('Error fetching new messages:', err)
+    console.error('Error fetching conversations (all):', err)
+    return []
   }
+}
+
+// Fetch unread conversation counts to compute per-item and total badges
+const getUnreadConvoCounts = async () => {
+  try {
+    const token = localStorage.getItem('token')
+    const url = `${import.meta.env.VITE_APP_API_URL}/api/chat/notSeen`
+    const headers = { 'x-auth-token': token }
+    const result = await axios.get(url, { headers })
+    const arr = Array.isArray(result?.data?.data) ? result.data.data : []
+    const map = {}
+    for (const r of arr) {
+      if (r && r.id_conversation) map[r.id_conversation] = Number(r.count) || 0
+    }
+    return map
+  } catch (err) {
+    console.error('Error fetching unread counts (notSeen):', err)
+    return {}
+  }
+}
+
+const unreadCount = (item) => unreadCountsByConv.value[item?.id_conversation] || 0
+const presenceClass = (item) => {
+  const s = String(item?.status ?? '').toLowerCase()
+  return s === 'online' || s === '1' || s === 'true' ? 'online' : 'offline'
 }
 
 const updateNotifAndMsg = async () => {
@@ -437,14 +588,12 @@ const updateNotifAndMsg = async () => {
           })
           .slice(0, 5)
       : []
-    newMessage.value = await getNewMsg()
-    if (Array.isArray(newMessage.value)) {
-      menuConvos.value = sortAndFilterMessages(newMessage.value)
-      newMsgNum.value = newMessage.value.filter((cur) => !cur.is_read).length
-    } else {
-      menuConvos.value = []
-      newMsgNum.value = 0
-    }
+    // Build menu items from full conversations
+    newMessage.value = await getAllConvos()
+    menuConvos.value = buildMenuMessages(newMessage.value)
+    // Compute unread badge from per-conversation counts
+    unreadCountsByConv.value = await getUnreadConvoCounts()
+    newMsgNum.value = Object.values(unreadCountsByConv.value).reduce((a, b) => a + (Number(b) || 0), 0)
   }
 }
 
@@ -466,6 +615,26 @@ onBeforeUnmount(() => {
   font-family: 'Elliane' !important;
   align-items: center;
   color: black;
+}
+
+.avatar-presence {
+  position: relative;
+  display: inline-block;
+}
+.presence-dot {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid white;
+}
+.presence-dot.online {
+  background: #21ba45; /* Quasar positive green */
+}
+.presence-dot.offline {
+  background: #9e9e9e; /* grey */
 }
 
 q-drawer {
