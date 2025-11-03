@@ -20,23 +20,30 @@
         </q-toolbar-title>
       </div>
 
-      <q-space></q-space>
+      <q-space />
 
       <div v-if="connected" justify-end class="search-notif-msg">
         <div>
-          <q-btn ripple flat round dense class="icon-size">
-            <img
-              src="@/assets/Navbar/notification.png"
-              :nudge-width="250"
-              alt="notifMenu"
-              class="icon-size"
-            />
-            <q-badge v-if="unreadNotifCount" :value="!!unreadNotifCount" color="primary" floating>
+          <!-- Notifications button + menu (YouTube-style) -->
+          <button
+            ref="notifBtnEl"
+            class="yt-btn"
+            type="button"
+            aria-label="Notifications"
+            @click="notifMenu = !notifMenu"
+          >
+            <img :src="notificationImage" alt="Notifications (YT)" class="yt-icon" />
+            <q-badge v-if="unreadNotifCount" class="yt-badge" color="primary">
               <span>{{ unreadNotifLabel }}</span>
             </q-badge>
-          </q-btn>
+          </button>
           <q-menu
+            v-if="notifBtnEl"
             v-model="notifMenu"
+            :target="notifBtnEl"
+            anchor="bottom right"
+            self="top right"
+            no-parent-event
             style="font-family: 'Elliane' !important; font-size: 16px !important"
           >
             <q-list padding class="notif-msg">
@@ -82,19 +89,26 @@
         </div>
 
         <div>
-          <q-btn ripple flat round dense class="icon-size">
-            <img
-              src="@/assets/Navbar/chat.png"
-              :nudge-width="250"
-              alt="Messages"
-              class="icon-size"
-            />
-            <q-badge v-if="newMsgNum" :value="!!newMsgNum" color="primary" floating>
-              <span>{{ newMsgNum }}</span>
+          <!-- Messages button + menu (YouTube-style) -->
+          <button
+            ref="msgBtnEl"
+            class="yt-btn"
+            type="button"
+            aria-label="Messages"
+            @click="msgMenu = !msgMenu"
+          >
+            <img :src="chatImage" alt="Messages (YT)" class="yt-icon" />
+            <q-badge v-if="newMsgNum" class="yt-badge" color="primary">
+              <span>{{ newMsgNum > 99 ? '99+' : newMsgNum }}</span>
             </q-badge>
-          </q-btn>
+          </button>
           <q-menu
+            v-if="msgBtnEl"
             v-model="msgMenu"
+            :target="msgBtnEl"
+            anchor="bottom right"
+            self="top right"
+            no-parent-event
             style="font-family: 'Elliane' !important; font-size: 16px !important"
           >
             <q-list padding class="notif-msg">
@@ -168,7 +182,7 @@
             </q-item-section>
           </q-item>
         </div>
-        <q-separator></q-separator>
+        <q-separator />
         <div v-for="link in links" :key="link.text">
           <q-item v-if="link.public || connected" clickable @click="$router.push(link.route)">
             <img :src="link.image" alt="Icon" class="icon-size" />
@@ -194,7 +208,6 @@ import { ref, onMounted, onUnmounted, onBeforeUnmount, computed, watch } from 'v
 import { useStore } from 'vuex'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
-// Realtime sockets disabled here (server rejects WS); using lightweight polling instead
 
 import acceilImage from '@/assets/Navbar/acceil.png'
 import decouvrirImage from '@/assets/Navbar/decouvrir.png'
@@ -206,43 +219,22 @@ const store = useStore()
 const router = useRouter()
 const searchText = ref('')
 const drawer = ref(false)
+const notifBtnEl = ref(null)
+const msgBtnEl = ref(null)
 const image = computed(() => store.getters.profileImage)
+
 const links = [
-  {
-    text: 'Homepage',
-    route: '/',
-    public: true,
-    image: acceilImage
-  },
-  {
-    text: 'Discover',
-    route: '/discover',
-    public: false,
-    image: decouvrirImage
-  },
-  {
-    text: 'Chat',
-    route: '/chat',
-    public: false,
-    image: chatImage
-  },
-  {
-    text: 'Notifications',
-    route: '/notifications',
-    public: false,
-    image: notificationImage
-  },
-  {
-    text: 'Settings',
-    route: '/settings',
-    public: false,
-    image: parametreImage
-  }
+  { text: 'Homepage', route: '/', public: true, image: acceilImage },
+  { text: 'Discover', route: '/discover', public: false, image: decouvrirImage },
+  { text: 'Chat', route: '/chat', public: false, image: chatImage },
+  { text: 'Notifications', route: '/notifications', public: false, image: notificationImage },
+  { text: 'Settings', route: '/settings', public: false, image: parametreImage }
 ]
+
 let notifMenu = ref(false)
 let msgMenu = ref(false)
+
 // Unread notifications (excluding chat) badge count
-// Ne compte pas lorsque l'utilisateur est sur la page /notifications
 const unreadNotifCount = computed(() => {
   try {
     const path = router.currentRoute?.value?.path || ''
@@ -252,6 +244,7 @@ const unreadNotifCount = computed(() => {
   if (!Array.isArray(arr)) return 0
   return arr.filter((n) => n && n.type !== 'chat' && !n.is_read).length
 })
+
 let newMsgNum = ref(0)
 const user = computed(() => store.getters.user)
 const connected = computed(() => store.getters.status)
@@ -266,13 +259,12 @@ notifs.value = Array.isArray(notif.value)
   ? notif.value
       .filter((n) => n.type !== 'chat')
       .sort((a, b) => {
-        if (a.is_read !== b.is_read) {
-          return a.is_read - b.is_read
-        }
+        if (a.is_read !== b.is_read) return a.is_read - b.is_read
         return new Date(b.date) - new Date(a.date)
       })
       .slice(0, 5)
   : []
+
 const unreadNotifLabel = computed(() => {
   const n = unreadNotifCount.value || 0
   return n > 99 ? '99+' : String(n)
@@ -330,17 +322,14 @@ watch(
   () => notifMenu.value,
   async (opened) => {
     if (opened) {
+      // close the other menu when this opens
+      if (msgMenu.value) msgMenu.value = false
       try {
-        // 1) Marque localement comme lus les 5 visibles
         const visible = Array.isArray(notifs.value) ? notifs.value : []
         const ids = visible
           .filter((n) => n && n.type !== 'chat' && !n.is_read && n.id)
           .map((n) => n.id)
         if (ids.length) store.commit('markNotifsSeenByIds', ids)
-
-        // 2) Pause le polling tant que le menu est ouvert (géré dans updateNotifAndMsg)
-
-        // 3) Persist exact IDs côté serveur (ne marque que ces 5 visibles)
         if (ids.length) {
           try {
             await store.dispatch('seenNotifByIds', ids)
@@ -351,9 +340,15 @@ watch(
   }
 )
 
-// Auth bootstrap now happens before app mount in main.js to avoid flicker/races
+// Ensure mutual exclusivity: open messages menu closes notifications
+watch(
+  () => msgMenu.value,
+  (opened) => {
+    if (opened && notifMenu.value) notifMenu.value = false
+  }
+)
+
 onMounted(() => {
-  // After mount, just refresh counters/menus if already connected
   if (connected.value) updateNotifAndMsg()
 })
 
@@ -385,13 +380,10 @@ const logout = async () => {
 }
 
 function sortAndFilterMessages(messages) {
-  if (!Array.isArray(messages)) {
-    messages = []
-  }
+  if (!Array.isArray(messages)) messages = []
   messages.sort((a, b) => {
-    if (a.is_read !== b.is_read) {
-      return a.is_read - b.is_read
-    } else if (a.id_conversation === b.id_conversation) {
+    if (a.is_read !== b.is_read) return a.is_read - b.is_read
+    else if (a.id_conversation === b.id_conversation) {
       const dateA = new Date(a.last_update)
       const dateB = new Date(b.last_update)
       return dateB - dateA
@@ -402,14 +394,12 @@ function sortAndFilterMessages(messages) {
 
   const uniqueConversations = new Set()
   const uniqueMessages = []
-
   for (const message of messages) {
     if (!uniqueConversations.has(message.id_conversation)) {
       uniqueMessages.push(message)
       uniqueConversations.add(message.id_conversation)
     }
   }
-
   return uniqueMessages.slice(0, 5)
 }
 
@@ -429,26 +419,20 @@ const getNewMsg = async () => {
 
 const updateNotifAndMsg = async () => {
   if (connected.value !== null) {
-    // Ne pas rafraîchir pendant que l'utilisateur est sur /notifications ou si le menu est ouvert
     try {
       const path = router.currentRoute?.value?.path || ''
       if ((typeof path === 'string' && path.startsWith('/notifications')) || notifMenu.value) return
     } catch (_) {}
-    // Poll latest notifications (page 1) to keep badge/menu updated
     try {
       await store.dispatch('getNotifPage', { limit: 50, page: 1 })
-    } catch (_) {
-      /* silent */
-    }
+    } catch (_) {}
     convos.value = store.getters.convos
     notif.value = store.getters.notif
     notifs.value = Array.isArray(notif.value)
       ? notif.value
           .filter((n) => n.type !== 'chat')
           .sort((a, b) => {
-            if (a.is_read !== b.is_read) {
-              return a.is_read - b.is_read
-            }
+            if (a.is_read !== b.is_read) return a.is_read - b.is_read
             return new Date(b.date) - new Date(a.date)
           })
           .slice(0, 5)
@@ -473,8 +457,6 @@ const refreshInterval = setInterval(refreshMethods, 3000)
 onBeforeUnmount(() => {
   clearInterval(refreshInterval)
 })
-
-// No local socket; polling keeps the UI in sync when server WS is unavailable
 </script>
 
 <style scoped>
@@ -519,14 +501,81 @@ q-drawer {
 
 .icon-size {
   width: 42px;
-  margin: 7px;
+  margin: 10px;
+  /* thinner white contour around PNG icons */
+  filter: drop-shadow(0.05px 0 0 #fff) drop-shadow(-0.05px 0 0 #fff) drop-shadow(0 0.05px 0 #fff)
+    drop-shadow(0 -0.05px 0 #fff) drop-shadow(0 0 0.1px rgba(255, 255, 255, 0.65));
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+/* YouTube-style raw buttons (no overlay background) */
+.yt-btn {
+  background: transparent !important;
+  border: 0;
+  padding: 4px;
+  margin: 10px;
+  border-radius: 9999px; /* circular hit area like YT */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  outline: none;
+  position: relative; /* to anchor the floating badge */
+}
+.yt-btn:before,
+.yt-btn:after {
+  display: none !important;
+}
+.yt-btn:focus {
+  outline: none;
+}
+.yt-btn:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.55);
+  outline-offset: 3px;
+}
+.yt-icon {
+  width: 42px;
+  height: 42px;
+  user-select: none;
+  -webkit-user-drag: none;
+  /* white contour around PNG, thin */
+  filter: drop-shadow(0.05px 0 0 #fff) drop-shadow(-0.05px 0 0 #fff) drop-shadow(0 0.05px 0 #fff)
+    drop-shadow(0 -0.05px 0 #fff) drop-shadow(0 0 0.1px rgba(255, 255, 255, 0.65));
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+.yt-btn:hover .yt-icon {
+  transform: translateZ(0) scale(1.06);
+}
+.yt-btn:active .yt-icon {
+  transform: translateZ(0) scale(0.94);
+}
+
+/* Floating badge position for the raw buttons */
+.yt-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  pointer-events: none;
+}
+
+/* Even thinner contour specifically for Notifications and Messages icons */
+.icon-size.notif-icon,
+.icon-size.msg-icon {
+  filter: drop-shadow(0.04px 0 0 #fff) drop-shadow(-0.04px 0 0 #fff) drop-shadow(0 0.04px 0 #fff)
+    drop-shadow(0 -0.04px 0 #fff) drop-shadow(0 0 0.08px rgba(255, 255, 255, 0.6));
 }
 
 .q-header {
-  background: linear-gradient(to bottom, #000 0%, #fff 91%, rgba(255, 255, 255, 0) 100%) !important;
+  background: linear-gradient(
+    to bottom,
+    #000 3%,
+    transparent 81%,
+    rgba(255, 255, 255, 0) 70%
+  ) !important;
+  /* background: linear-gradient(to bottom, #000 0%, transparent 91%, transparent 100%) !important; */
   box-shadow: none !important;
   border: none !important;
-  padding: 7px;
+  /* padding: 7px; */
 }
 
 .circular-icon {
@@ -536,6 +585,120 @@ q-drawer {
 .text-link {
   cursor: pointer;
   color: black;
+  /* white contour on text */
+  text-shadow: 0.02px 0 0 #fff, -0.02px 0 0 #fff, 0 0.02px 0 #fff, 0 -0.02px 0 #fff,
+    0 0 0.02px rgba(255, 255, 255, 0.85);
+  display: inline-block;
+  transition: transform 0.15s ease, text-shadow 0.15s ease;
+}
+
+/* Remove any hover/active background on buttons in header */
+:deep(.q-header .q-btn),
+:deep(.q-header .q-btn:before),
+:deep(.q-header .q-btn:after),
+:deep(.q-header .q-hoverable:before),
+:deep(.q-header .q-item.q-hoverable:before),
+:deep(.q-header .q-item--active:before) {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+/* Forcefully suppress overlay opacity as well (YouTube-like: no hover press bg) */
+:deep(.q-header .q-btn:before),
+:deep(.q-header .q-btn:after),
+:deep(.q-header .q-hoverable:before),
+:deep(.q-header .q-item.q-hoverable:before),
+:deep(.q-header .q-item--active:before) {
+  opacity: 0 !important;
+}
+
+/* Also remove any default background on q-avatar/q-img wrappers */
+:deep(.q-header .q-avatar),
+:deep(.q-header .q-img) {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+/* Hide ripple visuals on icon buttons (click) */
+:deep(.q-header .q-btn .q-ripple),
+:deep(.q-header .q-btn .q-ripple__container),
+:deep(.q-header .q-btn .q-focus-helper) {
+  display: none !important;
+  background: transparent !important;
+}
+
+/* Also remove background for drawer/menu items (teleported) */
+:deep(.q-drawer .q-item.q-hoverable:before),
+:deep(.q-drawer .q-item--active:before),
+:deep(.q-menu .q-item.q-hoverable:before),
+:deep(.q-menu .q-item--active:before),
+:deep(.q-menu .q-btn:before),
+:deep(.q-menu .q-btn:after) {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+/* And suppress their overlay opacity as well */
+:deep(.q-drawer .q-item.q-hoverable:before),
+:deep(.q-drawer .q-item--active:before),
+:deep(.q-menu .q-item.q-hoverable:before),
+:deep(.q-menu .q-item--active:before),
+:deep(.q-menu .q-btn:before),
+:deep(.q-menu .q-btn:after) {
+  opacity: 0 !important;
+}
+
+/* Hover enlarge for icons */
+.q-btn:hover .icon-size,
+.icon-size:hover,
+:deep(.q-drawer .q-item:hover img.icon-size),
+:deep(.q-menu .q-item:hover img.icon-size),
+:deep(.q-drawer .q-item:hover .q-icon.icon-size),
+:deep(.q-menu .q-item:hover .q-icon.icon-size) {
+  transform: translateZ(0) scale(1.06);
+}
+
+/* Click shrink for icons */
+.q-btn:active .icon-size,
+.icon-size:active,
+:deep(.q-drawer .q-item:active img.icon-size),
+:deep(.q-menu .q-item:active img.icon-size),
+:deep(.q-drawer .q-item:active .q-icon.icon-size),
+:deep(.q-menu .q-item:active .q-icon.icon-size) {
+  transform: translateZ(0) scale(0.94);
+}
+
+/* Username/title contour */
+.q-header .q-toolbar-title,
+.q-header .q-toolbar-title .q-item-label {
+  text-shadow: 0.02px 0 0 #fff, -0.02px 0 0 #fff, 0 0.02px 0 #fff, 0 -0.02px 0 #fff,
+    0 0 0.02px rgba(255, 255, 255, 0.85);
+}
+
+/* Drawer & menu labels contour + interactions */
+:deep(.q-drawer .q-item-label),
+:deep(.q-menu .q-item-label),
+.notif_msg,
+.notif_username,
+.see_all {
+  text-shadow: 0.02px 0 0 #fff, -0.02px 0 0 #fff, 0 0.02px 0 #fff, 0 -0.02px 0 #fff,
+    0 0 0.02px rgba(255, 255, 255, 0.85);
+  transition: transform 0.15s ease, text-shadow 0.15s ease;
+}
+
+:deep(.q-drawer .q-item:hover .q-item-label),
+:deep(.q-menu .q-item:hover .q-item-label),
+.text-link:hover,
+.notif_msg:hover,
+.notif_username:hover,
+.see_all:hover {
+  transform: translateZ(0) scale(1.05);
+}
+
+:deep(.q-drawer .q-item:active .q-item-label),
+:deep(.q-menu .q-item:active .q-item-label),
+.text-link:active,
+.notif_msg:active,
+.notif_username:active,
+.see_all:active {
+  transform: translateZ(0) scale(0.95);
 }
 
 .notif-text {

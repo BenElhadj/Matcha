@@ -691,7 +691,10 @@ a {
 /* Fluid cards grid: reduces columns as width shrinks, min 260px per card */
 .cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, 260px); /* colonnes fixes: pas d'étirement en pleine largeur */
+  grid-template-columns: repeat(
+    auto-fill,
+    260px
+  ); /* colonnes fixes: pas d'étirement en pleine largeur */
   gap: 16px;
   align-items: start;
   justify-content: center; /* centrer la grille quand il reste de l'espace */
