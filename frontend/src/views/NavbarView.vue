@@ -128,7 +128,11 @@
                   </div>
                 </q-item-section>
                 <div class="ml-auto q-mr-sm">
-                  <q-badge v-if="unreadCount(item) > 0" color="primary" :label="unreadCount(item)" />
+                  <q-badge
+                    v-if="unreadCount(item) > 0"
+                    color="primary"
+                    :label="unreadCount(item)"
+                  />
                 </div>
                 <q-item-section>
                   <q-item-label class="notif_msg">
@@ -312,13 +316,18 @@ const toUserChat = async (convo) => {
       const map = { ...unreadCountsByConv.value }
       map[convo.id_conversation] = 0
       unreadCountsByConv.value = map
-      newMsgNum.value = Object.values(unreadCountsByConv.value).reduce((a, b) => a + (Number(b) || 0), 0)
+      newMsgNum.value = Object.values(unreadCountsByConv.value).reduce(
+        (a, b) => a + (Number(b) || 0),
+        0
+      )
     }
     syncConvo(convo)
   } catch (err) {
     console.error('err toUserChat in frontend/NavbarView.view ===> ', err)
     // Still navigate to chat on error
-    try { syncConvo(convo) } catch (_) {}
+    try {
+      syncConvo(convo)
+    } catch (_) {}
   }
 }
 
@@ -341,6 +350,7 @@ onUnmounted(() => {
 watch(
   () => notifMenu.value,
   async (opened) => {
+    if (!connected.value) return
     if (opened) {
       // close the other menu when this opens
       if (msgMenu.value) msgMenu.value = false
@@ -364,6 +374,7 @@ watch(
 watch(
   () => msgMenu.value,
   (opened) => {
+    if (!connected.value) return
     if (opened && notifMenu.value) notifMenu.value = false
   }
 )
@@ -428,6 +439,7 @@ const prefetchNotifProfilePhotos = async () => {
 watch(
   () => notifs.value,
   () => {
+    if (!connected.value) return
     prefetchNotifProfilePhotos()
   },
   { deep: true, immediate: true }
@@ -435,6 +447,7 @@ watch(
 watch(
   () => notifMenu.value,
   (opened) => {
+    if (!connected.value) return
     if (opened) prefetchNotifProfilePhotos()
   }
 )
@@ -480,6 +493,7 @@ const prefetchMsgProfilePhotos = async () => {
 watch(
   () => menuConvos.value,
   () => {
+    if (!connected.value) return
     prefetchMsgProfilePhotos()
   },
   { deep: true, immediate: true }
@@ -487,6 +501,7 @@ watch(
 watch(
   () => msgMenu.value,
   (opened) => {
+    if (!connected.value) return
     if (opened) prefetchMsgProfilePhotos()
   }
 )
@@ -518,11 +533,14 @@ const logout = async () => {
   }
 }
 
-// Build the list of the last 5 conversations by last update (newest first)
+// Build the list of the last 5 received messages (exclude my own last messages), newest first
 function buildMenuMessages(messages) {
-  const arr = Array.isArray(messages) ? messages.slice() : []
+  const me = user.value?.id
+  // Keep only conversations where the last message was sent by the other person
+  const arr = Array.isArray(messages) ? messages.filter((m) => m && m.message_from !== me) : []
   arr.sort(
-    (a, b) => new Date(b.last_update || b.created_at || 0) - new Date(a.last_update || a.created_at || 0)
+    (a, b) =>
+      new Date(b.last_update || b.created_at || 0) - new Date(a.last_update || a.created_at || 0)
   )
   return arr.slice(0, 5)
 }
@@ -569,14 +587,16 @@ const presenceClass = (item) => {
 }
 
 const updateNotifAndMsg = async () => {
-  if (connected.value !== null) {
-    try {
-      const path = router.currentRoute?.value?.path || ''
-      if ((typeof path === 'string' && path.startsWith('/notifications')) || notifMenu.value) return
-    } catch (_) {}
-    try {
-      await store.dispatch('getNotifPage', { limit: 50, page: 1 })
-    } catch (_) {}
+  if (!connected.value) return
+  try {
+    const path = router.currentRoute?.value?.path || ''
+    if ((typeof path === 'string' && path.startsWith('/notifications')) || notifMenu.value) return
+  } catch (_) {}
+  // Prevent re-entrancy while periodic refresh is in-flight
+  if (updateNotifAndMsg._inFlight) return
+  updateNotifAndMsg._inFlight = true
+  try {
+    await store.dispatch('getNotifPage', { limit: 50, page: 1 })
     convos.value = store.getters.convos
     notif.value = store.getters.notif
     notifs.value = Array.isArray(notif.value)
@@ -593,7 +613,14 @@ const updateNotifAndMsg = async () => {
     menuConvos.value = buildMenuMessages(newMessage.value)
     // Compute unread badge from per-conversation counts
     unreadCountsByConv.value = await getUnreadConvoCounts()
-    newMsgNum.value = Object.values(unreadCountsByConv.value).reduce((a, b) => a + (Number(b) || 0), 0)
+    newMsgNum.value = Object.values(unreadCountsByConv.value).reduce(
+      (a, b) => a + (Number(b) || 0),
+      0
+    )
+  } catch (e) {
+    // Swallow transient errors (e.g., QUIC/HTTP3) to avoid reactive churn
+  } finally {
+    updateNotifAndMsg._inFlight = false
   }
 }
 
@@ -601,10 +628,29 @@ function refreshMethods() {
   updateNotifAndMsg()
 }
 
-const refreshInterval = setInterval(refreshMethods, 3000)
+let refreshIntervalId = null
+onMounted(() => {
+  if (connected.value && !refreshIntervalId) {
+    refreshIntervalId = setInterval(refreshMethods, 3000)
+  }
+})
+watch(
+  () => connected.value,
+  (val) => {
+    if (val) {
+      if (!refreshIntervalId) refreshIntervalId = setInterval(refreshMethods, 3000)
+    } else {
+      if (refreshIntervalId) {
+        clearInterval(refreshIntervalId)
+        refreshIntervalId = null
+      }
+    }
+  }
+)
 
 onBeforeUnmount(() => {
-  clearInterval(refreshInterval)
+  if (refreshIntervalId) clearInterval(refreshIntervalId)
+  refreshIntervalId = null
 })
 </script>
 

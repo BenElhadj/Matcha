@@ -1,46 +1,38 @@
 <template>
-  <div class="q-pa-md" style="max-width: 350px">
+  <div class="q-pa-md" style="max-width: 280px">
     <q-list style="background-color: WhiteSmoke">
-
       <q-item>
-        <q-item-section>Recent Discussions</q-item-section>
+        <q-item-section>Discussions</q-item-section>
       </q-item>
-      <q-item v-if="sortedConvos.length == 0" style="align-items: center, justify-content: center, display: flex">
+      <q-item
+        v-if="sortedConvos.length == 0"
+        style="align-items: center; justify-content: center; display: flex"
+      >
         <q-item-section>No conversations</q-item-section>
       </q-item>
 
-      <q-item clickable v-ripple v-for="(convo) in sortedConvos.sort(sortByLastSeen)"
-        :key="convo.id_conversation" @click="syncConvo(convo)"
-        :class="{ 'selected-convo': convo === selectedConvo }">
-
-        <q-item-section :value="!!unRead(convo)" overlap color="primary" class="mx-2" left>
-            <template v-slot:badge>
-              <span>{{ unRead(convo) }}</span>
-            </template>
-            <q-avatar>
-              <img :src="getConvoAvatar(convo)">
-            </q-avatar>
+      <q-item
+        clickable
+        v-ripple
+        v-for="convo in sortedConvos"
+        :key="convo.id_conversation"
+        @click="syncConvo(convo)"
+        :class="{ 'selected-convo': convo.id_conversation === selectedConvoId }"
+      >
+        <q-item-section :value="!!unRead(convo)" overlap color="primary" class="mr-1" left>
+          <template v-slot:badge>
+            <span>{{ unRead(convo) }}</span>
+          </template>
+          <q-avatar class="avatar-presence" size="50px">
+            <img :src="getConvoAvatar(convo)" />
+            <span :class="['presence-dot', presenceClass(convo)]"></span>
+          </q-avatar>
         </q-item-section>
-        
-        <q-item-section class="hidden-sm-and-down">
+
+        <q-item-section class="hidden-md-and-down name-section">
           <q-item-label class="truncate-text">{{ convo.username }}</q-item-label>
         </q-item-section>
-
-        <q-item-section side>
-
-          <q-tooltip bottom class="status_container">
-            <span>{{ lastSeen[convo.user_id] }}</span>
-          </q-tooltip>
-
-          <q-badge v-if="notTyping(convo)" small rounded :color="lastSeen[convo.user_id] == 'online' ? 'green' : 'grey'" />
-          <div v-else class="typing">
-            <q-spinner-dots size="2rem" />
-          </div>
-
-        </q-item-section>
-
       </q-item>
-
     </q-list>
   </div>
 </template>
@@ -49,7 +41,7 @@
 import utility from '@/utility.js'
 import axios from 'axios'
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
-import { useStore, mapActions  } from 'vuex'
+import { useStore, mapActions } from 'vuex'
 import moment from 'moment'
 
 const store = useStore()
@@ -61,7 +53,10 @@ const convosStatus = ref([])
 const lastSeen = ref([])
 const updateTimer = ref(null)
 const connectedUsers = computed(() => store.state.connectedUsers)
-const selectedConvo = ref(null)
+// Selected conversation id from store (number)
+const selectedConvoId = computed(() => store.state.selectedConvo)
+// Unread counts per conversation (received & not opened)
+const unreadCountsByConv = ref({})
 
 // Avatar resolution
 const base = import.meta.env.BASE_URL || '/'
@@ -75,12 +70,15 @@ const fetchUserProfileImage = async (id) => {
     const url = `${import.meta.env.VITE_APP_API_URL}/api/users/show/${id}`
     const res = await axios.get(url, { headers })
     const images = Array.isArray(res.data?.images) ? res.data.images : []
-    const profileImg = images.find((img) => img && (img.profile === 1 || img.profile === true)) || images[0]
+    const profileImg =
+      images.find((img) => img && (img.profile === 1 || img.profile === true)) || images[0]
     if (!profileImg) return ''
     const fallback = utility.getCachedDefault?.('profile') || defaultProfileTxt
     const src = utility.getImageSrc
       ? utility.getImageSrc(profileImg, fallback)
-      : (utility.getFullPath ? utility.getFullPath(profileImg?.name || profileImg?.link || profileImg?.data || '') : fallback)
+      : utility.getFullPath
+      ? utility.getFullPath(profileImg?.name || profileImg?.link || profileImg?.data || '')
+      : fallback
     return src || ''
   } catch (_) {
     return ''
@@ -94,41 +92,50 @@ const getConvoAvatar = (convo) => {
     if (cached) return cached
     // fallback to whatever the convo carries
     return utility.getImageSrc
-      ? utility.getImageSrc(convo?.profile_image, utility.getCachedDefault?.('profile') || defaultProfileTxt)
-      : (utility.getFullPath ? utility.getFullPath(convo?.profile_image) : defaultProfileTxt)
+      ? utility.getImageSrc(
+          convo?.profile_image,
+          utility.getCachedDefault?.('profile') || defaultProfileTxt
+        )
+      : utility.getFullPath
+      ? utility.getFullPath(convo?.profile_image)
+      : defaultProfileTxt
   } catch (_) {
     return defaultProfileTxt
   }
 }
 
-const syncConvo = (convo) => {
+const syncConvo = async (convo) => {
+  try {
+    // Mark as read on server so counters drop
+    const token = localStorage.getItem('token')
+    const headers = { 'x-auth-token': token }
+    const url = `${import.meta.env.VITE_APP_API_URL}/api/chat/update`
+    await axios.post(url, { id: convo?.id_conversation }, { headers })
+  } catch (_) {}
+  // Optimistic local update
+  if (convo?.id_conversation) {
+    const map = { ...unreadCountsByConv.value }
+    map[convo.id_conversation] = 0
+    unreadCountsByConv.value = map
+  }
   store.dispatch('syncConvo', convo)
-  selectedConvo.value = convo
 }
 
-const unRead = (convo) => {
-  if (notif.value.length) {
-    let sum = 0
-    notif.value.forEach(cur => {
-      if (cur.type === 'chat' && cur.id_conversation === convo.id_conversation) {
-        sum++
-      }
-    })
-    return sum
-  }
-}
+// Unread received messages count for this conversation
+const unRead = (convo) => unreadCountsByConv.value[convo?.id_conversation] || 0
 
 const notTyping = (convo) => {
   if (typingSec.value.status) {
-    const conv = typingSec.value.convos.find(cur => cur.id_conversation === convo.id_conversation)
+    const conv = typingSec.value.convos.find((cur) => cur.id_conversation === convo.id_conversation)
     return !conv
   }
   return true
 }
 
 function updateConnectedUsers() {
-  utility.getConnectedUsers()
-    .then(data => {
+  utility
+    .getConnectedUsers()
+    .then((data) => {
       const connectedUserIds = data
       convos.value.forEach((cur) => {
         if (connectedUserIds.includes(cur.user_id.toString())) {
@@ -140,20 +147,30 @@ function updateConnectedUsers() {
         }
       })
     })
-    .catch(error => {
+    .catch((error) => {
       console.error('Erreur lors de la récupération des données :', error)
     })
 }
 
 onMounted(async () => {
-  sortedConvos.value.forEach(convo => {
-    if (convo.id_conversation === store.state.selectedConvo.id_conversation) {
-      selectedConvo.value = convo
+  // Fetch initial unread counts
+  try {
+    const token = localStorage.getItem('token')
+    const headers = { 'x-auth-token': token }
+    const url = `${import.meta.env.VITE_APP_API_URL}/api/chat/notSeen`
+    const res = await axios.get(url, { headers })
+    const arr = Array.isArray(res?.data?.data) ? res.data.data : []
+    const map = {}
+    for (const r of arr) {
+      if (r && r.id_conversation) map[r.id_conversation] = Number(r.count) || 0
     }
-  })
+    unreadCountsByConv.value = map
+  } catch (_) {}
+
+  // no-op: selection is driven by store.selectedConvoId
   // Prefetch avatars for visible convos
   try {
-    const ids = Array.from(new Set(sortedConvos.value.map(c => c && c.user_id).filter(Boolean)))
+    const ids = Array.from(new Set(sortedConvos.value.map((c) => c && c.user_id).filter(Boolean)))
     for (const id of ids) {
       if (!profilePhotosById.value[id]) {
         const src = await fetchUserProfileImage(id)
@@ -163,13 +180,13 @@ onMounted(async () => {
   } catch (_) {}
 })
 
-watch([online, convos], updateConnectedUsers,{ immediate: true })
+watch([online, convos], updateConnectedUsers, { immediate: true })
 // Also prefetch when convos change
 watch(
   () => convos.value,
   async () => {
     try {
-      const ids = Array.from(new Set(sortedConvos.value.map(c => c && c.user_id).filter(Boolean)))
+      const ids = Array.from(new Set(sortedConvos.value.map((c) => c && c.user_id).filter(Boolean)))
       for (const id of ids) {
         if (!profilePhotosById.value[id]) {
           const src = await fetchUserProfileImage(id)
@@ -181,30 +198,54 @@ watch(
   { deep: true }
 )
 
-const sortByLastSeen = (a, b) => {
-  if (lastSeen.value[a.user_id] === 'online' && lastSeen.value[b.user_id] !== 'online') {
-    return -1
-  } else if (lastSeen.value[a.user_id] !== 'online' && lastSeen.value[b.user_id] === 'online') {
-    return 1
-  } else {
-    return 0
-  }
+const sortByStatusAndDate = (a, b) => {
+  const aOnline = lastSeen.value[a.user_id] === 'online'
+  const bOnline = lastSeen.value[b.user_id] === 'online'
+  if (aOnline !== bOnline) return aOnline ? -1 : 1
+  const da = new Date(a.last_update || a.created_at || 0)
+  const db = new Date(b.last_update || b.created_at || 0)
+  return db - da
 }
 
 const sortedConvos = computed(() => {
-  const uniqueConvos = Array.from(new Set(convos.value.map(convo => convo.user_id)))
-    .map(user_id => convos.value.find(convo => convo.user_id === user_id))
-
-  return uniqueConvos.sort(sortByLastSeen)
+  // unique by other user
+  const uniqueConvos = Array.from(new Set(convos.value.map((convo) => convo.user_id))).map(
+    (user_id) => convos.value.find((convo) => convo.user_id === user_id)
+  )
+  // base sort: online first, then by recency
+  let arr = uniqueConvos.sort(sortByStatusAndDate)
+  // pin selected conversation to the very top if present
+  const selId = selectedConvoId.value
+  if (selId) {
+    const idx = arr.findIndex((c) => c && c.id_conversation === selId)
+    if (idx > 0) {
+      const [sel] = arr.splice(idx, 1)
+      arr.unshift(sel)
+    }
+  }
+  return arr
 })
+
+const presenceClass = (convo) => (lastSeen.value[convo.user_id] === 'online' ? 'online' : 'offline')
 
 function refreshMethods() {
   updateConnectedUsers()
-  sortedConvos.value.forEach(convo => {
-    if (convo.id_conversation === store.state.selectedConvo.id_conversation) {
-      selectedConvo.value = convo
-    }
-  })
+  // Periodically refresh unread counts
+  ;(async () => {
+    try {
+      const token = localStorage.getItem('token')
+      const headers = { 'x-auth-token': token }
+      const url = `${import.meta.env.VITE_APP_API_URL}/api/chat/notSeen`
+      const res = await axios.get(url, { headers })
+      const arr = Array.isArray(res?.data?.data) ? res.data.data : []
+      const map = {}
+      for (const r of arr) {
+        if (r && r.id_conversation) map[r.id_conversation] = Number(r.count) || 0
+      }
+      unreadCountsByConv.value = map
+    } catch (_) {}
+  })()
+  // selection highlight is reactive via selectedConvoId
 }
 
 const refreshInterval = setInterval(refreshMethods, 2000)
@@ -212,7 +253,6 @@ const refreshInterval = setInterval(refreshMethods, 2000)
 onBeforeUnmount(() => {
   clearInterval(refreshInterval)
 })
-
 </script>
 
 <style scoped>
@@ -220,12 +260,44 @@ onBeforeUnmount(() => {
   background: var(--color-primary);
 }
 .selected-convo {
-  background-color: silver;
+  background-color: #e8f0ff; /* light highlight */
+  border-left: 4px solid var(--q-primary);
+}
+.selected-convo .truncate-text {
+  font-weight: 700;
+}
+.q-item:hover {
+  background-color: #f6f9ff;
 }
 .truncate-text {
   min-width: 40px;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+/* Bring the name closer to the avatar */
+.name-section {
+  margin-left: 4px;
+}
+/* Presence dot overlay like Navbar */
+.avatar-presence {
+  position: relative;
+  display: inline-block;
+}
+.presence-dot {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid white;
+  z-index: 1;
+}
+.presence-dot.online {
+  background: #21ba45; /* green */
+}
+.presence-dot.offline {
+  background: #9e9e9e; /* grey */
 }
 </style>

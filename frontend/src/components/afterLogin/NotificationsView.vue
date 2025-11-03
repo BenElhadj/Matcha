@@ -98,12 +98,15 @@ const fetchUserProfileImage = async (id) => {
     const url = `${import.meta.env.VITE_APP_API_URL}/api/users/show/${id}`
     const res = await axios.get(url, { headers })
     const images = Array.isArray(res.data?.images) ? res.data.images : []
-    const profileImg = images.find((img) => img && (img.profile === 1 || img.profile === true)) || images[0]
+    const profileImg =
+      images.find((img) => img && (img.profile === 1 || img.profile === true)) || images[0]
     if (!profileImg) return ''
     const fallback = utility.getCachedDefault?.('profile') || defaultProfileTxt
     const src = utility.getImageSrc
       ? utility.getImageSrc(profileImg, fallback)
-      : (utility.getFullPath ? utility.getFullPath(profileImg?.name || profileImg?.link || profileImg?.data || '') : fallback)
+      : utility.getFullPath
+      ? utility.getFullPath(profileImg?.name || profileImg?.link || profileImg?.data || '')
+      : fallback
     return src || ''
   } catch (_) {
     return ''
@@ -175,7 +178,9 @@ watch(
         const res = await axios.get(url, { headers })
         if (!res.data.msg) return
       } catch (err) {
+        // Treat network/transient errors as temporary; don't force logout here
         console.error('err watch user in frontend/NotificationsView.vue ===> ', err)
+        return
       }
     }
     if (newUser?.id) await logout(newUser.id)
@@ -189,7 +194,9 @@ onMounted(async () => {
   if (!Array.isArray(items) || items.length < limit.value) hasMore.value = false
   if (currentUser.value?.id) store.dispatch('seenNotif', { id: currentUser.value.id })
   // Prefetch avatars for visible notifications
-  try { await prefetchEntryPhotos() } catch (_) {}
+  try {
+    await prefetchEntryPhotos()
+  } catch (_) {}
   // Si la socket est active, toute nouvelle notif pendant que la page est ouverte sera aussitôt marquée lue
   try {
     const s = getSocket && getSocket()
@@ -197,7 +204,9 @@ onMounted(async () => {
       s.on('notif:new', async () => {
         await store.dispatch('getNotifPage', { limit: limit.value, page: 1 })
         if (currentUser.value?.id) await store.dispatch('seenNotif', { id: currentUser.value.id })
-        try { await prefetchEntryPhotos() } catch (_) {}
+        try {
+          await prefetchEntryPhotos()
+        } catch (_) {}
       })
     }
   } catch (_) {}
@@ -209,7 +218,9 @@ onMounted(() => {
   refreshTimer = setInterval(() => {
     store.dispatch('getNotifPage', { limit: limit.value, page: 1 }).then(() => {
       if (currentUser.value?.id) store.dispatch('seenNotif', { id: currentUser.value.id })
-      try { prefetchEntryPhotos() } catch (_) {}
+      try {
+        prefetchEntryPhotos()
+      } catch (_) {}
     })
   }, 4000)
 })

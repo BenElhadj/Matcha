@@ -53,31 +53,45 @@ const messageSent = (msg) => {
   store.dispatch('updateConvosOrder', msg.id_conversation)
 }
 
-watch(user, async (newUser) => {
-  const token = newUser.token || localStorage.getItem('token')
-  if (token) {
-    try {
-      const url = `${import.meta.env.VITE_APP_API_URL}/api/auth/isloggedin`
-      const headers = { 'x-auth-token': token }
-      const res = await axios.get(url, { headers })
-      data.value = res.data
-      if (!res.data.msg) {
+watch(
+  user,
+  async (newUser) => {
+    const token = newUser.token || localStorage.getItem('token')
+    if (token) {
+      try {
+        const url = `${import.meta.env.VITE_APP_API_URL}/api/auth/isloggedin`
+        const headers = { 'x-auth-token': token }
+        const res = await axios.get(url, { headers })
+        data.value = res.data
+        // Backend convention: res.data.msg truthy means NOT logged in
+        if (!res.data.msg) {
+          loaded.value = true
+          return
+        }
+        // Explicit not-logged-in → proceed to logout
+      } catch (err) {
+        // Network/transient error (e.g., QUIC/HTTP3 or cold start): don't force logout; allow UI to load
+        console.error('err watch user in frontend/MessengerView.vue ===> ', err)
         loaded.value = true
         return
       }
-    } catch (err) {
-      console.error('err watch user in frontend/MessengerView.vue ===> ', err)
     }
-  }
-  store.dispatch('logout', newUser.id)
-  router.push('/login')
-}, { immediate: true })
+    // Only reached if we have a definitive signal that the user is not logged in
+    await store.dispatch('logout', newUser.id)
+    router.push('/login')
+  },
+  { immediate: true }
+)
 
-watch(convos, (newConvos) => {
-  if (newConvos.length && !selectedConvo.value) {
-    store.dispatch('syncConvo', newConvos[0])
-  }
-}, { immediate: true })
+watch(
+  convos,
+  (newConvos) => {
+    if (newConvos.length && !selectedConvo.value) {
+      store.dispatch('syncConvo', newConvos[0])
+    }
+  },
+  { immediate: true }
+)
 
 onBeforeUnmount(() => {
   store.dispatch('syncConvo', null)
@@ -96,11 +110,15 @@ onBeforeUnmount(() => {
 
 .right-scroll {
   height: 100%;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  /* Let inner .top_chat handle the scrolling so the input can stick at the bottom */
+  overflow: hidden;
 }
 
 .top_chat {
-  flex: 0% 20% 100% !important;
+  flex: 1 1 auto !important;
+  overflow-y: auto;
 }
 
 .top_chat::-webkit-scrollbar {
@@ -115,16 +133,23 @@ onBeforeUnmount(() => {
 .left {
   padding: 0 !important;
   margin: 0 !important;
-  max-width: 270px;
+  max-width: 240px;
   min-width: 120px;
 }
 
-.right, .chat_layout, .parent {
+.right,
+.chat_layout,
+.parent {
   height: 100% !important;
 }
 
 .bottom {
-  flex: 0 0 100% !important;
+  flex: 0 0 auto !important;
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  background: #ffffff;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .left-scroll {
@@ -132,7 +157,7 @@ onBeforeUnmount(() => {
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
-  width: 25%;
+  width: 22%;
   min-width: 120px;
 }
 
@@ -157,5 +182,4 @@ onBeforeUnmount(() => {
 .right-scroll::-webkit-scrollbar-track {
   background-color: transparent;
 }
-
 </style>

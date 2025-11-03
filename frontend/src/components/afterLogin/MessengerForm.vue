@@ -111,14 +111,10 @@ const sendMsg = async (e) => {
   margin-top: 5px;
 }
 .custom-q-input {
-  position: fixed;
-  bottom: 140px;
-  left: 24%;
-  right: 10%;
-  z-index: 10;
+  width: 100%;
+  margin-top: 8px;
   border-radius: 10px;
-  padding: 10px;
-  border: 5% solid white !important;
+  padding: 8px 10px;
   background: white;
 }
 </style>
