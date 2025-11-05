@@ -8,7 +8,5 @@ routes.post('/messages', authCheck, chat.getMessages)
 routes.post('/update', authCheck, chat.updateConv)
 routes.post('/send', authCheck, chat.sendMsg)
 routes.get('/getInChat', authCheck, chat.getInChat)
-// Expose per-conversation unread counts
-routes.get('/notSeen', authCheck, chat.getNotSeenMsg)
 
 module.exports = routes
