@@ -1,5 +1,53 @@
 // Utilitaire global pour l'affichage d'image (gère 'false', base64 et URLs)
+// Memoization to avoid repeatedly validating large base64 payloads during re-renders
+const __imageSrcMemoStr = new Map(); // key: `${default}|${value}` -> resolved src
+const __imageSrcMemoObj = new WeakMap(); // key: object -> Map(default -> resolved)
+function __getMemoForObj(obj, def) {
+  let m = __imageSrcMemoObj.get(obj)
+  if (!m) {
+    m = new Map()
+    __imageSrcMemoObj.set(obj, m)
+  }
+  return m.get(def)
+}
+function __setMemoForObj(obj, def, val) {
+  let m = __imageSrcMemoObj.get(obj)
+  if (!m) {
+    m = new Map()
+    __imageSrcMemoObj.set(obj, m)
+  }
+  m.set(def, val)
+}
+
 export function getImageSrc(image, defaultImage = 'default/defaut_profile.txt') {
+  try {
+    // Quick memoization for strings (including data URIs and base64) to cut regex/split cost
+    if (typeof image === 'string') {
+      const key = `${defaultImage}|${image}`
+      if (__imageSrcMemoStr.has(key)) return __imageSrcMemoStr.get(key)
+      const resolved = __resolveImageInternal(image, defaultImage)
+      // Prevent unbounded growth
+      if (__imageSrcMemoStr.size > 1000) __imageSrcMemoStr.clear()
+      __imageSrcMemoStr.set(key, resolved)
+      return resolved
+    }
+    // WeakMap memoization for object refs
+    if (image && typeof image === 'object') {
+      const cached = __getMemoForObj(image, defaultImage)
+      if (cached) return cached
+      const resolved = __resolveImageInternal(image, defaultImage)
+      __setMemoForObj(image, defaultImage, resolved)
+      return resolved
+    }
+    // Fallback to resolver for other types (null/undefined handled inside)
+    return __resolveImageInternal(image, defaultImage)
+  } catch (_) {
+    return defaultImage
+  }
+}
+
+// Internal resolver (original logic), kept separate to allow memoization above
+function __resolveImageInternal(image, defaultImage = 'default/defaut_profile.txt') {
   if (!image) return defaultImage;
 
   // Si c'est une chaîne directe
@@ -10,18 +58,54 @@ export function getImageSrc(image, defaultImage = 'default/defaut_profile.txt') 
       // Validate data URI doesn't contain HTML or invalid base64 payload
       const parts = s.split(',')
       const payload = parts.length > 1 ? parts.slice(1).join(',') : ''
-      const base64Pattern = /^[A-Za-z0-9+/=\s]+$/
+      // Allow standard and URL-safe base64 (include - and _), tolerate whitespace
+      const base64Pattern = /^[A-Za-z0-9+/=_-\s]+$/
       if (!payload || payload.startsWith('<!DOCTYPE') || payload.startsWith('<html') || !base64Pattern.test(payload)) {
         return defaultImage
       }
       return s
     }
     // Plain base64 provided as a string (no data: prefix)
-    if (/^[A-Za-z0-9+/=]+$/.test(s)) {
-      return `data:image/png;base64,${s}`
+    // Accept URL-safe base64 and whitespace, then normalize by stripping whitespace
+    if (/^[A-Za-z0-9+/=_-\s]+$/.test(s)) {
+      const compact = s.replace(/\s+/g, '')
+      return `data:image/png;base64,${compact}`
     }
     if (isExternal(s)) return s;
     return getFullPath(s);
+  }
+
+  // Si c'est un objet, appliquer d'abord la convention DB:
+  // - link === false  => l'image est dans data (base64)
+  // - data === false  => l'image est dans link (URL)
+  if (image && typeof image === 'object') {
+    const isFalse = (v) => v === false || v === 'false' || v === 0
+    const useData = isFalse(image.link) && typeof image.data === 'string' && image.data.trim()
+    if (useData) {
+      const val = image.data.trim()
+      if (val.startsWith('data:image')) {
+        const parts = val.split(',')
+        const payload = parts.length > 1 ? parts.slice(1).join(',') : ''
+        const base64Pattern = /^[A-Za-z0-9+/=_-\s]+$/
+        if (!payload || payload.startsWith('<!DOCTYPE') || payload.startsWith('<html') || !base64Pattern.test(payload)) {
+          return defaultImage
+        }
+        return val
+      }
+      if (/^[A-Za-z0-9+/=_-\s]+$/.test(val)) {
+        const compact = val.replace(/\s+/g, '')
+        return `data:image/png;base64,${compact}`
+      }
+      // fallback: treat as path or URL
+      return isExternal(val) ? val : getFullPath(val)
+    }
+
+    const useLink = isFalse(image.data) && typeof image.link === 'string' && image.link.trim()
+    if (useLink) {
+      const val = image.link.trim()
+      if (isExternal(val)) return val
+      return getFullPath(val)
+    }
   }
 
   // Champ image prioritaire si présent
@@ -51,13 +135,16 @@ export function getImageSrc(image, defaultImage = 'default/defaut_profile.txt') 
         // validate payload
         const parts = val.split(',')
         const payload = parts.length > 1 ? parts.slice(1).join(',') : ''
-        const base64Pattern = /^[A-Za-z0-9+/=\s]+$/
+        const base64Pattern = /^[A-Za-z0-9+/=_-\s]+$/
         if (!payload || payload.startsWith('<!DOCTYPE') || payload.startsWith('<html') || !base64Pattern.test(payload)) {
           return defaultImage
         }
         return val
       }
-      if (/^[A-Za-z0-9+/=]+$/.test(val)) return `data:image/png;base64,${val}`;
+      if (/^[A-Za-z0-9+/=_-\s]+$/.test(val)) {
+        const compact = val.replace(/\s+/g, '')
+        return `data:image/png;base64,${compact}`
+      }
     }
   }
 
@@ -106,7 +193,7 @@ export function getCachedDefault (kind = 'profile') {
     if (s.startsWith('data:image')) {
       const parts = s.split(',')
       const payload = parts.length > 1 ? parts.slice(1).join(',') : ''
-      const base64Pattern = /^[A-Za-z0-9+/=\s]+$/
+      const base64Pattern = /^[A-Za-z0-9+/=_-\s]+$/
       if (!payload || payload.startsWith('<!DOCTYPE') || payload.startsWith('<html') || !base64Pattern.test(payload)) {
         // Bad cache, purge it
         try { localStorage.removeItem(key) } catch (_) {}
@@ -195,7 +282,7 @@ export function getFullPath(file) {
   if (s.startsWith('data:image')) {
     const parts = s.split(',')
     const payload = parts.length > 1 ? parts.slice(1).join(',') : ''
-    const base64Pattern = /^[A-Za-z0-9+/=\s]+$/
+    const base64Pattern = /^[A-Za-z0-9+/=_-\s]+$/
     if (!payload || payload.startsWith('<!DOCTYPE') || payload.startsWith('<html') || !base64Pattern.test(payload)) {
       return fallback
     }
@@ -704,4 +791,46 @@ export default {
   ,uploadProfileImage
   ,uploadGalleryImage
   ,deleteUserImage
+}
+
+// --- Small avatar thumbnail generator ----------------------------------------
+// Create smaller thumbnails for large data URIs to speed up decoding/rendering
+const __thumbCache = new Map(); // key: `${size}|${src}` -> data URL
+export async function makeSmallAvatar (src, size = 48) {
+  try {
+    if (!src || typeof src !== 'string') return src
+    if (!/^data:image\//i.test(src)) return src
+    // If payload is already small, don't waste CPU to re-encode
+    if (src.length < 80000) return src // ~60KB base64 payload threshold
+    const key = `${size}|${src}`
+    if (__thumbCache.has(key)) return __thumbCache.get(key)
+
+    // Create image
+    const img = new Image()
+    img.decoding = 'async'
+    const loaded = new Promise((resolve, reject) => {
+      img.onload = () => resolve(true)
+      img.onerror = reject
+    })
+    img.src = src
+    await loaded
+    const w = img.naturalWidth || img.width
+    const h = img.naturalHeight || img.height
+    if (!w || !h) { __thumbCache.set(key, src); return src }
+    const scale = size / Math.max(w, h)
+    const newW = Math.max(1, Math.round(w * scale))
+    const newH = Math.max(1, Math.round(h * scale))
+    const canvas = document.createElement('canvas')
+    canvas.width = newW
+    canvas.height = newH
+    const ctx = canvas.getContext('2d', { willReadFrequently: false })
+    ctx.drawImage(img, 0, 0, newW, newH)
+    // Use JPEG for better compression; adjust quality as needed
+    const out = canvas.toDataURL('image/jpeg', 0.82)
+    if (__thumbCache.size > 300) __thumbCache.clear()
+    __thumbCache.set(key, out)
+    return out
+  } catch (_) {
+    return src
+  }
 }

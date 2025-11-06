@@ -4,9 +4,7 @@
       <div v-if="connected" @click="drawer = true">
         <q-item>
           <q-btn flat round dense>
-            <q-avatar size="70px">
-              <q-img :src="image" alt="Photo de profil" />
-            </q-avatar>
+            <AppAvatar :image="image" size="medium" :showPresence="false" />
           </q-btn>
           <q-toolbar-title>
             <q-item-label>{{ user.username }}</q-item-label>
@@ -55,12 +53,12 @@
                 style="align-items: initial !important"
               >
                 <q-item-section avatar>
-                  <div class="avatar-presence">
-                    <q-avatar size="44px">
-                      <img :src="getNotifProfileSrc(item)" />
-                    </q-avatar>
-                    <span :class="['presence-dot', presenceClass(item)]"></span>
-                  </div>
+                  <AppAvatar
+                    :image="getNotifProfileSrc(item)"
+                    :userId="item.id_from"
+                    :showPresence="true"
+                    size="small"
+                  />
                 </q-item-section>
                 <q-item-section>
                   <q-item-label class="notif_msg">
@@ -124,12 +122,12 @@
                 style="align-items: initial !important"
               >
                 <q-item-section avatar>
-                  <div class="avatar-presence">
-                    <q-avatar size="44px">
-                      <img :src="getMsgProfileSrc(item)" />
-                    </q-avatar>
-                    <span :class="['presence-dot', presenceClass(item)]"></span>
-                  </div>
+                  <AppAvatar
+                    :image="getMsgProfileSrc(item)"
+                    :userId="otherIdUniversal(item)"
+                    :showPresence="true"
+                    size="small"
+                  />
                 </q-item-section>
                 <div class="ml-auto q-mr-sm">
                   <q-badge
@@ -184,9 +182,7 @@
         <div @click="drawer = !drawer">
           <q-item>
             <q-btn flat round dense>
-              <q-avatar size="70px">
-                <q-img :src="image" alt="Photo de profil" />
-              </q-avatar>
+              <AppAvatar :image="image" size="medium" :showPresence="false" />
             </q-btn>
             <q-item-section>
               <q-item-label>{{ user.username }}</q-item-label>
@@ -219,6 +215,7 @@ import { ref, onMounted, onUnmounted, onBeforeUnmount, computed, watch } from 'v
 import { useStore } from 'vuex'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
+import AppAvatar from '@/components/common/AppAvatar.vue'
 
 import acceilImage from '@/assets/Navbar/acceil.png'
 import decouvrirImage from '@/assets/Navbar/decouvrir.png'
@@ -779,25 +776,7 @@ onBeforeUnmount(() => {
   color: black;
 }
 
-.avatar-presence {
-  position: relative;
-  display: inline-block;
-}
-.presence-dot {
-  position: absolute;
-  bottom: 0;
-  right: 0;
-  width: 12px; /* slightly smaller than MessengerList's 14px, but visible */
-  height: 12px;
-  border-radius: 50%;
-  border: 2px solid white;
-}
-.presence-dot.online {
-  background: #21ba45; /* Quasar positive green */
-}
-.presence-dot.offline {
-  background: #9e9e9e; /* grey */
-}
+/* presence dot CSS removed; handled by AppAvatar */
 
 /* Highlight unread items in messages menu */
 .msg-menu-item.unread {

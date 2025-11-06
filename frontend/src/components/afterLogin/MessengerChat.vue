@@ -13,7 +13,6 @@
             <q-chat-message
               v-if="msg.id_from === user.id"
               :name="user.username"
-              :avatar="myAvatarSrc"
               :stamp="formatTime(msg.created_at)"
               sent
               text-color="white"
@@ -21,6 +20,16 @@
               class="nortl"
               @click="$router.push(`/`)"
             >
+              <template #avatar>
+                <div class="chat-avatar chat-avatar--me">
+                  <AppAvatar
+                    :image="myAvatarSrc"
+                    :showPresence="false"
+                    size="small"
+                    :pixelSize="40"
+                  />
+                </div>
+              </template>
               <div v-if="typing">
                 <q-spinner-dots size="2rem" />
               </div>
@@ -35,11 +44,20 @@
             <q-chat-message
               v-else
               :name="usernameConvo"
-              :avatar="otherAvatarSrc"
               bg-color="grey-3"
               :stamp="formatTime(msg.created_at)"
               @click="$router.push(`/user/${msg.id_from}`)"
             >
+              <template #avatar>
+                <div class="chat-avatar chat-avatar--other">
+                  <AppAvatar
+                    :image="otherAvatarSrc"
+                    :showPresence="false"
+                    size="small"
+                    :pixelSize="40"
+                  />
+                </div>
+              </template>
               <div v-if="typing">
                 <q-spinner-dots size="2rem" />
               </div>
@@ -67,6 +85,7 @@ import utility from '@/utility.js'
 import { useStore } from 'vuex'
 import axios from 'axios'
 import { getSocket, connectSocket } from '@/boot/socketClient'
+import AppAvatar from '@/components/common/AppAvatar.vue'
 const store = useStore()
 const key = ref(0)
 const page = ref(0)
@@ -96,29 +115,26 @@ const myAvatarSrc = computed(() =>
     ? utility.getFullPath(image.value)
     : defaultProfileTxt
 )
-const otherAvatarSrc = ref('')
+const otherAvatarSrc = computed(() => {
+  const id = idUserConvo.value
+  const cached = id ? store.state?.avatars?.byId?.[id] || '' : ''
+  return cached || fallbackOtherAvatar()
+})
 
-const fetchUserProfileImage = async (id) => {
-  try {
-    const token = user.value?.token || localStorage.getItem('token')
-    const headers = { 'x-auth-token': token }
-    const url = `${import.meta.env.VITE_APP_API_URL}/api/users/show/${id}`
-    const res = await axios.get(url, { headers })
-    const images = Array.isArray(res.data?.images) ? res.data.images : []
-    const profileImg =
-      images.find((img) => img && (img.profile === 1 || img.profile === true)) || images[0]
-    if (!profileImg) return ''
-    const fallback = utility.getCachedDefault?.('profile') || defaultProfileTxt
-    const src = utility.getImageSrc
-      ? utility.getImageSrc(profileImg, fallback)
-      : utility.getFullPath
-      ? utility.getFullPath(profileImg?.name || profileImg?.link || profileImg?.data || '')
-      : fallback
-    return src || ''
-  } catch (_) {
-    return ''
-  }
+const fallbackOtherAvatar = () => {
+  const base = import.meta.env.BASE_URL || '/'
+  const defaultProfileTxt = `${base}default/defaut_profile.txt`
+  return utility.getImageSrc
+    ? utility.getImageSrc(
+        imageConvo.value,
+        utility.getCachedDefault?.('profile') || defaultProfileTxt
+      )
+    : utility.getFullPath
+    ? utility.getFullPath(imageConvo.value)
+    : defaultProfileTxt
 }
+
+// Avatar fetching delegated to global store
 
 const checkLimit = (res) => {
   if (res && res.length < 50) {
@@ -179,37 +195,29 @@ watch(
         const result = await getChat()
         checkLimit(result)
         messages.value = result
-        // Prefetch the other user's avatar when loading the convo
+        // Ensure the other user's avatar is available in the global cache
         try {
           const otherId = idUserConvo.value
           if (otherId) {
-            const src = await fetchUserProfileImage(otherId)
-            otherAvatarSrc.value =
-              src ||
-              (utility.getImageSrc
-                ? utility.getImageSrc(
-                    imageConvo.value,
-                    utility.getCachedDefault?.('profile') || defaultProfileTxt
-                  )
-                : utility.getFullPath
-                ? utility.getFullPath(imageConvo.value)
-                : defaultProfileTxt)
+            await store.dispatch('ensureAvatar', { id: otherId, imageHint: imageConvo.value })
           }
-        } catch (_) {
-          otherAvatarSrc.value = utility.getImageSrc
-            ? utility.getImageSrc(
-                imageConvo.value,
-                utility.getCachedDefault?.('profile') || defaultProfileTxt
-              )
-            : utility.getFullPath
-            ? utility.getFullPath(imageConvo.value)
-            : defaultProfileTxt
-        }
+        } catch (_) {}
         store.dispatch('syncNotif')
       } catch (err) {
         console.error('err watch(selectedConvo) in frontend/MessengerChat.vue ===> ', err)
       }
     }
+  }
+)
+
+// If the target user id changes independently, ensure avatar refreshes quickly
+watch(
+  () => idUserConvo.value,
+  async (newId) => {
+    if (!newId) return
+    try {
+      await store.dispatch('ensureAvatar', { id: newId, imageHint: imageConvo.value })
+    } catch (_) {}
   }
 )
 
@@ -338,5 +346,14 @@ onBeforeUnmount(() => {
 }
 .nortl {
   direction: ltr;
+}
+.chat-avatar {
+  display: inline-flex;
+}
+.chat-avatar--me {
+  margin-left: 6px;
+}
+.chat-avatar--other {
+  margin-right: 6px;
 }
 </style>

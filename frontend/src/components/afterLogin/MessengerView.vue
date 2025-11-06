@@ -70,7 +70,9 @@ watch(
         data.value = res.data
         if (res?.data?.msg && store.getters.status) {
           // token invalid -> perform a single logout then redirect
-          try { await store.dispatch('logout', newUser?.id) } catch (_) {}
+          try {
+            await store.dispatch('logout', newUser?.id)
+          } catch (_) {}
           loaded.value = false
           wasLoggedOut.value = true
           router.push('/login')
@@ -94,11 +96,15 @@ watch(
   { immediate: true }
 )
 
-watch(convos, (newConvos) => {
-  if (newConvos.length && !selectedConvo.value) {
-    store.dispatch('syncConvo', newConvos[0])
-  }
-}, { immediate: true })
+watch(
+  convos,
+  (newConvos) => {
+    if (newConvos.length && !selectedConvo.value) {
+      store.dispatch('syncConvo', newConvos[0])
+    }
+  },
+  { immediate: true }
+)
 
 onBeforeUnmount(() => {
   store.dispatch('syncConvo', null)
@@ -140,7 +146,9 @@ onBeforeUnmount(() => {
   min-width: 120px;
 }
 
-.right, .chat_layout, .parent {
+.right,
+.chat_layout,
+.parent {
   height: 100% !important;
 }
 
@@ -178,5 +186,4 @@ onBeforeUnmount(() => {
 .right-scroll::-webkit-scrollbar-track {
   background-color: transparent;
 }
-
 </style>

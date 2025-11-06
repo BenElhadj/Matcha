@@ -6,6 +6,7 @@ import { socket } from './socket'
 import { getters } from './getter'
 import { allTags } from './allTags'
 import { connectedUsers } from './connectedUsers'
+import { avatars } from './avatars'
 import persist from './plugins/persist'
 
 export const store = createStore({
@@ -36,7 +37,8 @@ export const store = createStore({
     newMessage: null,
     isConnected: false,
     selectedConvo: null,
-    location: { lat: 0, lng: 0 }
+    location: { lat: 0, lng: 0 },
+    avatars: avatars.state()
   },
   getters,
   actions: {
@@ -46,6 +48,7 @@ export const store = createStore({
     ...allTags.actions,
     ...socket.actions,
     ...connectedUsers.actions,
+    ...avatars.actions,
   },
   mutations: {
     ...auth.mutations,
@@ -54,5 +57,6 @@ export const store = createStore({
     ...socket.mutations,
     ...allTags.mutations,
     ...connectedUsers.mutations,
+    ...avatars.mutations,
   }
 })

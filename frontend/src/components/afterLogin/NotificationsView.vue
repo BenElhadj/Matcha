@@ -16,12 +16,12 @@
             <q-card class="notif_bubble" clickable @click="openNotification(entry)">
               <q-card-section>
                 <div class="row items-center">
-                  <div class="avatar-presence">
-                    <q-avatar>
-                      <img :src="entryImg(entry.profile_image)" :alt="entry.username" />
-                    </q-avatar>
-                    <span :class="['presence-dot', presenceClass(entry)]"></span>
-                  </div>
+                  <AppAvatar
+                    :image="getNotifProfileSrc(entry)"
+                    :userId="entry.id_from"
+                    :showPresence="true"
+                    size="small"
+                  />
                   <div class="q-ml-md">
                     <span class="text-h6 text-weight-bold timeline_link">{{ entry.username }}</span>
                     <q-icon small style="font-size: 16px !important" class="mr-2 q-ml-xl">
@@ -62,6 +62,7 @@ import { useStore } from 'vuex'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 import utility from '@/utility.js'
+import AppAvatar from '@/components/common/AppAvatar.vue'
 import moment from 'moment'
 import { getSocket } from '@/boot/socketClient'
 
@@ -80,25 +81,24 @@ const notifs = computed(() => {
   return [...arr].sort((a, b) => new Date(b.date) - new Date(a.date))
 })
 const { fromNow, formatTime, getNotifMsg, getNotifIcon } = utility
+
+// Resolve an image value (string/object) into a usable src
 const base = import.meta.env.BASE_URL || '/'
 const defaultProfileTxt = `${base}default/defaut_profile.txt`
-const entryImg = (img) =>
+const resolveImg = (img) =>
   utility.getImageSrc
     ? utility.getImageSrc(img, utility.getCachedDefault?.('profile') || defaultProfileTxt)
-    : utility.getFullPath
-    ? utility.getFullPath(img)
-    : defaultProfileTxt
+    : utility.getFullPath(img)
 
-// Presence dot based on connected users list in store
-const connectedUsers = computed(() => store.state.connectedUsers || [])
-const presenceClass = (entry) => {
+// Use global avatars store (id -> optimized src)
+
+const getNotifProfileSrc = (entry) => {
   try {
-    const id = entry && entry.id_from
-    if (id === null || id === undefined) return 'offline'
-    const set = new Set((Array.isArray(connectedUsers.value) ? connectedUsers.value : []).map((x) => String(x)))
-    return set.has(String(id)) ? 'online' : 'offline'
+    const id = entry?.id_from
+    const cached = id ? store.state?.avatars?.byId?.[id] || '' : ''
+    return cached || resolveImg(entry?.profile_image)
   } catch (_) {
-    return 'offline'
+    return resolveImg(entry?.profile_image)
   }
 }
 
@@ -177,6 +177,25 @@ onMounted(() => {
   }, 4000)
 })
 
+// Ensure avatars are cached globally for all senders
+const prefetchNotifProfilePhotos = async () => {
+  const arr = Array.isArray(notifs.value) ? notifs.value : []
+  const ids = Array.from(new Set(arr.map((n) => n && n.id_from).filter(Boolean)))
+  for (const id of ids) {
+    const entry = arr.find((n) => n && n.id_from === id)
+    try {
+      await store.dispatch('ensureAvatar', { id, imageHint: entry?.profile_image })
+    } catch (_) {}
+  }
+}
+watch(
+  () => notifs.value,
+  () => {
+    prefetchNotifProfilePhotos()
+  },
+  { deep: true, immediate: true }
+)
+
 onUnmounted(() => {
   if (refreshTimer) clearInterval(refreshTimer)
   refreshTimer = null
@@ -199,21 +218,6 @@ const openNotification = async (entry) => {
 </script>
 
 <style scoped>
-.avatar-presence {
-  position: relative;
-  display: inline-block;
-}
-.presence-dot {
-  position: absolute;
-  bottom: 0;
-  right: 0;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  border: 2px solid white;
-}
-.presence-dot.online { background: #21ba45; }
-.presence-dot.offline { background: #9e9e9e; }
 .timeline_link {
   text-decoration: none;
 }

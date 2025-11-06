@@ -18,8 +18,30 @@
       </div>
 
       <div class="avatar">
-        <q-avatar slot="offset" class="profile__avatar mx-auto" size="250px">
-          <img :src="profileImage" />
+        <div class="profile__avatar mx-auto">
+          <AppAvatar
+            :image="profileImage"
+            size="large"
+            :showPresence="true"
+            :userId="route.params.id"
+          >
+            <!-- Distance badge anchored on the avatar (bottom-left, inside) -->
+            <div class="avatar-distance">
+              <q-chip outline small text-color="black" style="background: white !important">{{
+                distance
+              }}</q-chip>
+            </div>
+
+            <!-- Keep other slot content centered if needed (tooltip, etc.) -->
+            <div class="avatar-content">
+              <q-item-section side>
+                <q-tooltip bottom class="status_container">
+                  <span>{{ lastSeen }}</span>
+                </q-tooltip>
+                <!-- Presence dot handled by AppAvatar; badge removed to avoid duplication -->
+              </q-item-section>
+            </div>
+          </AppAvatar>
           <div style="margin-top: 10px">
             <input
               type="file"
@@ -30,26 +52,7 @@
             />
             <q-btn label="Changer la photo de profil" color="primary" @click="onProfileBtnClick" />
           </div>
-
-          <div class="avatar-content">
-            <q-chip outline small text-color="black" style="background: white !important">{{
-              distance
-            }}</q-chip>
-
-            <q-separator style="margin: 3px"></q-separator>
-            <q-item-section side>
-              <q-tooltip bottom class="status_container">
-                <span>{{ lastSeen }}</span>
-              </q-tooltip>
-              <q-badge
-                small
-                rounded
-                :color="`${lastSeen == 'online' ? 'green' : 'grey-9'}`"
-                style="border: 2px solid white !important; border-radius: 100%"
-              ></q-badge>
-            </q-item-section>
-          </div>
-        </q-avatar>
+        </div>
       </div>
 
       <q-separator spacing class="separator-margin"></q-separator>
@@ -236,6 +239,7 @@ const onCoverChange = async (e) => {
 import AlertView from '@/views/AlertView.vue'
 import LoaderView from '@/views/LoaderView.vue'
 import utility from '@/utility.js'
+import AppAvatar from '@/components/common/AppAvatar.vue'
 import ProfileEditor from '@/components/afterLogin/ProfileEditor.vue'
 import ProfileTabs from '@/components/afterLogin/ProfileTabs.vue'
 import ProfileForm from '@/components/afterLogin/ProfileForm.vue'
@@ -827,5 +831,27 @@ onBeforeUnmount(() => {})
   flex-direction: row;
   align-items: center;
   justify-content: center;
+}
+/* Distance badge positioned on the large avatar (bottom-left, just inside) */
+.avatar-distance {
+  position: absolute;
+  /* Move slightly up and to the right */
+  bottom: 26px;
+  left: 32px;
+  z-index: 3;
+}
+@media (max-width: 600px) {
+  /* Slightly less offset on small screens */
+  .avatar-distance {
+    bottom: 20px;
+    left: 24px;
+  }
+}
+@media (min-width: 1200px) {
+  /* Slightly more offset on wide screens */
+  .avatar-distance {
+    bottom: 32px;
+    left: 38px;
+  }
 }
 </style>
