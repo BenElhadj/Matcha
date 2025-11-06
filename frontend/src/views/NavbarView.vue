@@ -3,11 +3,11 @@
     <q-toolbar>
       <div v-if="connected" @click="drawer = true">
         <q-item>
-          <q-btn flat round dense>
+          <div class="navbar-avatar-btn avatar-wrapper" aria-hidden="true">
             <AppAvatar :image="image" size="medium" :showPresence="false" />
-          </q-btn>
+          </div>
           <q-toolbar-title>
-            <q-item-label>{{ user.username }}</q-item-label>
+            <q-item-label class="username-glow">{{ user.username }}</q-item-label>
           </q-toolbar-title>
         </q-item>
       </div>
@@ -181,11 +181,11 @@
       <q-list padding>
         <div @click="drawer = !drawer">
           <q-item>
-            <q-btn flat round dense>
+            <div class="avatar-wrapper">
               <AppAvatar :image="image" size="medium" :showPresence="false" />
-            </q-btn>
+            </div>
             <q-item-section>
-              <q-item-label>{{ user.username }}</q-item-label>
+              <q-item-label class="username-glow">{{ user.username }}</q-item-label>
             </q-item-section>
           </q-item>
         </div>
@@ -994,6 +994,20 @@ q-drawer {
   text-shadow: 0.02px 0 0 #fff, -0.02px 0 0 #fff, 0 0.02px 0 #fff, 0 -0.02px 0 #fff,
     0 0 0.02px rgba(255, 255, 255, 0.85);
 }
+
+/* Extra glow for username specifically */
+.username-glow {
+  /* Static soft white glow only */
+  text-shadow:
+    0 0 2px rgba(255,255,255,0.9),
+    0 0 4px rgba(255,255,255,0.85),
+    0 0 6px rgba(255,255,255,0.55),
+    0 0 8px rgba(255,255,255,0.35);
+}
+
+/* Lower the avatar slightly for visual breathing space from page top */
+/* Lower the avatar slightly for visual breathing space from page top */
+.avatar-wrapper { margin-top: 6px; }
 
 /* Drawer & menu labels contour + interactions */
 :deep(.q-drawer .q-item-label),
