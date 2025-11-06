@@ -81,7 +81,7 @@ const isOnline = computed(() => {
 .app-avatar__q {
   position: relative;
   display: inline-block;
-  width: 44px;
+  width: 4px;
   height: 44px;
 }
 .app-avatar__q img {
@@ -175,7 +175,7 @@ const isOnline = computed(() => {
 @media (min-width: 1200px) {
   /* Upscale slightly for wide screens */
   .app-avatar.size-small .app-avatar__q {
-    width: 68px;
+    width: 48px;
     height: 48px;
   }
   .app-avatar.size-medium .app-avatar__q {
