@@ -114,6 +114,10 @@ const sendMsg = async (req, res) => {
 		return res.json({ status: 'error', type: 'chat', message: 'Invalid request', data: null })
 	if (!req.body.id_from || isNaN(req.body.id_from))
 		return res.json({ status: 'error', type: 'chat', message: 'Invalid request', data: null })
+	// If provided by client, forbid messaging yourself
+	if (req.body.id_to && (parseInt(req.body.id_to) === parseInt(req.body.id_from))) {
+		return res.json({ status: 'error', type: 'chat', message: 'Cannot message yourself', data: null })
+	}
 	if (!validator(req.body.message, 'msg'))
 		return res.json({ status: 'error', type: 'chat', message: 'Invalid message', data: null })
 	// Security: enforce sender identity matches the authenticated user

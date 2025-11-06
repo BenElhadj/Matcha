@@ -13,6 +13,10 @@ const insertChatNotif = async (req, res) => {
 		return res.json({ status: 'error', type: 'notification', message: 'Invalid request', data: null })
 	if (!req.body.type)
 		return res.json({ status: 'error', type: 'notification', message: 'Invalid request', data: null })
+	// Forbid sending a notification to yourself
+	if (parseInt(req.body.id_from) === parseInt(req.body.id_to)) {
+		return res.json({ status: 'error', type: 'notification', message: 'Forbidden: self notification', data: null })
+	}
 	try {
 			await notifModel.insertNotifConv(req.body.type, req.body.id_from, req.body.id_to, req.body.id_conversation)
 			// Realtime push to recipient

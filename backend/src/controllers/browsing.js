@@ -244,8 +244,10 @@ async function discover(req, res) {
 		const search = q.search ? String(q.search).toLowerCase() : ''
 		const ageMin = isFinite(q.ageMin) ? Number(q.ageMin) : 18
 		const ageMax = isFinite(q.ageMax) ? Number(q.ageMax) : 85
+		const hasRatingMin = Object.prototype.hasOwnProperty.call(q, 'ratingMin')
+		const hasRatingMax = Object.prototype.hasOwnProperty.call(q, 'ratingMax')
 		const ratingMin = isFinite(q.ratingMin) ? Number(q.ratingMin) : 0
-		const ratingMax = isFinite(q.ratingMax) ? Number(q.ratingMax) : 7
+		const ratingMax = isFinite(q.ratingMax) ? Number(q.ratingMax) : 10000
 		const distanceMax = isFinite(q.distanceMax) ? Number(q.distanceMax) : 10000
 		const lat = isFinite(q.lat) ? Number(q.lat) : me.lat
 		const lng = isFinite(q.lng) ? Number(q.lng) : me.lng
@@ -334,12 +336,16 @@ async function discover(req, res) {
 			} catch (_) {}
 			return { ...u, distanceKm: d }
 		})
-		// Compute global max distance BEFORE applying distance filter
+		// Compute global maxima BEFORE applying specific filters
 		const maxDistance = rows.length ? Math.ceil(rows.reduce((acc, u) => Math.max(acc, Number(u.distanceKm) || 0), 0)) : 0
+		const maxRating = rows.length ? rows.reduce((acc, u) => Math.max(acc, Number(u.rating) || 0), 0) : 0
 		// Now apply distance filter
 		rows = rows.filter((u) => u.distanceKm >= 0 && u.distanceKm <= distanceMax)
 		rows = rows.filter((u) => u.ageYears >= ageMin && u.ageYears <= ageMax)
-		rows = rows.filter((u) => u.rating >= ratingMin && u.rating <= ratingMax)
+		// Only apply rating filter if client explicitly provided rating bounds
+		if (hasRatingMin || hasRatingMax) {
+			rows = rows.filter((u) => u.rating >= ratingMin && u.rating <= ratingMax)
+		}
 
 		// Interests count for sort if needed
 		const myTags = (me.tags || '').split(',')
@@ -387,7 +393,7 @@ async function discover(req, res) {
 		const items = rows.slice(start, start + limit)
 
 		// Minimal payload; no heavy images array
-	return res.json({ page, limit, total, maxDistance, items })
+		return res.json({ page, limit, total, maxDistance, maxRating, items })
 	} catch (err) {
 		return res.json({ msg: 'Fatal error', err: String(err && err.message ? err.message : err) })
 	}

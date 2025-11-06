@@ -59,6 +59,10 @@ const match = async (req, res) => {
 	const targetId = parseInt(req.body.id, 10)
 	if (typeof req.body.liked !== 'boolean' || !targetId || isNaN(targetId))
 		return res.json({ msg: 'Invalid request' })
+	// Forbid liking yourself
+	if (parseInt(req.user.id) === parseInt(targetId)) {
+		return res.json({ ok: false, msg: 'You cannot like yourself' })
+	}
 	try {
 		const hasForward = await matchModel.getMatche(req.user.id, targetId)
 		const hasReverse = await matchModel.getMatche(targetId, req.user.id)
