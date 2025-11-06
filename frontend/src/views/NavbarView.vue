@@ -998,16 +998,15 @@ q-drawer {
 /* Extra glow for username specifically */
 .username-glow {
   /* Static soft white glow only */
-  text-shadow:
-    0 0 2px rgba(255,255,255,0.9),
-    0 0 4px rgba(255,255,255,0.85),
-    0 0 6px rgba(255,255,255,0.55),
-    0 0 8px rgba(255,255,255,0.35);
+  text-shadow: 0 0 2px rgba(255, 255, 255, 0.9), 0 0 4px rgba(255, 255, 255, 0.85),
+    0 0 6px rgba(255, 255, 255, 0.55), 0 0 8px rgba(255, 255, 255, 0.35);
 }
 
 /* Lower the avatar slightly for visual breathing space from page top */
 /* Lower the avatar slightly for visual breathing space from page top */
-.avatar-wrapper { margin-top: 6px; }
+.avatar-wrapper {
+  margin-top: 6px;
+}
 
 /* Drawer & menu labels contour + interactions */
 :deep(.q-drawer .q-item-label),

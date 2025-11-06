@@ -7,11 +7,11 @@
             <div class="px-5">
               <q-layout class="column">
                 <div class="row items-center justify-between q-mb-md">
+                  <h4 class="title q-ma-none">Search</h4>
                   <div class="row items-center">
                     <div class="text-subtitle2">Online: {{ onlineCount }}</div>
                     <div class="q-ml-md text-caption">Showing: {{ sorted.length }}</div>
                   </div>
-                  <h4 class="title q-ma-none">Search</h4>
                 </div>
                 <q-input
                   v-model="recherche"

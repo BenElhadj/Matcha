@@ -2,56 +2,68 @@
   <q-layout>
     <q-page padding>
       <h1 class="q-pb-md" style="margin-top: -10px; text-align: center">Notifications</h1>
-      <div v-for="(entry, i) in notifs" :key="i" class="q-my-md">
-        <div class="row justify-center items-start q-pa-md">
-          <div class="col-3 text-center">
-            <q-tooltip anchor="bottom middle" self="top middle">
-              <template #activator="{ on }">
-                <strong class="mt-2 d-block grey--text" v-on="on">{{ fromNow(entry.date) }}</strong>
-              </template>
-              <span>{{ formatTime(entry.date) }}</span>
-            </q-tooltip>
-          </div>
-          <div style="font-family: 'Elliane' !important" class="col-9">
-            <q-card class="notif_bubble" clickable @click="openNotification(entry)">
-              <q-card-section>
-                <div class="row items-center">
-                  <AppAvatar
-                    :image="getNotifProfileSrc(entry)"
-                    :userId="entry.id_from"
-                    :showPresence="true"
-                    size="small"
-                  />
-                  <div class="q-ml-md">
-                    <span class="text-h6 text-weight-bold timeline_link">{{ entry.username }}</span>
-                    <q-icon small style="font-size: 16px !important" class="mr-2 q-ml-xl">
-                      <span :class="getNotifIcon(entry.type)"></span>&nbsp;
-                    </q-icon>
-                    <div class="subtitle">
-                      <span class="text-weight-bold">{{ getNotifMsg(entry) }}</span>
-                      <span class="text-weight-bold">{{
-                        ' on ' + moment(entry.date).format('D MMMM, YYYY, h:mm A')
-                      }}</span>
+      <q-infinite-scroll @load="onLoadMore" :offset="300">
+        <template v-for="(entry, i) in notifs" :key="entry.id || i">
+          <div class="q-my-sm">
+            <div class="row justify-center items-start q-pa-sm">
+              <div class="col-3 text-center">
+                <q-tooltip anchor="bottom middle" self="top middle">
+                  <template #activator="{ on }">
+                    <strong class="mt-2 d-block grey--text" v-on="on">{{
+                      fromNow(entry.date)
+                    }}</strong>
+                  </template>
+                  <span>{{ formatTime(entry.date) }}</span>
+                </q-tooltip>
+              </div>
+              <div style="font-family: 'Elliane' !important" class="col-9">
+                <q-card class="notif_bubble" clickable @click="openNotification(entry)">
+                  <q-card-section>
+                    <div class="row items-center">
+                      <AppAvatar
+                        :image="getNotifProfileSrc(entry)"
+                        :userId="entry.id_from"
+                        :showPresence="true"
+                        size="small"
+                      />
+                      <div class="q-ml-md">
+                        <span class="text-h6 text-weight-bold timeline_link">{{
+                          entry.username
+                        }}</span>
+                        <q-icon small style="font-size: 16px !important" class="mr-2 q-ml-xl">
+                          <span :class="getNotifIcon(entry.type)"></span>&nbsp;
+                        </q-icon>
+                        <div class="subtitle">
+                          <span class="text-weight-bold">{{ getNotifMsg(entry) }}</span>
+                          <span class="text-weight-bold">{{
+                            ' on ' + moment(entry.date).format('D MMMM, YYYY, h:mm A')
+                          }}</span>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              </q-card-section>
-            </q-card>
+                  </q-card-section>
+                </q-card>
+              </div>
+            </div>
+          </div>
+        </template>
+        <div v-if="!hasMore && notifs.length" class="end-history">
+          <q-icon name="mdi-history" size="32px" class="q-mr-sm" />
+          <div class="text-subtitle1">
+            <span v-if="notifs.length === 1">First notification — no previous history.</span>
+            <span v-else>You’ve reached the start of your notification history.</span>
           </div>
         </div>
-      </div>
-      <div class="my-4 q-mx-auto q-mb-md flex justify-center">
-        <q-btn
-          v-if="moreToLoad"
-          block
-          color="primary"
-          class="my-4"
-          style="text-align: center !important"
-          @click="increaseLimit"
-        >
-          Show more
-        </q-btn>
-      </div>
+        <div v-else-if="!hasMore && !notifs.length" class="end-history">
+          <q-icon name="mdi-history" size="32px" class="q-mr-sm" />
+          <div class="text-subtitle1">No notifications yet.</div>
+        </div>
+        <template #loading>
+          <div class="q-my-md flex items-center justify-center">
+            <LoaderView />
+          </div>
+        </template>
+      </q-infinite-scroll>
     </q-page>
   </q-layout>
 </template>
@@ -65,21 +77,20 @@ import utility from '@/utility.js'
 import AppAvatar from '@/components/common/AppAvatar.vue'
 import moment from 'moment'
 import { getSocket } from '@/boot/socketClient'
+import LoaderView from '@/views/LoaderView.vue'
 
 const store = useStore()
 const router = useRouter()
 const page = ref(1)
 const limit = ref(15)
 const hasMore = ref(true)
+const isLoading = ref(false)
 // Utiliser les getters pour récupérer le vrai user (fusion auth/user)
 const currentUser = computed(() => store.getters.user)
 // Récupérer la liste des notifications depuis les getters (root state)
 const notif = computed(() => store.getters.notif)
-// Afficher TOUTES les notifications (y compris 'chat'), triées décroissant par date
-const notifs = computed(() => {
-  const arr = Array.isArray(notif.value) ? notif.value : []
-  return [...arr].sort((a, b) => new Date(b.date) - new Date(a.date))
-})
+// Garder l'ordre tel que renvoyé par le store (pagination + append non saccadé)
+const notifs = computed(() => (Array.isArray(notif.value) ? notif.value : []))
 const { fromNow, formatTime, getNotifMsg, getNotifIcon } = utility
 
 // Resolve an image value (string/object) into a usable src
@@ -105,13 +116,38 @@ const getNotifProfileSrc = (entry) => {
 const loadMore = async () => {
   page.value += 1
   const items = await store.dispatch('getNotifPage', { limit: limit.value, page: page.value })
+  if (Array.isArray(items) && items.length) {
+    // Prefetch avatars for new batch to avoid image jank
+    try {
+      const ids = Array.from(new Set(items.map((n) => n && n.id_from).filter(Boolean)))
+      for (const id of ids) {
+        const entry = items.find((n) => n && n.id_from === id)
+        await store.dispatch('ensureAvatar', { id, imageHint: entry?.profile_image })
+      }
+    } catch (_) {}
+  }
   if (!Array.isArray(items) || items.length < limit.value) hasMore.value = false
 }
 
 // Compatibilité avec l'ancien template qui utilisait `increaseLimit`
 // On délègue simplement à la nouvelle pagination côté serveur
-const increaseLimit = () => {
-  return loadMore()
+const increaseLimit = () => loadMore()
+
+// Infinite scroll loader hook
+const onLoadMore = async (_index, done) => {
+  if (isLoading.value || !hasMore.value) {
+    done(true)
+    return
+  }
+  isLoading.value = true
+  try {
+    await loadMore()
+    done(!hasMore.value)
+  } catch (_) {
+    done(false)
+  } finally {
+    isLoading.value = false
+  }
 }
 
 // Quand on utilise DISTINCT ON côté backend, la pagination renvoie d'autres expéditeurs
@@ -160,22 +196,33 @@ onMounted(async () => {
     const s = getSocket && getSocket()
     if (s) {
       s.on('notif:new', async () => {
-        await store.dispatch('getNotifPage', { limit: limit.value, page: 1 })
-        if (currentUser.value?.id) await store.dispatch('seenNotif', { id: currentUser.value.id })
+        // Soft-refresh top notifications without resetting appended pages
+        try {
+          const fresh = await utility.syncNotif({
+            limit: limit.value,
+            page: 1,
+            mode: 'all',
+            includeBlocked: 1
+          })
+          if (Array.isArray(fresh) && fresh.length) {
+            store.commit('appendNotif', fresh)
+            if (currentUser.value?.id)
+              await store.dispatch('seenNotif', { id: currentUser.value.id })
+            // Prefetch avatars for new heads
+            const ids = Array.from(new Set(fresh.map((n) => n && n.id_from).filter(Boolean)))
+            for (const id of ids) {
+              const entry = fresh.find((n) => n && n.id_from === id)
+              await store.dispatch('ensureAvatar', { id, imageHint: entry?.profile_image })
+            }
+          }
+        } catch (_) {}
       })
     }
   } catch (_) {}
 })
 
-// Fallback: si le push temps réel ne passe pas, on rafraîchit périodiquement
+// Supprimer le rafraîchissement périodique qui cassait la pagination et causait des lags.
 let refreshTimer = null
-onMounted(() => {
-  refreshTimer = setInterval(() => {
-    store.dispatch('getNotifPage', { limit: limit.value, page: 1 }).then(() => {
-      if (currentUser.value?.id) store.dispatch('seenNotif', { id: currentUser.value.id })
-    })
-  }, 4000)
-})
 
 // Ensure avatars are cached globally for all senders
 const prefetchNotifProfilePhotos = async () => {
@@ -234,5 +281,25 @@ const openNotification = async (entry) => {
 
 .notif_bubble {
   margin-top: -0.6rem;
+  border-radius: 14px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.04);
+  transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+}
+.notif_bubble:hover {
+  transform: translateZ(0) scale(1.01);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+  border-color: rgba(0, 0, 0, 0.12);
+}
+.end-history {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px 12px 34px;
+  opacity: 0.9;
+  font-family: 'Elliane';
+  color: black;
+  text-shadow: 0.02px 0 0 #fff, -0.02px 0 0 #fff, 0 0.02px 0 #fff, 0 -0.02px 0 #fff,
+    0 0 0.02px rgba(255, 255, 255, 0.85);
 }
 </style>
