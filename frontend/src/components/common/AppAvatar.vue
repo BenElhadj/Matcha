@@ -81,7 +81,7 @@ const isOnline = computed(() => {
 .app-avatar__q {
   position: relative;
   display: inline-block;
-  width: 4px;
+  width: 44px;
   height: 44px;
 }
 .app-avatar__q img {
