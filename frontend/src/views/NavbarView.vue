@@ -4,7 +4,7 @@
       <div v-if="connected" @click="drawer = true">
         <q-item>
           <q-btn flat round dense>
-            <q-avatar size="60px">
+            <q-avatar size="70px">
               <q-img :src="image" alt="Photo de profil" />
             </q-avatar>
           </q-btn>
@@ -55,9 +55,12 @@
                 style="align-items: initial !important"
               >
                 <q-item-section avatar>
-                  <q-avatar>
-                    <img :src="getNotifProfileSrc(item)" />
-                  </q-avatar>
+                  <div class="avatar-presence">
+                    <q-avatar size="44px">
+                      <img :src="getNotifProfileSrc(item)" />
+                    </q-avatar>
+                    <span :class="['presence-dot', presenceClass(item)]"></span>
+                  </div>
                 </q-item-section>
                 <q-item-section>
                   <q-item-label class="notif_msg">
@@ -117,11 +120,12 @@
                 :key="i"
                 clickable
                 @click="toUserChat(item)"
+                :class="['msg-menu-item', { unread: unreadCount(item) > 0 }]"
                 style="align-items: initial !important"
               >
                 <q-item-section avatar>
                   <div class="avatar-presence">
-                    <q-avatar>
+                    <q-avatar size="44px">
                       <img :src="getMsgProfileSrc(item)" />
                     </q-avatar>
                     <span :class="['presence-dot', presenceClass(item)]"></span>
@@ -153,7 +157,7 @@
                     <span
                       class="ml-auto chat_time text-truncate"
                       style="font-size: 16px !important"
-                      >{{ item.message }}</span
+                      >{{ truncateText(item.message, 30) }}</span
                     >
                   </q-item-label>
                 </q-item-section>
@@ -180,7 +184,7 @@
         <div @click="drawer = !drawer">
           <q-item>
             <q-btn flat round dense>
-              <q-avatar size="60px">
+              <q-avatar size="70px">
                 <q-img :src="image" alt="Photo de profil" />
               </q-avatar>
             </q-btn>
@@ -280,6 +284,8 @@ const unreadNotifLabel = computed(() => {
 
 let menuConvos = ref([])
 let newMessage = ref([])
+// Track connected users (ids) for presence dots in menus
+const connectedUserIds = ref(new Set())
 // Track unread counts per conversation for the messages list and total badge
 const unreadCountsByConv = ref({})
 
@@ -297,8 +303,13 @@ const updateOneNotif = utility.updateOneNotif
 
 const toUserProfile = (id_from) => {
   try {
-    updateOneNotif(id_from, user.value.id)
-    router.push(`/user/${id_from}`)
+    const me = user.value?.id
+    updateOneNotif(id_from, me)
+    if (me && String(id_from) === String(me)) {
+      router.push('/settings')
+    } else {
+      router.push(`/user/${id_from}`)
+    }
   } catch (err) {
     console.error('err toUserProfile in frontend/NavbarView.view ===> ', err)
   }
@@ -373,9 +384,27 @@ watch(
 // Ensure mutual exclusivity: open messages menu closes notifications
 watch(
   () => msgMenu.value,
-  (opened) => {
+  async (opened) => {
     if (!connected.value) return
     if (opened && notifMenu.value) notifMenu.value = false
+    // On open, aggressively refresh conversations and unread counts for fastest accuracy
+    if (opened) {
+      try {
+        const [counts, allConvos] = await Promise.all([getUnreadConvoCounts(), getAllConvos()])
+        unreadCountsByConv.value = counts
+        newMessage.value = allConvos
+        menuConvos.value = buildMenuMessages(newMessage.value)
+        newMsgNum.value = Object.values(unreadCountsByConv.value).reduce(
+          (a, b) => a + (Number(b) || 0),
+          0
+        )
+        // Also hydrate store's convos so Messenger list becomes accurate immediately
+        try {
+          store.commit('syncConvoAll', allConvos)
+        } catch (_) {}
+        updateNotifAndMsg._lastAllConvosAt = Date.now()
+      } catch (_) {}
+    }
   }
 )
 
@@ -466,6 +495,16 @@ const deriveOtherId = (it) => {
   }
 }
 
+// For notifications, use id_from; else fallback to deriveOtherId
+const otherIdUniversal = (it) => {
+  try {
+    if (it && it.id_from !== undefined && it.id_from !== null) return it.id_from
+    return deriveOtherId(it)
+  } catch (_) {
+    return null
+  }
+}
+
 // Prefer fetched profile image for messages menu items
 const getMsgProfileSrc = (item) => {
   try {
@@ -487,6 +526,18 @@ const prefetchMsgProfilePhotos = async () => {
         if (src) profilePhotosById.value = { ...profilePhotosById.value, [id]: src }
       } catch (_) {}
     }
+  }
+}
+
+// Truncate helper for message previews (30 chars by default)
+const truncateText = (val, limit = 30) => {
+  try {
+    if (val == null) return ''
+    const s = typeof val === 'string' ? val : String(val)
+    if (s.length <= limit) return s
+    return s.slice(0, limit) + '...'
+  } catch (_) {
+    return ''
   }
 }
 
@@ -533,16 +584,17 @@ const logout = async () => {
   }
 }
 
-// Build the list of the last 5 received messages (exclude my own last messages), newest first
+// Build the menu: prioritize UNREAD by newest, then READ by newest, max 5 total
 function buildMenuMessages(messages) {
   const me = user.value?.id
-  // Keep only conversations where the last message was sent by the other person
-  const arr = Array.isArray(messages) ? messages.filter((m) => m && m.message_from !== me) : []
-  arr.sort(
-    (a, b) =>
-      new Date(b.last_update || b.created_at || 0) - new Date(a.last_update || a.created_at || 0)
-  )
-  return arr.slice(0, 5)
+  const all = Array.isArray(messages) ? messages : []
+  // Only keep items where the last message is from the other person (received)
+  const arr = all.filter((m) => m && m.message_from !== me)
+  const byDateDesc = (a, b) =>
+    new Date(b.last_update || b.created_at || 0) - new Date(a.last_update || a.created_at || 0)
+  const unread = arr.filter((it) => unreadCount(it) > 0).sort(byDateDesc)
+  const read = arr.filter((it) => !(unreadCount(it) > 0)).sort(byDateDesc)
+  return unread.concat(read).slice(0, 5)
 }
 
 menuConvos.value = buildMenuMessages(newMessage.value)
@@ -575,15 +627,29 @@ const getUnreadConvoCounts = async () => {
     }
     return map
   } catch (err) {
-    console.error('Error fetching unread counts (notSeen):', err)
+    // If backend doesn't expose the route (older deployments), fail soft without console noise
+    const status = err?.response?.status
+    if (status !== 404) {
+      console.error('Error fetching unread counts (notSeen):', err)
+    }
     return {}
   }
 }
 
 const unreadCount = (item) => unreadCountsByConv.value[item?.id_conversation] || 0
 const presenceClass = (item) => {
-  const s = String(item?.status ?? '').toLowerCase()
-  return s === 'online' || s === '1' || s === 'true' ? 'online' : 'offline'
+  try {
+    const id = otherIdUniversal(item)
+    if (id === null || id === undefined) return 'offline'
+    const has =
+      connectedUserIds.value instanceof Set
+        ? connectedUserIds.value.has(String(id))
+        : Array.isArray(connectedUserIds.value) &&
+          connectedUserIds.value.map(String).includes(String(id))
+    return has ? 'online' : 'offline'
+  } catch (_) {
+    return 'offline'
+  }
 }
 
 const updateNotifAndMsg = async () => {
@@ -608,15 +674,38 @@ const updateNotifAndMsg = async () => {
           })
           .slice(0, 5)
       : []
-    // Build menu items from full conversations
-    newMessage.value = await getAllConvos()
-    menuConvos.value = buildMenuMessages(newMessage.value)
-    // Compute unread badge from per-conversation counts
-    unreadCountsByConv.value = await getUnreadConvoCounts()
+    // Always refresh unread counts and presence; fetch all conversations less frequently
+    const [counts, connectedList] = await Promise.all([
+      getUnreadConvoCounts(),
+      (async () => {
+        try {
+          return await utility.getConnectedUsers()
+        } catch (_) {
+          return []
+        }
+      })()
+    ])
+    unreadCountsByConv.value = counts
     newMsgNum.value = Object.values(unreadCountsByConv.value).reduce(
       (a, b) => a + (Number(b) || 0),
       0
     )
+    const set = new Set((Array.isArray(connectedList) ? connectedList : []).map((x) => String(x)))
+    connectedUserIds.value = set
+    // Fetch full conversations at most every 12s in background to keep menu warm without causing jank
+    const now = Date.now()
+    if (!updateNotifAndMsg._lastAllConvosAt || now - updateNotifAndMsg._lastAllConvosAt > 12000) {
+      try {
+        const allConvos = await getAllConvos()
+        newMessage.value = allConvos
+        menuConvos.value = buildMenuMessages(newMessage.value)
+        // Keep store in sync to speed up Messenger list hydration
+        try {
+          store.commit('syncConvoAll', allConvos)
+        } catch (_) {}
+        updateNotifAndMsg._lastAllConvosAt = now
+      } catch (_) {}
+    }
   } catch (e) {
     // Swallow transient errors (e.g., QUIC/HTTP3) to avoid reactive churn
   } finally {
@@ -629,20 +718,47 @@ function refreshMethods() {
 }
 
 let refreshIntervalId = null
+let boostIntervalId = null
+let boostTimeoutId = null
 onMounted(() => {
   if (connected.value && !refreshIntervalId) {
-    refreshIntervalId = setInterval(refreshMethods, 3000)
+    // Immediately refresh, then do a short boost period for quick hydration post-login
+    refreshMethods()
+    if (!boostIntervalId) boostIntervalId = setInterval(refreshMethods, 1000)
+    if (!boostTimeoutId)
+      boostTimeoutId = setTimeout(() => {
+        if (boostIntervalId) clearInterval(boostIntervalId)
+        boostIntervalId = null
+        refreshIntervalId = setInterval(refreshMethods, 4000)
+      }, 8000)
   }
 })
 watch(
   () => connected.value,
   (val) => {
     if (val) {
-      if (!refreshIntervalId) refreshIntervalId = setInterval(refreshMethods, 3000)
+      // Immediate refresh and short boost interval to hydrate quickly
+      refreshMethods()
+      if (boostIntervalId) clearInterval(boostIntervalId)
+      if (boostTimeoutId) clearTimeout(boostTimeoutId)
+      boostIntervalId = setInterval(refreshMethods, 1000)
+      boostTimeoutId = setTimeout(() => {
+        if (boostIntervalId) clearInterval(boostIntervalId)
+        boostIntervalId = null
+        if (!refreshIntervalId) refreshIntervalId = setInterval(refreshMethods, 4000)
+      }, 8000)
     } else {
       if (refreshIntervalId) {
         clearInterval(refreshIntervalId)
         refreshIntervalId = null
+      }
+      if (boostIntervalId) {
+        clearInterval(boostIntervalId)
+        boostIntervalId = null
+      }
+      if (boostTimeoutId) {
+        clearTimeout(boostTimeoutId)
+        boostTimeoutId = null
       }
     }
   }
@@ -671,8 +787,8 @@ onBeforeUnmount(() => {
   position: absolute;
   bottom: 0;
   right: 0;
-  width: 10px;
-  height: 10px;
+  width: 12px; /* slightly smaller than MessengerList's 14px, but visible */
+  height: 12px;
   border-radius: 50%;
   border: 2px solid white;
 }
@@ -681,6 +797,14 @@ onBeforeUnmount(() => {
 }
 .presence-dot.offline {
   background: #9e9e9e; /* grey */
+}
+
+/* Highlight unread items in messages menu */
+.msg-menu-item.unread {
+  background-color: #e8f0ff; /* light blue highlight */
+}
+.msg-menu-item.unread .notif_username {
+  font-weight: 700;
 }
 
 q-drawer {
@@ -781,16 +905,21 @@ q-drawer {
 }
 
 .q-header {
+  /* Keep navbar always visible at the top across all pages */
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--header-height, 80px);
+  z-index: 1000;
   background: linear-gradient(
     to bottom,
     #000 3%,
     transparent 81%,
     rgba(255, 255, 255, 0) 70%
   ) !important;
-  /* background: linear-gradient(to bottom, #000 0%, transparent 91%, transparent 100%) !important; */
   box-shadow: none !important;
   border: none !important;
-  /* padding: 7px; */
 }
 
 .circular-icon {

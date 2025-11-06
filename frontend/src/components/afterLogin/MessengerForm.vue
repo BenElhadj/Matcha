@@ -76,6 +76,12 @@ const sendMsg = async (e) => {
   if (msg.value && msg.value.trim()) {
     if (!e.shiftKey) {
       try {
+        // Forbid sending a message to yourself (previous behavior)
+        if (String(user.id) === String(props.toId)) {
+          $q.notify({ type: 'negative', message: 'Vous ne pouvez pas vous envoyer un message.' })
+          msg.value = ''
+          return
+        }
         const url = `${import.meta.env.VITE_APP_API_URL}/api/chat/send`
         const headers = { 'x-auth-token': user.token }
         const data = {
@@ -111,10 +117,14 @@ const sendMsg = async (e) => {
   margin-top: 5px;
 }
 .custom-q-input {
-  width: 100%;
-  margin-top: 8px;
+  position: fixed;
+  bottom: 140px;
+  left: 24%;
+  right: 10%;
+  z-index: 10;
   border-radius: 10px;
-  padding: 8px 10px;
+  padding: 10px;
+  border: 5% solid white !important;
   background: white;
 }
 </style>

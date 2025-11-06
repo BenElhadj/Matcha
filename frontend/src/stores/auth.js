@@ -57,20 +57,34 @@ export const auth = {
           localStorage.setItem('token', user.token)
           const { lat, lng } = user
           commit('locate', { lat, lng })
-          
-          // Dispatch toutes les actions nécessaires
-          await Promise.all([
+          // 1) Switch UI to connected state immediately
+          commit('login', user)
+
+          // 2) Kick off critical hydration first (non-blocking but started ASAP)
+          // Conversations and notifications populate menus/Messenger quickly
+          ;(async () => {
+            try {
+              // Fire without awaiting to avoid blocking UI thread
+              dispatch('syncConvoAll')
+              dispatch('getNotifPage', { limit: 50, page: 1 })
+            } catch (_) {}
+          })()
+
+          // 3) Kick off the rest of the hydration in the background
+          Promise.all([
             dispatch('getTags'),
             dispatch('getAllTags'),
+            dispatch('fetchUserImages'),
             dispatch('getConnectedUsers'),
-            dispatch('getNotif'),
             dispatch('syncHistory'),
             dispatch('syncMatches'),
-            dispatch('syncConvoAll'),
             dispatch('syncBlocked', user.id)
-          ])
-          
-          commit('login', user)
+          ]).catch((e) => {
+            // Soft-fail; UI is already connected
+            console.warn('Background hydration after login had errors:', e)
+          })
+
+          // 3) Return immediately so UI can render avatar/menus without waiting
           return true
         }
       } catch (error) {

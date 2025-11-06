@@ -6,7 +6,13 @@
           <div class="col-auto filters-panel">
             <div class="px-5">
               <q-layout class="column">
-                <h4 class="title mb-4">Search</h4>
+                <div class="row items-center justify-between q-mb-md">
+                  <div class="row items-center">
+                    <div class="text-subtitle2">Online: {{ onlineCount }}</div>
+                    <div class="q-ml-md text-caption">Showing: {{ sorted.length }}</div>
+                  </div>
+                  <h4 class="title q-ma-none">Search</h4>
+                </div>
                 <q-input
                   v-model="recherche"
                   class="location_input mb-5"
@@ -65,7 +71,7 @@
                 <q-range
                   v-model="rating"
                   :min="0"
-                  :max="7"
+                  :max="ratingCap"
                   :step="0.1"
                   label-always
                   thumb-label="always"
@@ -140,10 +146,6 @@
           </div>
 
           <div class="col-grow position-relative grid-column">
-            <div class="row items-center q-px-md q-mb-md">
-              <div class="text-subtitle2">Online: {{ onlineCount }}</div>
-              <div class="q-ml-md text-caption">Showing: {{ sorted.length }}</div>
-            </div>
             <div class="q-px-md">
               <div class="grid-wrapper position-relative">
                 <div class="cards-grid">
@@ -231,11 +233,13 @@ const hasBoth = ref(false)
 const hasAll = ref(false)
 const loaded = ref(false)
 const age = ref({ min: 18, max: 85 })
-const rating = ref({ min: 0, max: 7 })
+const rating = ref({ min: 0, max: 100 })
 const distance = ref({ min: 0, max: 10000 })
 const maxDis = ref(10000)
 const programmaticUpdate = ref(false)
 const distanceTouched = ref(false)
+const ratingTouched = ref(false)
+const ratingCap = ref(100)
 const sortTypes = ['age', 'distance', 'rating', 'interests']
 const nats = ref(countries)
 const recherche = ref('')
@@ -367,7 +371,10 @@ function reset() {
   // Reset gender to 'all' explicitly
   gender.value = 'all'
   age.value = { min: 18, max: 85 }
-  rating.value = { min: 0, max: 7 }
+  programmaticUpdate.value = true
+  rating.value = { min: 0, max: ratingCap.value }
+  ratingTouched.value = false
+  programmaticUpdate.value = false
   distance.value = { min: 0, max: 10000 }
   location.value = null
   recherche.value = ''
@@ -416,8 +423,9 @@ async function fetchDiscover({ resetPage = false } = {}) {
     gender: gender.value && gender.value !== 'all' ? gender.value : undefined,
     ageMin: age.value?.min ?? 18,
     ageMax: age.value?.max ?? 85,
-    ratingMin: rating.value?.min ?? 0,
-    ratingMax: rating.value?.max ?? 7,
+    // Only include rating bounds if the user adjusted the slider
+    ratingMin: ratingTouched.value ? rating.value?.min : undefined,
+    ratingMax: ratingTouched.value ? rating.value?.max : undefined,
     distanceMax:
       distance.value && typeof distance.value.max === 'number' && distance.value.max > 0
         ? distance.value.max
@@ -432,7 +440,7 @@ async function fetchDiscover({ resetPage = false } = {}) {
   try {
     const res = await axios.get(url, { headers, params, signal: abortController.signal })
     if (res.data && !res.data.msg) {
-      const { items = [], total: t = 0, maxDistance: md = null } = res.data
+      const { items = [], total: t = 0, maxDistance: md = null, maxRating: mr = null } = res.data
       total.value = t
       const shaped = items.map((cur) => ({
         ...cur,
@@ -445,6 +453,28 @@ async function fetchDiscover({ resetPage = false } = {}) {
       else users.value = [...users.value, ...shaped]
       // update presence flags
       whoIsUp()
+      // Update rating slider cap from server-provided maxRating on first page
+      if (page.value === 1 && mr != null) {
+        const nextCap = Math.max(0, Number(mr))
+        if (isFinite(nextCap) && nextCap > 0 && nextCap !== ratingCap.value) {
+          ratingCap.value = nextCap
+          if (!ratingTouched.value) {
+            programmaticUpdate.value = true
+            rating.value = { min: 0, max: nextCap }
+            setTimeout(() => (programmaticUpdate.value = false), 0)
+          } else {
+            // Clamp current selection within new cap without refetch loop
+            const cur = rating.value || { min: 0, max: nextCap }
+            const clamped = {
+              min: Math.max(0, Math.min(cur.min ?? 0, nextCap)),
+              max: Math.max(0, Math.min(cur.max ?? nextCap, nextCap))
+            }
+            programmaticUpdate.value = true
+            rating.value = clamped
+            setTimeout(() => (programmaticUpdate.value = false), 0)
+          }
+        }
+      }
       // Update slider max from server-provided maxDistance on first page
       if (page.value === 1 && md != null) {
         const nextMax = Math.max(0, Math.ceil(md))
@@ -530,6 +560,15 @@ watch(
   distance,
   () => {
     if (!programmaticUpdate.value) distanceTouched.value = true
+  },
+  { deep: true }
+)
+
+// Detect manual changes to rating
+watch(
+  rating,
+  () => {
+    if (!programmaticUpdate.value) ratingTouched.value = true
   },
   { deep: true }
 )

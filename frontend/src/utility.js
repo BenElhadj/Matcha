@@ -16,6 +16,10 @@ export function getImageSrc(image, defaultImage = 'default/defaut_profile.txt') 
       }
       return s
     }
+    // Plain base64 provided as a string (no data: prefix)
+    if (/^[A-Za-z0-9+/=]+$/.test(s)) {
+      return `data:image/png;base64,${s}`
+    }
     if (isExternal(s)) return s;
     return getFullPath(s);
   }

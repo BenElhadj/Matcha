@@ -36,6 +36,8 @@ import MessengerForm from '@/components/afterLogin/MessengerForm.vue'
 const store = useStore()
 const router = useRouter()
 const loaded = ref(false)
+// avoid recursive logout loops triggered by watchers reacting to state resets
+const wasLoggedOut = ref(false)
 const user = computed(() => store.state.user)
 const convos = computed(() => store.state.convos)
 const selectedConvo = computed(() => store.state.selectedConvo)
@@ -56,42 +58,47 @@ const messageSent = (msg) => {
 watch(
   user,
   async (newUser) => {
-    const token = newUser.token || localStorage.getItem('token')
-    if (token) {
+    const token = newUser?.token || localStorage.getItem('token')
+    const isConnected = !!store.getters.status
+    // If connected, render quickly and validate in background
+    if (token && isConnected) {
+      loaded.value = true
       try {
         const url = `${import.meta.env.VITE_APP_API_URL}/api/auth/isloggedin`
         const headers = { 'x-auth-token': token }
         const res = await axios.get(url, { headers })
         data.value = res.data
-        // Backend convention: res.data.msg truthy means NOT logged in
-        if (!res.data.msg) {
-          loaded.value = true
-          return
+        if (res?.data?.msg && store.getters.status) {
+          // token invalid -> perform a single logout then redirect
+          try { await store.dispatch('logout', newUser?.id) } catch (_) {}
+          loaded.value = false
+          wasLoggedOut.value = true
+          router.push('/login')
         }
-        // Explicit not-logged-in → proceed to logout
       } catch (err) {
-        // Network/transient error (e.g., QUIC/HTTP3 or cold start): don't force logout; allow UI to load
+        // Non-fatal; keep UI responsive
         console.error('err watch user in frontend/MessengerView.vue ===> ', err)
-        loaded.value = true
-        return
       }
+      return
     }
-    // Only reached if we have a definitive signal that the user is not logged in
-    await store.dispatch('logout', newUser.id)
-    router.push('/login')
+    // If already logged out, just redirect once without dispatching logout again
+    if (!isConnected && !token) {
+      if (!wasLoggedOut.value) {
+        wasLoggedOut.value = true
+        loaded.value = false
+        router.push('/login')
+      }
+      return
+    }
   },
   { immediate: true }
 )
 
-watch(
-  convos,
-  (newConvos) => {
-    if (newConvos.length && !selectedConvo.value) {
-      store.dispatch('syncConvo', newConvos[0])
-    }
-  },
-  { immediate: true }
-)
+watch(convos, (newConvos) => {
+  if (newConvos.length && !selectedConvo.value) {
+    store.dispatch('syncConvo', newConvos[0])
+  }
+}, { immediate: true })
 
 onBeforeUnmount(() => {
   store.dispatch('syncConvo', null)
@@ -110,15 +117,11 @@ onBeforeUnmount(() => {
 
 .right-scroll {
   height: 100%;
-  display: flex;
-  flex-direction: column;
-  /* Let inner .top_chat handle the scrolling so the input can stick at the bottom */
-  overflow: hidden;
+  overflow-y: auto;
 }
 
 .top_chat {
-  flex: 1 1 auto !important;
-  overflow-y: auto;
+  flex: 0% 20% 100% !important;
 }
 
 .top_chat::-webkit-scrollbar {
@@ -133,23 +136,16 @@ onBeforeUnmount(() => {
 .left {
   padding: 0 !important;
   margin: 0 !important;
-  max-width: 240px;
+  max-width: 270px;
   min-width: 120px;
 }
 
-.right,
-.chat_layout,
-.parent {
+.right, .chat_layout, .parent {
   height: 100% !important;
 }
 
 .bottom {
-  flex: 0 0 auto !important;
-  position: sticky;
-  bottom: 0;
-  z-index: 2;
-  background: #ffffff;
-  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  flex: 0 0 100% !important;
 }
 
 .left-scroll {
@@ -157,7 +153,7 @@ onBeforeUnmount(() => {
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
-  width: 22%;
+  width: 25%;
   min-width: 120px;
 }
 
@@ -182,4 +178,5 @@ onBeforeUnmount(() => {
 .right-scroll::-webkit-scrollbar-track {
   background-color: transparent;
 }
+
 </style>

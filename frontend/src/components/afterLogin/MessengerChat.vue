@@ -86,7 +86,7 @@ const seenConvo = computed(() => store.getters.seenConvo)
 const loadGif = 'https://i.giphy.com/media/uyCJt0OOhJBiE/giphy.webp'
 const convo = ref(selectedConvo.value)
 
-// Avatar resolution with same method as Navbar/UserProfile
+// Avatar resolution aligned with the previous version (fallbacks + profile fetch for other user)
 const base = import.meta.env.BASE_URL || '/'
 const defaultProfileTxt = `${base}default/defaut_profile.txt`
 const myAvatarSrc = computed(() =>
@@ -132,15 +132,11 @@ const formatTime = (created_at) => {
   return moment(created_at).fromNow()
 }
 
-// Scrolling helpers
-const getContainer = () => document.querySelector('.top_chat')
-const isNearBottom = (el, threshold = 80) => {
-  if (!el) return true
-  return el.scrollHeight - el.scrollTop - el.clientHeight <= threshold
-}
-const scrollToBottom = () => {
-  const el = getContainer()
-  if (el) el.scrollTop = el.scrollHeight
+const scroll = () => {
+  const chatContainer = document.querySelector('.chat_container .top_chat')
+  if (chatContainer) {
+    chatContainer.scrollTop = chatContainer.scrollHeight
+  }
 }
 
 const getChat = async () => {
@@ -183,8 +179,32 @@ watch(
         const result = await getChat()
         checkLimit(result)
         messages.value = result
-        await nextTick()
-        scrollToBottom()
+        // Prefetch the other user's avatar when loading the convo
+        try {
+          const otherId = idUserConvo.value
+          if (otherId) {
+            const src = await fetchUserProfileImage(otherId)
+            otherAvatarSrc.value =
+              src ||
+              (utility.getImageSrc
+                ? utility.getImageSrc(
+                    imageConvo.value,
+                    utility.getCachedDefault?.('profile') || defaultProfileTxt
+                  )
+                : utility.getFullPath
+                ? utility.getFullPath(imageConvo.value)
+                : defaultProfileTxt)
+          }
+        } catch (_) {
+          otherAvatarSrc.value = utility.getImageSrc
+            ? utility.getImageSrc(
+                imageConvo.value,
+                utility.getCachedDefault?.('profile') || defaultProfileTxt
+              )
+            : utility.getFullPath
+            ? utility.getFullPath(imageConvo.value)
+            : defaultProfileTxt
+        }
         store.dispatch('syncNotif')
       } catch (err) {
         console.error('err watch(selectedConvo) in frontend/MessengerChat.vue ===> ', err)
@@ -193,21 +213,24 @@ watch(
   }
 )
 
-// Remove unconditional scroll on messages change to avoid jumpiness
+watch(
+  () => messages.value,
+  () => {
+    if (page.value < 2) {
+      scroll()
+    }
+  }
+)
 
 watch(
   () => newMessage.value,
   async () => {
     const incoming = newMessage.value
     if (incoming && selectedConvo.value === incoming.id_conversation) {
-      const el = getContainer()
-      const wasNearBottom = isNearBottom(el)
       messages.value.push(incoming)
       store.dispatch('messageClr')
       await nextTick()
-      if (wasNearBottom || incoming.id_from === user.value.id) {
-        scrollToBottom()
-      }
+      scroll()
     }
   }
 )
@@ -235,35 +258,8 @@ watch(
 
 onMounted(async () => {
   ensureSocket()
-  // Prefetch other user's avatar
-  try {
-    const otherId = idUserConvo.value
-    if (otherId) {
-      const src = await fetchUserProfileImage(otherId)
-      otherAvatarSrc.value =
-        src ||
-        (utility.getImageSrc
-          ? utility.getImageSrc(
-              imageConvo.value,
-              utility.getCachedDefault?.('profile') || defaultProfileTxt
-            )
-          : utility.getFullPath
-          ? utility.getFullPath(imageConvo.value)
-          : defaultProfileTxt)
-    }
-  } catch (_) {
-    otherAvatarSrc.value = utility.getImageSrc
-      ? utility.getImageSrc(
-          imageConvo.value,
-          utility.getCachedDefault?.('profile') || defaultProfileTxt
-        )
-      : utility.getFullPath
-      ? utility.getFullPath(imageConvo.value)
-      : defaultProfileTxt
-  }
   await fetchNewMessages()
-  await getChat()
-  scrollToBottom()
+  scroll()
 
   const top = document.querySelector('.top_chat')
   top.addEventListener('scroll', async (e) => {
@@ -289,8 +285,6 @@ onBeforeUnmount(() => {
 const fetchNewMessages = async () => {
   if (selectedConvo.value) {
     try {
-      const el = getContainer()
-      const wasNearBottom = isNearBottom(el)
       const result = await getChat()
       checkLimit(result)
       const newMessages = result.filter((message) => {
@@ -298,9 +292,11 @@ const fetchNewMessages = async () => {
       })
 
       if (newMessages.length > 0) {
+        const el = document.querySelector('.top_chat')
+        const wasNearBottom = !el || el.scrollHeight - el.scrollTop - el.clientHeight <= 80
         messages.value = [...messages.value, ...newMessages]
         await nextTick()
-        if (wasNearBottom) scrollToBottom()
+        if (wasNearBottom) scroll()
       }
     } catch (err) {
       console.error('Error fetching new messages:', err)
@@ -309,50 +305,22 @@ const fetchNewMessages = async () => {
 }
 function refreshMethods() {
   if (selectedConvo.value) {
-    // Only fetch new messages; do not force scroll or refetch the whole page
     fetchNewMessages()
+    getChat()
+    scroll()
   } else {
     console.log('not refreshing')
   }
 }
 
-const refreshInterval = setInterval(refreshMethods, 2000)
+// Reduce polling cadence; rely primarily on socket events
+const refreshInterval = setInterval(() => {
+  fetchNewMessages()
+}, 5000)
 
 onBeforeUnmount(() => {
   clearInterval(refreshInterval)
 })
-
-// Update other avatar when conversation target changes
-watch(
-  () => idUserConvo.value,
-  async (newId) => {
-    try {
-      if (newId) {
-        const src = await fetchUserProfileImage(newId)
-        otherAvatarSrc.value =
-          src ||
-          (utility.getImageSrc
-            ? utility.getImageSrc(
-                imageConvo.value,
-                utility.getCachedDefault?.('profile') || defaultProfileTxt
-              )
-            : utility.getFullPath
-            ? utility.getFullPath(imageConvo.value)
-            : defaultProfileTxt)
-      }
-    } catch (_) {
-      otherAvatarSrc.value = utility.getImageSrc
-        ? utility.getImageSrc(
-            imageConvo.value,
-            utility.getCachedDefault?.('profile') || defaultProfileTxt
-          )
-        : utility.getFullPath
-        ? utility.getFullPath(imageConvo.value)
-        : defaultProfileTxt
-    }
-  },
-  { immediate: false }
-)
 </script>
 
 <style>

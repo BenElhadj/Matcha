@@ -16,9 +16,12 @@
             <q-card class="notif_bubble" clickable @click="openNotification(entry)">
               <q-card-section>
                 <div class="row items-center">
-                  <q-avatar>
-                    <img :src="getEntryProfileSrc(entry)" :alt="entry.username" />
-                  </q-avatar>
+                  <div class="avatar-presence">
+                    <q-avatar>
+                      <img :src="entryImg(entry.profile_image)" :alt="entry.username" />
+                    </q-avatar>
+                    <span :class="['presence-dot', presenceClass(entry)]"></span>
+                  </div>
                   <div class="q-ml-md">
                     <span class="text-h6 text-weight-bold timeline_link">{{ entry.username }}</span>
                     <q-icon small style="font-size: 16px !important" class="mr-2 q-ml-xl">
@@ -79,7 +82,6 @@ const notifs = computed(() => {
 const { fromNow, formatTime, getNotifMsg, getNotifIcon } = utility
 const base = import.meta.env.BASE_URL || '/'
 const defaultProfileTxt = `${base}default/defaut_profile.txt`
-// Fallback resolver for raw notification image field
 const entryImg = (img) =>
   utility.getImageSrc
     ? utility.getImageSrc(img, utility.getCachedDefault?.('profile') || defaultProfileTxt)
@@ -87,54 +89,16 @@ const entryImg = (img) =>
     ? utility.getFullPath(img)
     : defaultProfileTxt
 
-// Cache per user id for resolved profile images (API-backed)
-const profilePhotosById = ref({})
-
-// Fetch the profile image for a given user id using the same approach as UserProfile/Navbar
-const fetchUserProfileImage = async (id) => {
+// Presence dot based on connected users list in store
+const connectedUsers = computed(() => store.state.connectedUsers || [])
+const presenceClass = (entry) => {
   try {
-    const token = currentUser.value?.token || localStorage.getItem('token')
-    const headers = { 'x-auth-token': token }
-    const url = `${import.meta.env.VITE_APP_API_URL}/api/users/show/${id}`
-    const res = await axios.get(url, { headers })
-    const images = Array.isArray(res.data?.images) ? res.data.images : []
-    const profileImg =
-      images.find((img) => img && (img.profile === 1 || img.profile === true)) || images[0]
-    if (!profileImg) return ''
-    const fallback = utility.getCachedDefault?.('profile') || defaultProfileTxt
-    const src = utility.getImageSrc
-      ? utility.getImageSrc(profileImg, fallback)
-      : utility.getFullPath
-      ? utility.getFullPath(profileImg?.name || profileImg?.link || profileImg?.data || '')
-      : fallback
-    return src || ''
+    const id = entry && entry.id_from
+    if (id === null || id === undefined) return 'offline'
+    const set = new Set((Array.isArray(connectedUsers.value) ? connectedUsers.value : []).map((x) => String(x)))
+    return set.has(String(id)) ? 'online' : 'offline'
   } catch (_) {
-    return ''
-  }
-}
-
-// Helper to get entry avatar: prefer cached fetched image by sender id
-const getEntryProfileSrc = (entry) => {
-  try {
-    const id = entry?.id_from ?? entry?.from
-    const cached = id ? profilePhotosById.value[id] : ''
-    return cached || entryImg(entry?.profile_image)
-  } catch (_) {
-    return entryImg(entry?.profile_image)
-  }
-}
-
-// Prefetch for current page's notifications
-const prefetchEntryPhotos = async () => {
-  const arr = Array.isArray(notifs.value) ? notifs.value : []
-  const ids = Array.from(new Set(arr.map((n) => n && (n.id_from ?? n.from)).filter(Boolean)))
-  for (const id of ids) {
-    if (!profilePhotosById.value[id]) {
-      try {
-        const src = await fetchUserProfileImage(id)
-        if (src) profilePhotosById.value = { ...profilePhotosById.value, [id]: src }
-      } catch (_) {}
-    }
+    return 'offline'
   }
 }
 
@@ -178,9 +142,7 @@ watch(
         const res = await axios.get(url, { headers })
         if (!res.data.msg) return
       } catch (err) {
-        // Treat network/transient errors as temporary; don't force logout here
         console.error('err watch user in frontend/NotificationsView.vue ===> ', err)
-        return
       }
     }
     if (newUser?.id) await logout(newUser.id)
@@ -193,10 +155,6 @@ onMounted(async () => {
   const items = await store.dispatch('getNotifPage', { limit: limit.value, page: page.value })
   if (!Array.isArray(items) || items.length < limit.value) hasMore.value = false
   if (currentUser.value?.id) store.dispatch('seenNotif', { id: currentUser.value.id })
-  // Prefetch avatars for visible notifications
-  try {
-    await prefetchEntryPhotos()
-  } catch (_) {}
   // Si la socket est active, toute nouvelle notif pendant que la page est ouverte sera aussitôt marquée lue
   try {
     const s = getSocket && getSocket()
@@ -204,9 +162,6 @@ onMounted(async () => {
       s.on('notif:new', async () => {
         await store.dispatch('getNotifPage', { limit: limit.value, page: 1 })
         if (currentUser.value?.id) await store.dispatch('seenNotif', { id: currentUser.value.id })
-        try {
-          await prefetchEntryPhotos()
-        } catch (_) {}
       })
     }
   } catch (_) {}
@@ -218,9 +173,6 @@ onMounted(() => {
   refreshTimer = setInterval(() => {
     store.dispatch('getNotifPage', { limit: limit.value, page: 1 }).then(() => {
       if (currentUser.value?.id) store.dispatch('seenNotif', { id: currentUser.value.id })
-      try {
-        prefetchEntryPhotos()
-      } catch (_) {}
     })
   }, 4000)
 })
@@ -247,6 +199,21 @@ const openNotification = async (entry) => {
 </script>
 
 <style scoped>
+.avatar-presence {
+  position: relative;
+  display: inline-block;
+}
+.presence-dot {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid white;
+}
+.presence-dot.online { background: #21ba45; }
+.presence-dot.offline { background: #9e9e9e; }
 .timeline_link {
   text-decoration: none;
 }

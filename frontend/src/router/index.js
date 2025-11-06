@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { store } from '@/stores/store'
 import axios from 'axios'
 
 const router = createRouter({
@@ -108,6 +109,15 @@ router.beforeEach((to, from, next) => {
   if (authRequired && !loggedIn && to.path !== '/recover') {
     next('/login')
   } else {
+    // Prevent viewing own profile page: redirect to settings
+    if (to.name === 'userprofile') {
+      const paramId = to.params && to.params.id != null ? String(to.params.id) : null
+      const selfId = (store.getters?.user?.id || store.state?.auth?.user?.id || null)
+      if (paramId && selfId && String(selfId) === paramId) {
+        next('/settings')
+        return
+      }
+    }
     next()
   }
 })

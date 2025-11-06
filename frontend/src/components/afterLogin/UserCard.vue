@@ -136,6 +136,11 @@ function nextLikedFromState(type) {
 async function onLikeIconClick() {
   const targetId = props.user?.user_id
   if (!targetId) return
+  // Forbid liking yourself
+  if (String(targetId) === String(selfId.value)) {
+    alert.value = { state: true, color: 'red', text: 'Vous ne pouvez pas vous liker.' }
+    return
+  }
   try {
     const likedBool = nextLikedFromState(relationType.value)
     const url = `${import.meta.env.VITE_APP_API_URL}/api/match`
