@@ -299,7 +299,7 @@ const openNotification = async (entry) => {
   opacity: 0.9;
   font-family: 'Elliane';
   color: black;
-  text-shadow: 0.02px 0 0 #fff, -0.02px 0 0 #fff, 0 0.02px 0 #fff, 0 -0.02px 0 #fff,
-    0 0 0.02px rgba(255, 255, 255, 0.85);
+  text-shadow: 0 0 2px rgba(255, 255, 255, 0.9), 0 0 4px rgba(255, 255, 255, 0.85),
+    0 0 6px rgba(255, 255, 255, 0.55), 0 0 8px rgba(255, 255, 255, 0.35);
 }
 </style>

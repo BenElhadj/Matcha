@@ -7,7 +7,7 @@
             <MessengerList />
           </div>
         </div>
-        <div class="right-scroll col-md-9 col-sm-11 col-xs-12">
+        <div class="right-scroll col-md-9 col-sm-11">
           <div class="chat_layout column justify-start">
             <div class="top_chat col-xs-9">
               <MessengerChat ref="chat" />
@@ -114,6 +114,9 @@ onBeforeUnmount(() => {
 <style scoped>
 .messenger {
   height: calc(100vh - 4.75rem);
+  /* prevent chat from wrapping under the list: enforce a minimum content width */
+  min-width: 980px;
+  overflow-x: auto;
 }
 
 .left-scroll {
@@ -143,13 +146,28 @@ onBeforeUnmount(() => {
   padding: 0 !important;
   margin: 0 !important;
   max-width: 270px;
-  min-width: 120px;
+  /* allow the list content to shrink; the column itself enforces the true min */
+  min-width: 0;
 }
 
 .right,
 .chat_layout,
 .parent {
   height: 100% !important;
+}
+
+/* keep list + chat side-by-side regardless of viewport width */
+.parent.row {
+  flex-wrap: nowrap !important;
+}
+.left-scroll {
+  /* Allow shrinking down close to avatar size while preserving avatar visibility */
+  flex: 0 0 clamp(92px, 18vw, 270px) !important;
+  min-width: 92px;
+  max-width: 270px;
+}
+.right-scroll {
+  min-width: 640px;
 }
 
 .bottom {
@@ -161,8 +179,8 @@ onBeforeUnmount(() => {
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
-  width: 25%;
-  min-width: 120px;
+  width: clamp(92px, 18vw, 270px);
+  min-width: 92px;
 }
 
 .right-scroll {

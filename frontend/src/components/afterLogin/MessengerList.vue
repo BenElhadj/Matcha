@@ -1,8 +1,8 @@
 <template>
-  <div class="q-pa-md" style="max-width: 350px">
+  <div class="q-pa-md" style="max-width: 280px">
     <q-list style="background-color: WhiteSmoke">
       <q-item>
-        <q-item-section>Discussions</q-item-section>
+        <q-item-section style="padding-left: -5px; !important">Discussions</q-item-section>
       </q-item>
       <q-item
         v-if="sortedConvos.length == 0"
@@ -19,19 +19,17 @@
         @click="syncConvo(convo)"
         :class="{ 'selected-convo': convo === selectedConvo }"
       >
-        <q-item-section :value="!!unRead(convo)" overlap color="primary" class="mx-2" left>
+        <q-item-section :value="!!unRead(convo)" overlap color="primary" class="mr-1" left>
           <template v-slot:badge>
             <span>{{ unRead(convo) }}</span>
           </template>
-          <AppAvatar
-            :image="getConvoProfileSrc(convo)"
-            :userId="convo.user_id"
-            :showPresence="true"
-            size="small"
-          />
+          <q-avatar class="avatar-presence" size="50px">
+            <img :src="getConvoAvatar(convo)" />
+            <span :class="['presence-dot', presenceClass(convo)]"></span>
+          </q-avatar>
         </q-item-section>
 
-        <q-item-section class="hidden-sm-and-down">
+        <q-item-section class="hidden-md-and-down name-section">
           <q-item-label class="truncate-text">{{ convo.username }}</q-item-label>
         </q-item-section>
 
@@ -53,7 +51,6 @@ import utility from '@/utility.js'
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useStore } from 'vuex'
 import moment from 'moment'
-import AppAvatar from '@/components/common/AppAvatar.vue'
 import axios from 'axios'
 
 const store = useStore()
@@ -85,6 +82,9 @@ const getConvoProfileSrc = (convo) => {
     return resolveImg(convo?.profile_image)
   }
 }
+
+// Simple wrapper to align with the desired template API
+const getConvoAvatar = (convo) => getConvoProfileSrc(convo)
 
 // Prefetch images for visible convos (unique by user_id)
 // NOTE: placed after sortedConvos is defined to avoid TDZ errors
@@ -185,6 +185,10 @@ watch(
   { deep: true, immediate: true }
 )
 
+// Presence class for the avatar overlay
+const presenceClass = (convo) =>
+  lastSeen.value[convo.user_id] === 'online' ? 'online' : 'offline'
+
 function refreshMethods() {
   updateConnectedUsers()
   sortedConvos.value.forEach((convo) => {
@@ -203,13 +207,48 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.typing_point {
+  background: var(--color-primary);
+}
 .selected-convo {
-  background-color: silver;
+  background-color: #e8f0ff; /* light highlight */
+  border-left: 4px solid var(--q-primary);
+}
+.selected-convo .truncate-text {
+  font-weight: 700;
+}
+.q-item:hover {
+  background-color: #f6f9ff;
 }
 .truncate-text {
   min-width: 40px;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+/* Bring the name closer to the avatar */
+.name-section {
+  margin-left: 4px;
+}
+/* Presence dot overlay like Navbar */
+.avatar-presence {
+  position: relative;
+  display: inline-block;
+}
+.presence-dot {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid white;
+  z-index: 1;
+}
+.presence-dot.online {
+  background: #21ba45; /* green */
+}
+.presence-dot.offline {
+  background: #9e9e9e; /* grey */
 }
 </style>

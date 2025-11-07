@@ -7,13 +7,13 @@
             <AppAvatar :image="image" size="medium" :showPresence="false" />
           </div>
           <q-toolbar-title>
-            <q-item-label class="username-glow">{{ user.username }}</q-item-label>
+            <q-item-label class="text-glow">{{ user.username }}</q-item-label>
           </q-toolbar-title>
         </q-item>
       </div>
 
       <div v-else>
-        <q-toolbar-title>
+        <q-toolbar-title class="text-glow">
           <span>MATCHA </span>
         </q-toolbar-title>
       </div>
@@ -185,7 +185,7 @@
               <AppAvatar :image="image" size="medium" :showPresence="false" />
             </div>
             <q-item-section>
-              <q-item-label class="username-glow">{{ user.username }}</q-item-label>
+              <q-item-label class="text-glow">{{ user.username }}</q-item-label>
             </q-item-section>
           </q-item>
         </div>
@@ -907,10 +907,10 @@ q-drawer {
 
 .text-link {
   cursor: pointer;
-  color: black;
+  /* color: black; */
   /* white contour on text */
-  text-shadow: 0.02px 0 0 #fff, -0.02px 0 0 #fff, 0 0.02px 0 #fff, 0 -0.02px 0 #fff,
-    0 0 0.02px rgba(255, 255, 255, 0.85);
+  text-shadow: 0 0 2px rgba(255, 255, 255, 0.9), 0 0 4px rgba(255, 255, 255, 0.85),
+   0 0 6px rgba(255, 255, 255, 0.55), 0 0 8px rgba(255, 255, 255, 0.35);
   display: inline-block;
   transition: transform 0.15s ease, text-shadow 0.15s ease;
 }
@@ -996,7 +996,7 @@ q-drawer {
 }
 
 /* Extra glow for username specifically */
-.username-glow {
+.text-glow {
   /* Static soft white glow only */
   text-shadow: 0 0 2px rgba(255, 255, 255, 0.9), 0 0 4px rgba(255, 255, 255, 0.85),
     0 0 6px rgba(255, 255, 255, 0.55), 0 0 8px rgba(255, 255, 255, 0.35);

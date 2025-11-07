@@ -4,16 +4,16 @@
 
     <div id="q-app">
       <div class="row">
-        <div style="max-width: 85%; min-width: 20%; padding-bottom: 50px">
+        <div class="chat-scroll" style="max-width: 85%; min-width: 20%; padding-bottom: 50px">
           <q-item
             v-for="(msg, i) in messages"
             :key="i + key"
-            :class="{ rtl: msg.id_from === user.id }"
+            :class="['message-row', { rtl: msg.id_from === user.id }]"
           >
             <q-chat-message
               v-if="msg.id_from === user.id"
               :name="user.username"
-              :stamp="formatTime(msg.created_at)"
+              :stamp="stampForOutgoing(msg)"
               sent
               text-color="white"
               bg-color="primary"
@@ -146,6 +146,18 @@ const checkLimit = (res) => {
 
 const formatTime = (created_at) => {
   return moment(created_at).fromNow()
+}
+
+// Build a stamp with sent/read ticks for outgoing messages
+const stampForOutgoing = (msg) => {
+  try {
+    const base = formatTime(msg.created_at)
+    // Single tick = sent, Double tick = read
+    const isRead = msg && (msg.is_read === 1 || msg.is_read === true)
+    return isRead ? `${base} ✓✓` : `${base} ✓`
+  } catch (_) {
+    return formatTime(msg?.created_at)
+  }
 }
 
 const scroll = () => {
@@ -334,6 +346,7 @@ onBeforeUnmount(() => {
 <style>
 .chat_container {
   overflow: hidden;
+  padding-right: 4px;
 }
 
 .chat_load {
@@ -351,9 +364,47 @@ onBeforeUnmount(() => {
   display: inline-flex;
 }
 .chat-avatar--me {
-  margin-left: 6px;
+  margin-left: 16px;
 }
 .chat-avatar--other {
-  margin-right: 6px;
+  margin-right: 12px;
+}
+
+/* add subtle separation between received and sent bubble columns */
+.message-row {
+  padding: 4px 0;
+}
+.message-row.rtl {
+  /* keep a tiny gutter on the extreme right, but add a larger left gap to push sent bubbles further right */
+  margin-right: 10px;
+  margin-left: 150px;
+}
+.message-row:not(.rtl) {
+  margin-left: 16px;
+}
+
+/* fine-tune internal q-chat-message layout gap */
+:deep(.q-chat-message) {
+  /* shrink overall bubble width to create a wider middle gutter */
+  max-width: 66%;
+}
+:deep(.q-chat-message .q-message-container) {
+  border-radius: 14px;
+}
+:deep(.q-chat-message.sent) {
+  /* increase left margin on sent (right-aligned) messages to separate from the other side */
+  margin-left: 60px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+:deep(.q-chat-message:not(.sent)) {
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+:deep(.q-chat-message .q-message-text) {
+  line-height: 1.35;
+}
+
+/* ensure the scrolling region has a comfortable side padding without crowding */
+.chat-scroll {
+  padding-left: 4px;
 }
 </style>
