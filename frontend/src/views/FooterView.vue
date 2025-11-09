@@ -2,7 +2,7 @@
   <div class="footer">
     <div class="back-to-top-container">
       <img
-        class="back-to-top"
+        class="back-to-top icon-shadow"
         src="@/assets/Footer/back-to-top.png"
         alt="Back to top"
         @click="moveUp"
@@ -16,13 +16,13 @@
           <h2>Contact-us:</h2>
           <div class="link-box">
             <a class="links-contact-container" href="mailto:42projetsweb@gmail.com">
-              <img src="@/assets/Footer/email.png" alt="Email" />
+              <img src="@/assets/Footer/email.png" alt="Email" class="icon-shadow" />
             </a>
           </div>
         </div>
         <div class="logo-container">
           <div>
-            <img src="@/assets/Footer/matcha.png" alt="Logo" />
+            <img src="@/assets/Footer/matcha.png" alt="Logo" class="icon-shadow" />
           </div>
           <div class="bottom-container">
             <q-item>
@@ -42,16 +42,16 @@
           </div>
           <div class="follow-links-container link-box">
             <a class="links-follow-container" href="https://www.facebook.com/42Matcha">
-              <img src="@/assets/Footer/fb.png" alt="Facebook" />
+              <img src="@/assets/Footer/fb.png" alt="Facebook" class="icon-shadow" />
             </a>
             <a class="links-follow-container" href="https://www.instagram.com/42matcha/">
-              <img src="@/assets/Footer/inst.png" alt="Instagram" />
+              <img src="@/assets/Footer/inst.png" alt="Instagram" class="icon-shadow" />
             </a>
             <a class="links-follow-container" href="https://twitter.com/42Matcha">
-              <img src="@/assets/Footer/tw.png" alt="Twitter" />
+              <img src="@/assets/Footer/tw.png" alt="Twitter" class="icon-shadow" />
             </a>
             <a class="links-follow-container" href="https://www.youtube.com/@42Matcha">
-              <img src="@/assets/Footer/yt.png" alt="Youtube" />
+              <img src="@/assets/Footer/yt.png" alt="Youtube" class="icon-shadow" />
             </a>
           </div>
         </div>
@@ -107,8 +107,6 @@ onBeforeUnmount(() => {
 
 .back-to-top-container,
 .full-container {
-  text-shadow: 0 0 2px rgba(255, 255, 255, 0.9), 0 0 4px rgba(255, 255, 255, 0.85),
-    0 0 6px rgba(255, 255, 255, 0.55), 0 0 8px rgba(255, 255, 255, 0.35);
   position: relative;
 }
 
@@ -120,8 +118,6 @@ onBeforeUnmount(() => {
   right: 23px;
   bottom: -15px;
   z-index: 2;
-  text-shadow: 0 0 2px rgba(255, 255, 255, 0.9), 0 0 4px rgba(255, 255, 255, 0.85),
-    0 0 6px rgba(255, 255, 255, 0.55), 0 0 8px rgba(255, 255, 255, 0.35);
 }
 
 .back-to-top:disabled {
@@ -134,6 +130,8 @@ onBeforeUnmount(() => {
   margin: auto;
   max-height: 30vh;
   min-height: 10vh;
+  text-shadow: 0 0 1px rgba(255, 255, 255, 0.9), 0 0 3px rgba(255, 255, 255, 0.85),
+    0 0 3px rgba(255, 255, 255, 0.55), 0 0 4px rgba(255, 255, 255, 0.35);
 }
 
 .top-container {
@@ -176,10 +174,13 @@ onBeforeUnmount(() => {
   margin-left: auto;
 }
 
+.icon-shadow {
+  /* Subtle white glow for icons and logo */
+  filter: drop-shadow(0 0 3px #fff8) drop-shadow(0 0 4px #fff4);
+}
+
 .links-contact-container img,
 .links-follow-container img {
-  text-shadow: 0 0 2px rgba(255, 255, 255, 0.9), 0 0 4px rgba(255, 255, 255, 0.85),
-    0 0 6px rgba(255, 255, 255, 0.55), 0 0 8px rgba(255, 255, 255, 0.35);
   max-height: 5vh;
   min-height: 3vh;
   height: 21px;

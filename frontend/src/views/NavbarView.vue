@@ -30,7 +30,7 @@
             aria-label="Notifications"
             @click="notifMenu = !notifMenu"
           >
-            <img :src="notificationImage" alt="Notifications (YT)" class="yt-icon" />
+            <img :src="notificationImage" alt="Notifications (YT)" class="yt-icon icon-shadow" />
             <q-badge v-if="unreadNotifCount" class="yt-badge" color="primary">
               <span>{{ unreadNotifLabel }}</span>
             </q-badge>
@@ -98,7 +98,7 @@
             aria-label="Messages"
             @click="msgMenu = !msgMenu"
           >
-            <img :src="chatImage" alt="Messages (YT)" class="yt-icon" />
+            <img :src="chatImage" alt="Messages (YT)" class="yt-icon icon-shadow" />
             <q-badge v-if="newMsgNum" class="yt-badge" color="primary">
               <span>{{ newMsgNum > 99 ? '99+' : newMsgNum }}</span>
             </q-badge>
@@ -192,16 +192,20 @@
         <q-separator />
         <div v-for="link in links" :key="link.text">
           <q-item v-if="link.public || connected" clickable @click="$router.push(link.route)">
-            <img :src="link.image" alt="Icon" class="icon-size" />
+            <img :src="link.image" alt="Icon" class="icon-size icon-shadow" />
             <q-item-section>
               <q-item-label>{{ link.text }}</q-item-label>
             </q-item-section>
           </q-item>
         </div>
         <q-item clickable @click="logout">
-          <img src="@/assets/Navbar/deconnexion.png" alt="Déconnexion" class="icon-size" />
+          <img
+            src="@/assets/Navbar/deconnexion.png"
+            alt="Déconnexion"
+            class="icon-size icon-shadow"
+          />
           <q-item-section>
-            <q-item-label>Sign out</q-item-label>
+            <q-item-label class="text-shadow">Déconnexion</q-item-label>
           </q-item-section>
         </q-item>
       </q-list>
@@ -910,7 +914,7 @@ q-drawer {
   /* color: black; */
   /* white contour on text */
   text-shadow: 0 0 2px rgba(255, 255, 255, 0.9), 0 0 4px rgba(255, 255, 255, 0.85),
-   0 0 6px rgba(255, 255, 255, 0.55), 0 0 8px rgba(255, 255, 255, 0.35);
+    0 0 6px rgba(255, 255, 255, 0.55), 0 0 8px rgba(255, 255, 255, 0.35);
   display: inline-block;
   transition: transform 0.15s ease, text-shadow 0.15s ease;
 }
@@ -1002,6 +1006,10 @@ q-drawer {
     0 0 6px rgba(255, 255, 255, 0.55), 0 0 8px rgba(255, 255, 255, 0.35);
 }
 
+.icon-shadow {
+  /* Subtle white glow for icons and logo */
+  filter: drop-shadow(0 0 2px rgb(255, 255, 255)) drop-shadow(0 0 2px rgb(255, 255, 255));
+}
 /* Lower the avatar slightly for visual breathing space from page top */
 /* Lower the avatar slightly for visual breathing space from page top */
 .avatar-wrapper {
