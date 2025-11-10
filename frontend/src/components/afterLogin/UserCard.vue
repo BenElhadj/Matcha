@@ -21,7 +21,7 @@
           class="icon-avatar like-btn-absolute"
           square
           :src="likeIcon"
-          @click.stop="onLikeIconClick"
+          @click.stop.prevent="onLikeIconClick"
         />
       </div>
       <router-link :to="`/user/${user.user_id}`" style="text-decoration: none">
