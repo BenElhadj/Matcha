@@ -42,7 +42,7 @@
               </q-item-section>
             </div>
           </AppAvatar>
-          <div style="margin-top: 10px">
+          <div v-if="showProfileEditBtn" style="margin-top: 10px">
             <input
               type="file"
               id="profile-upload"
@@ -176,6 +176,10 @@
 </template>
 
 <script setup>
+const showProfileEditBtn = computed(() => {
+  // Show only if on /settings or viewing own profile
+  return route.path === '/settings' || String(route.params.id) === String(store.getters.user?.id)
+})
 const onCoverBtnClick = () => {
   const el = document.getElementById('cover-upload')
   if (el) el.click()
