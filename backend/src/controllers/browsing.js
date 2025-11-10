@@ -157,8 +157,11 @@ const getAllHistory = async (req, res) => {
 	if (!req.user.id)
 		return res.json({ msg: 'not logged in' });
 	try {
-		const history = await historyModel.getAllHistory(req.user.id);
-		res.json(history);
+		// Parse offset/limit from query params, default to 0/20
+		const offset = parseInt(req.query.offset, 10) || 0;
+		const limit = parseInt(req.query.limit, 10) || 20;
+		const result = await historyModel.getAllHistory(req.user.id, offset, limit);
+		res.json({ history: result.rows, total: result.total });
 	} catch (err) {
 		return res.json({ msg: 'Fatal error', err });
 	}

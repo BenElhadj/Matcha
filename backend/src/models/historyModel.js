@@ -62,8 +62,8 @@ const getVisited = async (user_id) => {
     return result.rows;
 }
 
-const getAllHistory = async (user_id) => {
-	// Returns all history events (likes, visits, etc) for the user
+const getAllHistory = async (user_id, offset = 0, limit = 20) => {
+	// Returns paginated history events (likes, visits, etc) for the user
 	const query = `
 		SELECT
 			h.id,
@@ -84,9 +84,12 @@ const getAllHistory = async (user_id) => {
 		LEFT JOIN images i ON h.visitor = i.user_id AND i.profile = TRUE
 		WHERE h.visited = $1
 		ORDER BY h.created_at DESC
+		OFFSET $2 LIMIT $3
 	`;
-	const result = await db.query(query, [user_id]);
-	return result.rows;
+	const dataResult = await db.query(query, [user_id, offset, limit]);
+	// Get total count for pagination
+	const countResult = await db.query('SELECT COUNT(*) FROM history WHERE visited = $1', [user_id]);
+	return { rows: dataResult.rows, total: parseInt(countResult.rows[0].count, 10) };
 };
 
 module.exports = {
