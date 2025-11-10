@@ -1,5 +1,5 @@
 <template>
-  <q-card :to="`/user/${user.user_id}`">
+  <q-card class="user-card-root">
     <div class="pt-1 column justify-center align-center">
       <div class="row justify-between q-ma-sm">
         <q-chip outline small text-color="grey-7">{{ distance }}</q-chip>
@@ -11,14 +11,27 @@
         </q-item-section>
       </div>
 
-      <q-avatar class="justify-center" size="150px">
-        <img class="icon-avatar" square :src="likeIcon" @click.stop="onLikeIconClick" />
-        <img :src="getProfileImage" loading="lazy" />
-      </q-avatar>
-      <span justify-center class="name headline text-capitalize mt-2">{{ user.username }}</span>
-      <span justify-center class="name headline text-capitalize mt-2"
-        >{{ user.last_name }} {{ user.first_name }}</span
-      >
+      <div class="avatar-like-wrapper">
+        <q-avatar class="justify-center avatar-card" size="150px">
+          <router-link :to="`/user/${user.user_id}`">
+            <img :src="getProfileImage" loading="lazy" class="avatar-img" />
+          </router-link>
+        </q-avatar>
+        <img
+          class="icon-avatar like-btn-absolute"
+          square
+          :src="likeIcon"
+          @click.stop="onLikeIconClick"
+        />
+      </div>
+      <router-link :to="`/user/${user.user_id}`" style="text-decoration: none">
+        <span justify-center class="name headline text-capitalize mt-2">{{ user.username }}</span>
+      </router-link>
+      <router-link :to="`/user/${user.user_id}`" style="text-decoration: none">
+        <span justify-center class="name headline text-capitalize mt-2">
+          {{ user.last_name }} {{ user.first_name }}
+        </span>
+      </router-link>
       <span justify-center class="name headline text-capitalize mt-2">
         <q-icon
           class="mr-2"
@@ -68,28 +81,22 @@
         }}</span>
         <span v-else class="text-truncate">Earth</span>
       </div>
+      <AlertView :alert="alert" />
     </div>
   </q-card>
-  <AlertView :alert="alert" />
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useStore } from 'vuex'
 import moment from 'moment'
 import utility from '@/utility'
 import { getImageSrc } from '@/utility.js'
 import AlertView from '@/views/AlertView.vue'
 import axios from 'axios'
-// import io from 'socket.io-client'
-// const socket = io(`${import.meta.env.VITE_APP_API_URL}`)
 
-const getLikeIcon = utility.getLikeIcon
-
-const location = computed(() => store.getters.location)
-const connectedUsers = computed(() => store.state.connectedUsers)
-const updateTimer = ref(null)
 const store = useStore()
+const getLikeIcon = utility.getLikeIcon
 
 const props = defineProps({
   user: {
@@ -98,7 +105,6 @@ const props = defineProps({
   }
 })
 
-// Centralized relation state using DB-backed store data only
 const followers = computed(() => store.getters.followers || [])
 const following = computed(() => store.getters.following || [])
 const convos = computed(() => store.getters.convos || [])
@@ -113,14 +119,10 @@ const relationType = computed(() =>
     flags: store.state.user?.relation || { unlike: {} }
   })
 )
-
 const likeIcon = computed(() => getLikeIcon(relationType.value))
-
-// Lightweight alert holder
 const alert = ref({ state: false, color: '', text: '' })
 
 function nextLikedFromState(type) {
-  // DB-only: default/he_like -> like; you_like/you_like_back -> unlike
   switch (type) {
     case 'default':
     case 'he_like':
@@ -136,7 +138,6 @@ function nextLikedFromState(type) {
 async function onLikeIconClick() {
   const targetId = props.user?.user_id
   if (!targetId) return
-  // Forbid liking yourself
   if (String(targetId) === String(selfId.value)) {
     alert.value = { state: true, color: 'red', text: 'Vous ne pouvez pas vous liker.' }
     return
@@ -185,11 +186,10 @@ const lastSeen = computed(() => {
   if (props.user.lastSeen == 'online') {
     return 'online'
   } else {
-    return (props.user.lastSeen = moment(props.user.status).utc().fromNow())
+    return moment(props.user.status).utc().fromNow()
   }
 })
 
-// Presence derived from store (socket-driven)
 const isOnline = computed(() => {
   const ids = store.getters.connectedUsers || []
   const targetId = props.user?.user_id != null ? String(props.user.user_id) : ''
@@ -201,7 +201,6 @@ const getProfileImage = computed(() => {
   const defaultTxt = `${base}default/defaut_profile.txt`
   const cachedDefault = utility.getCachedDefault ? utility.getCachedDefault('profile') : null
   const fallback = cachedDefault || defaultTxt
-  // Prefer lightweight field from discover endpoint
   if (
     props.user.profile_image &&
     typeof props.user.profile_image === 'string' &&
@@ -217,54 +216,77 @@ const getProfileImage = computed(() => {
   return fallback
 })
 
-// Deprecated helper kept for reference; prefer computed getProfileImage using getImageSrc
-// const profileImage = (image) => utility.getImageSrc(image, utility.getCachedDefault?.('profile') || `${import.meta.env.BASE_URL || '/' }default/defaut_profile.txt`)
-
-// Deprecated: history-based icon fetching removed; state is derived from DB-backed store
-
-// function updateConnectedUsers() {
-//   utility.getConnectedUsers()
-//     .then(data => {
-//       const connectedUserIds = data
-//       const userId = props.user.user_id.toString()
-
-//       if (connectedUserIds.includes(userId)) {
-//         props.user.lastSeen = 'online'
-//         props.user.isConnected = true
-//       } else {
-//         props.user.lastSeen = moment(props.user.status, 'YYYY-MM-DD HH:mm:ss').fromNow()
-//         props.user.isConnected = false
-//       }
-//     })
-//     .catch(error => {
-//       console.error('Error retrieving data :', error)
-//     });
-// }
-
 onMounted(() => {
   // Like icon reacts via store updates (syncMatches and sockets)
 })
-
-// function refreshMethods() {
-//   updateConnectedUsers()
-//   // getHistory()
-// }
-
-// const refreshInterval = setInterval(refreshMethods, 2000)
-
-// onBeforeUnmount(() => {
-//   clearInterval(refreshInterval)
-// })
 </script>
 
-<style>
+<style scoped>
+.user-card-root {
+  border-radius: 10px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  border: 1.5px solid #e0e0e0;
+  background: #fff;
+  margin: 18px 0;
+  padding: 18px 18px 10px 18px; /* padding horizontal augmenté */
+  transition: box-shadow 0.2s, border-radius 0.2s;
+  overflow: visible;
+}
+.user-card-root:hover {
+  box-shadow: 0 0 20px 6px rgba(0, 0, 0, 0.18), 0 0 0 1px #bdbdbd;
+  border-color: #bdbdbd;
+}
+.avatar-card {
+  width: 150px;
+  height: 150px;
+  margin: 0 auto 12px auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.avatar-img {
+  width: 150px;
+  height: 150px;
+  object-fit: contain;
+  object-position: center center;
+  border-radius: 50%;
+  background: #f5f5f5;
+  display: block;
+  max-width: 150px;
+  max-height: 150px;
+  min-width: 0;
+  min-height: 0;
+}
+.avatar-like-wrapper {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.like-btn-absolute {
+  position: absolute;
+  bottom: 0;
+  height: 70px;
+  width: 70px;
+  z-index: 999;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.1s;
+}
+.like-btn-absolute:hover {
+  opacity: 1;
+  transform: translateX(-50%) scale(1.15);
+  transform-origin: center center;
+}
+
 .icon-avatar {
   width: 35px !important;
   height: 35px !important;
   position: absolute;
-  size: 100%;
-  top: 5px;
-  left: 80%;
+  top: 15px;
+  left: 78%;
   transform: translateX(-50%);
 }
 .icon-male {
@@ -302,17 +324,14 @@ onMounted(() => {
   color: #828282;
   position: relative;
 }
-
 .name:after {
   display: block;
   content: '';
   position: absolute;
-  top: 125%;
-  left: 50%;
-  width: 40%;
-  height: 1px;
-  background: var(--color-primary);
-  transform: translate(-50%, -50%);
+}
+.align-center {
+  text-align: center;
+  gap: 10px;
 }
 
 .q-card {
@@ -329,57 +348,7 @@ onMounted(() => {
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1);
   transition: all 0.3s ease-out;
 }
-.align-center {
-  text-align: center;
-  gap: 10px;
-}
-
 .q-card:hover {
   border: 1px solid rgba(25, 25, 25, 0.3) !important;
-}
-
-.q-card__title {
-  background: none;
-}
-
-.top,
-.bottom {
-  width: 100%;
-}
-
-.rating {
-  transform: scale(0.8) translateY(-1px);
-}
-
-.rating_value {
-  margin-left: 7px;
-  margin-right: -3px;
-}
-
-.status_container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.status_icon {
-  margin-left: auto !important;
-}
-
-.location_icon {
-  transform: scale(1.1);
-  margin-bottom: 2px;
-}
-
-.cake_icon {
-  margin-bottom: 3px;
-}
-
-.love {
-  transform: translate(-5px, -3px);
-}
-
-.v-responsive.v-image {
-  border: 3px solid rgba(0, 0, 0, 0.1) !important;
 }
 </style>

@@ -652,10 +652,6 @@ a {
   box-shadow: none;
 }
 
-.user {
-  overflow: hidden;
-}
-
 .sort_icon.flip {
   transform: rotate(180deg);
 }
