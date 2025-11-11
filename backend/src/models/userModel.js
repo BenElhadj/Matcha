@@ -143,11 +143,11 @@ const getImages = async (id) => {
     }));
 }
 
-// Get image By Id
+// Get image By Id (pour suppression, retourne même les images corrompues ou vides)
 const getImagesById = async (id, user_id) => {
     const query = `SELECT *, COALESCE(link, '') AS link, COALESCE(data, '') AS data FROM images WHERE id = $1 AND user_id = $2`;
     const result = await db.query(query, [id, user_id]);
-    return result.rows.filter(isValidImage).map(img => ({
+    return result.rows.map(img => ({
         ...img,
         image: img.link ? img.link : img.data
     }));
