@@ -11,8 +11,8 @@ const uploadProfileImage = async (req, res) => {
 			mime = req.file.mimetype || 'image/png';
 			data = `data:${mime};base64,${req.file.buffer.toString('base64')}`;
 		} else if (req.body.data) {
-			// Correction : si déjà un data URI, on ne touche pas
-			if (typeof req.body.data === 'string' && req.body.data.trim().startsWith('data:image')) {
+			// Correction stricte : ne préfixer que si ce n'est PAS déjà un data URI complet
+			if (typeof req.body.data === 'string' && req.body.data.trim().startsWith('data:image/')) {
 				data = req.body.data.trim();
 			} else {
 				data = `data:${mime};base64,${req.body.data}`;
@@ -203,7 +203,7 @@ const uploadImages = async (req, res) => {
 			mime = req.file.mimetype || 'image/png';
 			data = `data:${mime};base64,${req.file.buffer.toString('base64')}`;
 		} else if (req.body.data) {
-			if (typeof req.body.data === 'string' && req.body.data.trim().startsWith('data:image')) {
+			if (typeof req.body.data === 'string' && req.body.data.trim().startsWith('data:image/')) {
 				data = req.body.data.trim();
 			} else {
 				data = `data:${mime};base64,${req.body.data}`;
@@ -246,7 +246,7 @@ const uploadCover = async (req, res) => {
 			mime = req.file.mimetype || 'image/png';
 			data = `data:${mime};base64,${req.file.buffer.toString('base64')}`;
 		} else if (req.body.data) {
-			if (typeof req.body.data === 'string' && req.body.data.trim().startsWith('data:image')) {
+			if (typeof req.body.data === 'string' && req.body.data.trim().startsWith('data:image/')) {
 				data = req.body.data.trim();
 			} else {
 				data = `data:${mime};base64,${req.body.data}`;
