@@ -3,14 +3,17 @@ const uploadProfileImage = async (req, res) => {
 	if (!req.user.id)
 		return res.json({ status: 'error', type: 'auth', message: 'Not logged in', data: null })
 	try {
-	// Always store as base64 in `data` and set `link` to 'false'
-	const mime = req.file?.mimetype || 'image/png'
-	const data = req.file ? `data:${mime};base64,${req.file.buffer.toString('base64')}` : null
-	const link = 'false'
-	await userModel.updateProfilePic(req.user.id)
-	await userModel.insertImages({ id: req.user.id, link, data, profile: true, cover: false })
-	await userModel.setImages(req.user.id)
-	return res.json({ status: 'success', type: 'profile', message: 'Profile image updated', data: { image: data, user_id: req.user.id } })
+		// Always store as base64 in `data` and set `link` to 'false'
+		const mime = req.file?.mimetype || 'image/png'
+		const data = req.file ? `data:${mime};base64,${req.file.buffer.toString('base64')}` : null
+		const link = 'false'
+		// Mettre tous les profile à 0
+		await userModel.updateProfilePic(req.user.id)
+		// Insérer la nouvelle image de profil
+		await userModel.insertImages({ id: req.user.id, link, data, profile: true, cover: false })
+		// Récupérer toutes les images à jour
+		const images = await userModel.getImages(req.user.id)
+		return res.json({ status: 'success', type: 'profile', message: 'Profile image updated', data: { images, user_id: req.user.id } })
 	} catch (err) {
 		return res.json({ status: 'error', type: 'profile', message: 'Fatal error', data: err })
 	}
@@ -176,38 +179,36 @@ const changePassword = async (req, res) => {
 // Upload images 
 
 const uploadImages = async (req, res) => {
-	   if (!req.user.id)
-		   return res.json({ status: 'error', type: 'auth', message: 'Not logged in', data: null })
-	   try {
-		   const images = await userModel.getImages(req.user.id)
-		   if (images.length < 5) {
-			   // Always store as base64 in `data` and set `link` to 'false'
-			   const mime = req.file?.mimetype || 'image/png'
-			   const data = req.file ? `data:${mime};base64,${req.file.buffer.toString('base64')}` : null
-			   const link = 'false'
-			   let user = {
-				   id: req.user.id,
-				   link,
-				   data,
-				   profile: false,
-				   cover: false
-			   }
-			   try {
-				   const insertRes = await userModel.insertImages(user)
-				   console.log(`[UPLOAD] Insertion DB :`, insertRes)
-			   } catch (dbErr) {
-				   console.error(`[UPLOAD] Erreur insertion DB :`, dbErr)
-				   return res.json({ status: 'error', type: 'profile', message: 'Erreur insertion DB', data: dbErr })
-			   }
-			   await userModel.setImages(req.user.id)
-			   return res.json({ status: 'success', type: 'profile', message: 'Image Updated', data: { image: data, user_id: req.user.id } })
-		   } else {
-			   return res.json({ status: 'error', type: 'profile', message: 'User already has 5 photos', data: null })
-		   }
-	   } catch (err) {
-		   console.error(`[UPLOAD] Erreur générale :`, err)
-		   return res.json({ status: 'error', type: 'profile', message: 'Fatal error', data: err })
-	   }
+	if (!req.user.id)
+		return res.json({ status: 'error', type: 'auth', message: 'Not logged in', data: null })
+	try {
+		const images = await userModel.getImages(req.user.id)
+		if (images.length < 5) {
+			// Always store as base64 in `data` and set `link` to 'false'
+			const mime = req.file?.mimetype || 'image/png'
+			const data = req.file ? `data:${mime};base64,${req.file.buffer.toString('base64')}` : null
+			const link = 'false'
+			let user = {
+				id: req.user.id,
+				link,
+				data,
+				profile: false,
+				cover: false
+			}
+			try {
+				await userModel.insertImages(user)
+			} catch (dbErr) {
+				return res.json({ status: 'error', type: 'profile', message: 'Erreur insertion DB', data: dbErr })
+			}
+			// Récupérer toutes les images à jour
+			const newImages = await userModel.getImages(req.user.id)
+			return res.json({ status: 'success', type: 'profile', message: 'Image Updated', data: { images: newImages, user_id: req.user.id } })
+		} else {
+			return res.json({ status: 'error', type: 'profile', message: 'User already has 5 photos', data: null })
+		}
+	} catch (err) {
+		return res.json({ status: 'error', type: 'profile', message: 'Fatal error', data: err })
+	}
 }
 
 // Upload cover 
@@ -218,24 +219,17 @@ const uploadCover = async (req, res) => {
 	try {
 		const result = await userModel.getCover(req.user.id)
 		if (result.length) {
-			// Only unlink if link is a real local filename
-			if (result[0].link && result[0].link !== 'false' && !isExternal(result[0].link)) {
-				try {
-					await unlinkAsync(resolve(dirname(dirname(__dirname)), 'uploads', result[0].link))
-				} catch (err) {
-					return res.json({ status: 'error', type: 'profile', message: 'Fatal error', data: err })
-				}
-			}
 			await userModel.delCover(result[0].id, req.user.id)
 		}
 		// Always store as base64 in `data` and set `link` to 'false'
 		const mime = req.file?.mimetype || 'image/png'
 		const data = req.file ? `data:${mime};base64,${req.file.buffer.toString('base64')}` : null
 		const link = 'false'
-		const insertRes = await userModel.insertCover(req.user.id, link, data)
-		if (!insertRes)
-			return res.json({ status: 'error', type: 'profile', message: 'Something went wrong', data: null })
-		return res.json({ status: 'success', type: 'profile', message: 'Image Updated', data: { image: data, user_id: req.user.id } })
+		// Insérer la nouvelle cover
+		await userModel.insertImages({ id: req.user.id, link, data, profile: false, cover: true })
+		// Récupérer toutes les images à jour
+		const images = await userModel.getImages(req.user.id)
+		return res.json({ status: 'success', type: 'profile', message: 'Cover image updated', data: { images, user_id: req.user.id } })
 	} catch (err) {
 		return res.json({ status: 'error', type: 'profile', message: 'Fatal error', data: err })
 	}
