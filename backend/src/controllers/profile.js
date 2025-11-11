@@ -5,12 +5,22 @@ const uploadProfileImage = async (req, res) => {
 	try {
 		console.log('--- uploadProfileImage ---');
 		console.log('req.file:', req.file);
-		if (!req.file) {
-			return res.json({ status: 'error', type: 'profile', message: 'Aucun fichier reçu (req.file vide)', data: null });
+		let data = null;
+		let mime = 'image/png';
+		if (req.file) {
+			mime = req.file.mimetype || 'image/png';
+			data = `data:${mime};base64,${req.file.buffer.toString('base64')}`;
+		} else if (req.body.data) {
+			// Si le frontend envoie déjà un data URI complet
+			if (req.body.data.startsWith('data:')) {
+				data = req.body.data;
+			} else {
+				// Sinon, on suppose que c'est du base64 pur
+				data = `data:${mime};base64,${req.body.data}`;
+			}
+		} else {
+			return res.json({ status: 'error', type: 'profile', message: 'Aucun fichier ou base64 reçu', data: null });
 		}
-		// Always store as base64 in `data` and set `link` to 'false'
-		const mime = req.file.mimetype || 'image/png';
-		const data = `data:${mime};base64,${req.file.buffer.toString('base64')}`;
 		const link = 'false';
 		// Mettre tous les profile à 0
 		await userModel.updateProfilePic(req.user.id);
@@ -188,10 +198,21 @@ const uploadImages = async (req, res) => {
 	if (!req.user.id)
 		return res.json({ status: 'error', type: 'auth', message: 'Not logged in', data: null })
 	try {
-		// Always store as base64 in `data` and set `link` to 'false'
-		const mime = req.file?.mimetype || 'image/png'
-		const data = req.file ? `data:${mime};base64,${req.file.buffer.toString('base64')}` : null
-		const link = 'false'
+		let data = null;
+		let mime = 'image/png';
+		if (req.file) {
+			mime = req.file.mimetype || 'image/png';
+			data = `data:${mime};base64,${req.file.buffer.toString('base64')}`;
+		} else if (req.body.data) {
+			if (req.body.data.startsWith('data:')) {
+				data = req.body.data;
+			} else {
+				data = `data:${mime};base64,${req.body.data}`;
+			}
+		} else {
+			return res.json({ status: 'error', type: 'profile', message: 'Aucun fichier ou base64 reçu', data: null });
+		}
+		const link = 'false';
 		let user = {
 			id: req.user.id,
 			link,
@@ -220,16 +241,24 @@ const uploadCover = async (req, res) => {
 	try {
 		console.log('--- uploadCover ---');
 		console.log('req.file:', req.file);
-		if (!req.file) {
-			return res.json({ status: 'error', type: 'profile', message: 'Aucun fichier reçu (req.file vide)', data: null });
+		let data = null;
+		let mime = 'image/png';
+		if (req.file) {
+			mime = req.file.mimetype || 'image/png';
+			data = `data:${mime};base64,${req.file.buffer.toString('base64')}`;
+		} else if (req.body.data) {
+			if (req.body.data.startsWith('data:')) {
+				data = req.body.data;
+			} else {
+				data = `data:${mime};base64,${req.body.data}`;
+			}
+		} else {
+			return res.json({ status: 'error', type: 'profile', message: 'Aucun fichier ou base64 reçu', data: null });
 		}
 		const result = await userModel.getCover(req.user.id);
 		if (result.length) {
 			await userModel.delCover(result[0].id, req.user.id);
 		}
-		// Always store as base64 in `data` and set `link` to 'false'
-		const mime = req.file.mimetype || 'image/png';
-		const data = `data:${mime};base64,${req.file.buffer.toString('base64')}`;
 		const link = 'false';
 		// Insérer la nouvelle cover
 		await userModel.insertImages({ id: req.user.id, link, data, profile: false, cover: true });
