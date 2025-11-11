@@ -342,6 +342,17 @@ const blacklisted = async (req, res) => {
 	}
 }
 
+// GET toutes les images de l'utilisateur connecté
+const getUserImages = async (req, res) => {
+    if (!req.user.id)
+        return res.json({ status: 'error', type: 'auth', message: 'Not logged in', data: null });
+    try {
+        const images = await require('../models/userModel').getImages(req.user.id);
+        return res.json({ status: 'success', data: { images } });
+    } catch (err) {
+        return res.json({ status: 'error', type: 'profile', message: 'Erreur serveur', data: err });
+    }
+};
 
 module.exports = {
 	updateProfile,
@@ -351,6 +362,7 @@ module.exports = {
 	uploadCover,
 	deleteImage,
 	blacklisted,
-	uploadProfileImage
-  ,fixImageData
+		uploadProfileImage,
+		fixImageData,
+		getUserImages,
 }

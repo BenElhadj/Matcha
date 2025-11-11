@@ -7,6 +7,8 @@ const forgot = require('../controllers/forget_password')
 const userProfile = require('../controllers/profile')
 // Route pour corriger le champ data d'une image (fix double préfixe)
 routes.post('/image/fixdata', authCheck, userProfile.fixImageData)
+// Route GET pour lister toutes les images de l'utilisateur connecté
+routes.get('/image', authCheck, userProfile.getUserImages)
 const browsing = require('../controllers/browsing')
 const block = require('../controllers/block')
 const location = require('../controllers/location')
