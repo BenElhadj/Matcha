@@ -336,10 +336,13 @@ const deleteImage = async (req, res) => {
 	if (!req.body.id || isNaN(req.body.id))
 		return res.json({ status: 'error', type: 'profile', message: 'Invalid request', data: null })
 	try {
-		const imageId = parseInt(req.body.id, 10);
-		const userId = req.user.id;
-		console.log('[deleteImage] id:', imageId, 'user_id:', userId);
-		const result = await userModel.getImagesById(imageId, userId);
+	const imageId = parseInt(req.body.id, 10);
+	const userId = req.user.id;
+	// Log toutes les images de l'utilisateur avant suppression
+	const allImages = await require('../models/userModel').getImages(userId);
+	console.log('[deleteImage] Images en base pour user', userId, ':', allImages.map(img => ({id: img.id, link: img.link, data: img.data && img.data.substring(0,30)})));
+	console.log('[deleteImage] id:', imageId, 'user_id:', userId);
+	const result = await userModel.getImagesById(imageId, userId);
 		if (result.length) {
 			// Only unlink if link is a real local filename
 			if (result[0].link && result[0].link !== 'false' && !isExternal(result[0].link)) {
