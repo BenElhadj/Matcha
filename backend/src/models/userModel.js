@@ -134,8 +134,8 @@ const isValidImage = (img) => {
 };
 
 const getImages = async (id) => {
-    // Correction : utiliser 0/1 pour les champs cover/profile (type integer en SQL)
-    const query = `SELECT *, COALESCE(link, '') AS link, COALESCE(data, '') AS data FROM images WHERE user_id = $1 AND cover = 0 AND profile = 0`;
+    // Correction : utiliser false pour les champs cover/profile (type BOOLEAN en SQL)
+    const query = `SELECT *, COALESCE(link, '') AS link, COALESCE(data, '') AS data FROM images WHERE user_id = $1 AND cover = false AND profile = false`;
     const result = await db.query(query, [id]);
     return result.rows.filter(isValidImage).map(img => ({
         ...img,
@@ -180,8 +180,8 @@ const updateProfilePic = async (id) => {
 
 // Get cover photo
 const getCover = async (id) => {
-    // Correction : utiliser 1 pour cover (type integer en SQL)
-    const query = `SELECT *, COALESCE(link, '') AS link, COALESCE(data, '') AS data FROM images WHERE cover = 1 AND user_id = $1`;
+    // Correction : utiliser true pour cover (type BOOLEAN en SQL)
+    const query = `SELECT *, COALESCE(link, '') AS link, COALESCE(data, '') AS data FROM images WHERE cover = true AND user_id = $1`;
     const result = await db.query(query, [id]);
     return result.rows.map(img => ({
         ...img,
