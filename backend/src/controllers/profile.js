@@ -3,19 +3,25 @@ const uploadProfileImage = async (req, res) => {
 	if (!req.user.id)
 		return res.json({ status: 'error', type: 'auth', message: 'Not logged in', data: null })
 	try {
+		console.log('--- uploadProfileImage ---');
+		console.log('req.file:', req.file);
+		if (!req.file) {
+			return res.json({ status: 'error', type: 'profile', message: 'Aucun fichier reçu (req.file vide)', data: null });
+		}
 		// Always store as base64 in `data` and set `link` to 'false'
-		const mime = req.file?.mimetype || 'image/png'
-		const data = req.file ? `data:${mime};base64,${req.file.buffer.toString('base64')}` : null
-		const link = 'false'
+		const mime = req.file.mimetype || 'image/png';
+		const data = `data:${mime};base64,${req.file.buffer.toString('base64')}`;
+		const link = 'false';
 		// Mettre tous les profile à 0
-		await userModel.updateProfilePic(req.user.id)
+		await userModel.updateProfilePic(req.user.id);
 		// Insérer la nouvelle image de profil
-		await userModel.insertImages({ id: req.user.id, link, data, profile: true, cover: false })
+		await userModel.insertImages({ id: req.user.id, link, data, profile: true, cover: false });
 		// Récupérer toutes les images à jour
-		const images = await userModel.getImages(req.user.id)
-		return res.json({ status: 'success', type: 'profile', message: 'Profile image updated', data: { images, user_id: req.user.id } })
+		const images = await userModel.getImages(req.user.id);
+		return res.json({ status: 'success', type: 'profile', message: 'Profile image updated', data: { images, user_id: req.user.id } });
 	} catch (err) {
-		return res.json({ status: 'error', type: 'profile', message: 'Fatal error', data: err })
+		console.error('Erreur uploadProfileImage:', err);
+		return res.json({ status: 'error', type: 'profile', message: 'Erreur serveur: ' + (err.message || err), data: err });
 	}
 }
 const bcrypt = require('bcryptjs')
@@ -217,21 +223,27 @@ const uploadCover = async (req, res) => {
 	if (!req.user.id)
 		return res.json({ status: 'error', type: 'auth', message: 'Not logged in', data: null })
 	try {
-		const result = await userModel.getCover(req.user.id)
+		console.log('--- uploadCover ---');
+		console.log('req.file:', req.file);
+		if (!req.file) {
+			return res.json({ status: 'error', type: 'profile', message: 'Aucun fichier reçu (req.file vide)', data: null });
+		}
+		const result = await userModel.getCover(req.user.id);
 		if (result.length) {
-			await userModel.delCover(result[0].id, req.user.id)
+			await userModel.delCover(result[0].id, req.user.id);
 		}
 		// Always store as base64 in `data` and set `link` to 'false'
-		const mime = req.file?.mimetype || 'image/png'
-		const data = req.file ? `data:${mime};base64,${req.file.buffer.toString('base64')}` : null
-		const link = 'false'
+		const mime = req.file.mimetype || 'image/png';
+		const data = `data:${mime};base64,${req.file.buffer.toString('base64')}`;
+		const link = 'false';
 		// Insérer la nouvelle cover
-		await userModel.insertImages({ id: req.user.id, link, data, profile: false, cover: true })
+		await userModel.insertImages({ id: req.user.id, link, data, profile: false, cover: true });
 		// Récupérer toutes les images à jour
-		const images = await userModel.getImages(req.user.id)
-		return res.json({ status: 'success', type: 'profile', message: 'Cover image updated', data: { images, user_id: req.user.id } })
+		const images = await userModel.getImages(req.user.id);
+		return res.json({ status: 'success', type: 'profile', message: 'Cover image updated', data: { images, user_id: req.user.id } });
 	} catch (err) {
-		return res.json({ status: 'error', type: 'profile', message: 'Fatal error', data: err })
+		console.error('Erreur uploadCover:', err);
+		return res.json({ status: 'error', type: 'profile', message: 'Erreur serveur: ' + (err.message || err), data: err });
 	}
 }
 
