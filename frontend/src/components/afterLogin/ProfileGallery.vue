@@ -20,7 +20,7 @@
       </h3>
       <div class="row q-gutter-md mt-4">
         <div
-          v-for="image in props.images || []"
+          v-for="image in paginatedImages"
           :key="image.id"
           class="col-xs-12 col-sm-6 col-md-4 img_container"
         >
@@ -35,8 +35,11 @@
             @click="deleteImg(image)"
           >
           </q-btn>
-          <img :src="getImageSrc(image || {})" class="image full-width" />
+          <img :src="getImageSrc(image || {})" class="image full-width" loading="lazy" />
         </div>
+      </div>
+      <div class="row justify-center q-mt-md" v-if="canShowMore">
+        <q-btn color="primary" label="Show more" @click="showMore" />
       </div>
       <AlertView :alert="alert" />
     </q-page-container>
@@ -58,6 +61,11 @@ const user = computed(() => store.getters.user)
 const alert = ref({ state: false, color: '', text: '' })
 const username = ref('')
 const photoInputRef = ref(null)
+const page = ref(1)
+const pageSize = 12
+const paginatedImages = computed(() => (props.images || []).slice(0, page.value * pageSize))
+const canShowMore = computed(() => (props.images || []).length > paginatedImages.value.length)
+const showMore = () => { page.value++ }
 if (props.userToto?.username ?? false) {
   username.value = props.userToto.username
 } else {

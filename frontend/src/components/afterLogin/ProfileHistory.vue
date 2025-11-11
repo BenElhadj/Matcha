@@ -2,19 +2,15 @@
   <q-page class="q-pa-lg">
     <q-page-container>
       <h1 style="margin-top: -40px; text-align: center">History</h1>
-      <h3 style="margin-top: -50px; margin-bottom: 20px; text-align: center">
-        {{ user.username }}
-      </h3>
-
       <q-timeline align="top" label="Loose" center class="timeline_container q-gutter-md">
         <q-timeline color="secondary">
           <q-timeline-entry heading style="margin: 10px; text-align: center">
             Her you can see all your history of actions on the website
             <br /><br />
           </q-timeline-entry>
-
           <q-timeline-entry
-            v-for="(entry, i) in history"
+            v-for="(entry, i) in allHistory"
+            :key="entry.id || i"
             :title="getHistoryAction(entry.type, entry.first_name, entry.last_name)"
             :subtitle="moment(entry.created_at).format('D MMMM, YYYY, h:mm A')"
             :right="true"
@@ -29,49 +25,31 @@
               {{ moment(entry.created_at).fromNow() }}
             </q-item-section>
           </q-timeline-entry>
-
-          <q-timeline-entry
-            :subtitle="!moreToLoad ? 'you can\'t see more history' : null"
-            :title="
-              moreToLoad
-                ? 'You can show more history'
-                : 'you created your profile on ' +
-                  moment(user.created_at).format('D MMMM, YYYY, h:mm A')
-            "
-            side="left"
-          />
         </q-timeline>
+        <q-btn
+          v-if="canShowMore"
+          label="Show more"
+          color="primary"
+          text
+          rounded
+          class="my-4"
+          @click="showMore"
+        />
       </q-timeline>
-      <q-btn
-        v-if="moreToLoad"
-        label="Show more"
-        color="primary"
-        text
-        rounded
-        class="my-4"
-        @click="increaseLimit"
-      />
     </q-page-container>
   </q-page>
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
-import { useStore } from 'vuex'
-import { useRoute, useRouter } from 'vue-router'
+import { computed } from 'vue'
+import { useRouter } from 'vue-router'
 import utility from '@/utility.js'
 import moment from 'moment'
-import axios from 'axios'
 
-const store = useStore()
-const route = useRoute()
+const props = defineProps({ history: Array, total: Number })
+const emit = defineEmits(['fetch-more'])
 const router = useRouter()
-const limit = ref(25)
-const user = computed(() => store.getters.user)
 const getNotifIcon = utility.getNotifIcon
-const allHistory = ref([])
-const fromNow = utility.fromNow
-const formatTime = utility.formatTime
 const base = import.meta.env.BASE_URL || '/'
 const defaultProfileTxt = `${base}default/defaut_profile.txt`
 const getFullPath = utility.getFullPath
@@ -80,44 +58,12 @@ const historyImg = (img) =>
     ? utility.getImageSrc(img, utility.getCachedDefault?.('profile') || defaultProfileTxt)
     : getFullPath(img)
 const getHistoryAction = utility.getHistoryAction
-const getHistory = async () => {
-  try {
-    const token = user.value.token || localStorage.getItem('token')
-    const url = `${import.meta.env.VITE_APP_API_URL}/api/browse/allhistory`
-    const headers = { 'x-auth-token': token }
-    const result = await axios.get(url, { headers })
-    allHistory.value = result.data
-  } catch (err) {
-    console.error('err history in frontend/ProfileHistory.vue ===> ', err)
-  }
-}
-
-getHistory()
-
+const allHistory = computed(() => Array.isArray(props.history) ? props.history : [])
+const totalHistory = computed(() => typeof props.total === 'number' ? props.total : 0)
+const canShowMore = computed(() => allHistory.value.length < totalHistory.value)
+const showMore = () => emit('fetch-more')
 const redirectToUser = (hisId) => {
-  if (hisId === user.value.id || hisId === user.value._id) {
-    router.push('/')
-  } else {
-    router.push(`/user/${hisId}`)
-  }
-}
-
-const history = computed(() => {
-  const arr = Array.isArray(allHistory.value) ? allHistory.value : []
-  return arr.filter((cur) => !arr.includes(cur.id)).slice(0, limit.value)
-})
-
-const moreToLoad = computed(() => {
-  const arr = Array.isArray(allHistory.value) ? allHistory.value : []
-  return limit.value < arr.length - 1
-})
-
-const increaseLimit = () => {
-  if (limit.value + 24 < allHistory.value.length) {
-    limit.value += 25
-  } else {
-    limit.value = allHistory.value.length - 1
-  }
+  router.push(`/user/${hisId}`)
 }
 </script>
 

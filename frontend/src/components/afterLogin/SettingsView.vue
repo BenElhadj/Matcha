@@ -1,6 +1,6 @@
 <template>
   <q-page class="page-container">
-    <q-page-container v-if="loaded">
+  <q-page-container v-if="user && user.username">
       <div>
         <div class="profile__cover">
           <img :src="coverPhoto" alt="Cover Photo" class="cover__img" />
@@ -82,7 +82,7 @@
           <q-separator spacing class="separator-margin"></q-separator>
 
           <q-tab-panels v-model="activeTab" animated class="bg-grey-2 text-black">
-            <q-tab-panel name="tab-profile">
+            <q-tab-panel name="tab-profile" v-if="activeTab === 'tab-profile'">
               <profile-form
                 ref="form"
                 :user="user"
@@ -91,15 +91,19 @@
               ></profile-form>
             </q-tab-panel>
 
-            <q-tab-panel name="tab-photo">
+            <q-tab-panel name="tab-photo" v-if="activeTab === 'tab-photo'">
               <profile-gallery :images="filteredImages"></profile-gallery>
             </q-tab-panel>
 
-            <q-tab-panel name="tab-history">
-              <profile-history></profile-history>
+            <q-tab-panel name="tab-history" v-if="activeTab === 'tab-history'">
+              <profile-history
+                :history="history"
+                :total="historyTotal"
+                @fetch-more="fetchMoreHistory"
+              />
             </q-tab-panel>
 
-            <q-tab-panel name="tab-setting">
+            <q-tab-panel name="tab-setting" v-if="activeTab === 'tab-setting'">
               <profile-settings></profile-settings>
             </q-tab-panel>
           </q-tab-panels>
@@ -107,7 +111,7 @@
       </div>
       <AlertView :alert="alert"></AlertView>
     </q-page-container>
-    <LoaderView v-else />
+  <LoaderView v-else />
   </q-page>
 </template>
 
@@ -121,7 +125,7 @@ import ProfileForm from '@/components/afterLogin/ProfileForm.vue'
 import ProfileSettings from '@/components/afterLogin/ProfileSettings.vue'
 import { getImageSrc } from '@/utility.js'
 import ProfileGallery from '@/components/afterLogin/ProfileGallery.vue'
-import ProfileHistory from '@/components/afterLogin/ProfileHistory.vue'
+import ProfileHistory from './ProfileHistory.vue'
 
 import axios from 'axios'
 import { useStore } from 'vuex'
@@ -130,7 +134,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 const store = useStore()
 const user = ref(store.getters.user)
 const error = ref(null)
-const loaded = ref(false)
+// loaded supprimé, on se base sur user du store
 const activeTab = ref('tab-profile')
 const coverPhoto = ref(store.getters.coverPhoto)
 const profileImage = ref(store.getters.profileImage)
@@ -263,47 +267,63 @@ const updateUser = async () => {
   }
 }
 
-onMounted(async () => {
-  const token = user.value.token || localStorage.getItem('token')
-  if (token) {
-    try {
-      // Vérifie la connexion
-      const urlAuth = `${import.meta.env.VITE_APP_API_URL}/api/auth/isloggedin`
-      const headers = { 'x-auth-token': token }
-      const resAuth = await axios.get(urlAuth, { headers })
-      if (!resAuth.data.msg) {
-        // Recharge les infos utilisateur
-        const urlUser = `${import.meta.env.VITE_APP_API_URL}/api/users/show`
-        const resUser = await axios.post(urlUser, {}, { headers })
-        if (resUser.data && resUser.data.user) {
-          user.value = resUser.data.user
-          store.commit('updateUser', resUser.data.user)
-          // Recharge les images
-          const base = import.meta.env.BASE_URL || '/'
-          const coverFallback =
-            (utility.getCachedDefault && utility.getCachedDefault('cover')) ||
-            `${base}default/defaut_couverture.txt`
-          const profileFallback =
-            (utility.getCachedDefault && utility.getCachedDefault('profile')) ||
-            `${base}default/defaut_profile.txt`
-          coverPhoto.value = getImageSrc(
-            user.value.images?.find((img) => img.cover),
-            coverFallback
-          )
-          profileImage.value = getImageSrc(
-            user.value.images?.find((img) => img.profile),
-            profileFallback
-          )
-        }
-        loaded.value = true
-        return
-      }
-    } catch (err) {
-      console.error('Got error here --> ', err)
+const history = ref([])
+const historyTotal = ref(0)
+const historyOffset = ref(0)
+const historyLimit = 20
+
+const fetchUser = async () => {
+  try {
+    const token = user.value.token || localStorage.getItem('token')
+    const headers = { 'x-auth-token': token }
+    const url = `${import.meta.env.VITE_APP_API_URL || ''}/api/users/show`
+    const { data } = await axios.post(url, {}, { headers })
+    if (data && data.user) {
+      user.value = data.user
+      store.commit('updateUser', data.user)
     }
+  } catch (e) {
+    // handle error
   }
-  // Fonction robuste pour l'affichage des images
-  // getImageSrc replaced by getValidImageSrc
+}
+
+
+const fetchHistory = async (reset = false) => {
+  try {
+    const token = user.value.token || localStorage.getItem('token')
+    const headers = { 'x-auth-token': token }
+    const offset = reset ? 0 : historyOffset.value
+    const url = `${import.meta.env.VITE_APP_API_URL || ''}/api/browse/allhistory?offset=${offset}&limit=${historyLimit}`
+    const { data } = await axios.get(url, { headers })
+    if (data && data.history) {
+      if (reset) {
+        history.value = data.history
+      } else {
+        history.value = [...history.value, ...data.history]
+      }
+      historyTotal.value = data.total
+      historyOffset.value = history.value.length
+    }
+  } catch (e) {
+    // handle error
+  }
+}
+
+const fetchMoreHistory = () => {
+  fetchHistory(false)
+}
+
+onMounted(async () => {
+  // Si user déjà dans le store, on affiche direct
+  if (user.value && user.value.username) {
+    // fetch en arrière-plan pour update
+    fetchUser()
+    fetchHistory(true)
+  } else {
+    // fallback: premier chargement, on attend le fetch
+    await fetchUser()
+    await fetchHistory(true)
+  }
 })
 
 const syncUser = (updatedUser) => {
