@@ -7,15 +7,33 @@ const fixImageData = async (req, res) => {
 		return res.json({ status: 'error', type: 'profile', message: 'Requête invalide', data: null });
 	}
 	try {
-		// On ne modifie que si l'image appartient à l'utilisateur
-		const images = await require('../models/userModel').getImagesById(id, req.user.id);
-		if (!images.length) {
-			return res.json({ status: 'error', type: 'profile', message: 'Image non trouvée', data: null });
+		// Nettoyage du base64 (on garde un seul préfixe, on retire les espaces)
+		let cleanData = data.trim();
+		if (cleanData.startsWith('data:image/')) {
+			const match = cleanData.match(/^(data:image\/\w+;base64,)+/);
+			if (match && match[0].length > 0) {
+				const base64 = cleanData.replace(/^(data:image\/\w+;base64,)+/, '');
+				cleanData = `${match[0].split(',')[0]},${base64.replace(/\s+/g, '')}`;
+			} else {
+				const parts = cleanData.split(',');
+				if (parts.length > 1) {
+					cleanData = `${parts[0]},${parts.slice(1).join(',').replace(/\s+/g, '')}`;
+				}
+			}
+		} else {
+			cleanData = `data:image/png;base64,${cleanData.replace(/\s+/g, '')}`;
 		}
-		// Correction du champ data
+
+		// Correction directe en base, vérifie l'appartenance et update en une seule requête
 		const db = require('../config/database');
-		await db.query('UPDATE images SET data = $1 WHERE id = $2 AND user_id = $3', [data, id, req.user.id]);
-		return res.json({ status: 'success', message: 'Image corrigée', data: { id, data } });
+		const result = await db.query(
+			'UPDATE images SET data = $1 WHERE id = $2 AND user_id = $3 RETURNING id',
+			[cleanData, id, req.user.id]
+		);
+		if (!result.rowCount) {
+			return res.json({ status: 'error', type: 'profile', message: 'Image non trouvée ou non autorisée', data: null });
+		}
+		return res.json({ status: 'success', message: 'Image corrigée', data: { id, data: cleanData } });
 	} catch (err) {
 		return res.json({ status: 'error', type: 'profile', message: 'Erreur serveur', data: err });
 	}
@@ -23,7 +41,7 @@ const fixImageData = async (req, res) => {
 // Upload image de profil
 const uploadProfileImage = async (req, res) => {
 	if (!req.user.id)
-		return res.json({ status: 'error', type: 'auth', message: 'Not logged in', data: null })
+		return res.json({ status: 'error', type: 'auth', message: 'Not logged in', data: null });
 	try {
 		console.log('--- uploadProfileImage ---');
 		console.log('req.file:', req.file);
@@ -33,11 +51,28 @@ const uploadProfileImage = async (req, res) => {
 			mime = req.file.mimetype || 'image/png';
 			data = `data:${mime};base64,${req.file.buffer.toString('base64')}`;
 		} else if (req.body.data) {
-			// Correction stricte : ne préfixer que si ce n'est PAS déjà un data URI complet
-			if (typeof req.body.data === 'string' && req.body.data.trim().startsWith('data:image/')) {
-				data = req.body.data.trim();
+			let incoming = req.body.data;
+			if (typeof incoming === 'string') incoming = incoming.trim();
+			// Si déjà un data URI complet, on nettoie les espaces et on garde
+			if (typeof incoming === 'string' && incoming.startsWith('data:image/')) {
+				// Corrige les éventuels doubles préfixes
+				const match = incoming.match(/^(data:image\/\w+;base64,)+/);
+				if (match && match[0].length > 0) {
+					// On garde un seul préfixe
+					const base64 = incoming.replace(/^(data:image\/\w+;base64,)+/, '');
+					data = `${match[0].split(',')[0]},${base64.replace(/\s+/g, '')}`;
+				} else {
+					// On retire les espaces dans la partie base64
+					const parts = incoming.split(',');
+					if (parts.length > 1) {
+						data = `${parts[0]},${parts.slice(1).join(',').replace(/\s+/g, '')}`;
+					} else {
+						data = incoming;
+					}
+				}
 			} else {
-				data = `data:${mime};base64,${req.body.data}`;
+				// Si ce n'est pas un data URI, on force le préfixe et on nettoie les espaces
+				data = `data:${mime};base64,${String(incoming).replace(/\s+/g, '')}`;
 			}
 		} else {
 			return res.json({ status: 'error', type: 'profile', message: 'Aucun fichier ou base64 reçu', data: null });
@@ -354,15 +389,22 @@ const getUserImages = async (req, res) => {
     }
 };
 
+// Route DELETE compatible avec axios.delete (data dans req.body)
+const deleteImageHttp = async (req, res) => {
+	// Pour axios.delete, data est dans req.body (si body-parser le permet)
+	return deleteImage(req, res);
+}
+
 module.exports = {
 	updateProfile,
 	changeEmail,
 	changePassword,
 	uploadImages,
 	uploadCover,
-	deleteImage,
+	deleteImage, // POST legacy
+	deleteImageHttp, // DELETE moderne
 	blacklisted,
-		uploadProfileImage,
-		fixImageData,
-		getUserImages,
+	uploadProfileImage,
+	fixImageData,
+	getUserImages,
 }
