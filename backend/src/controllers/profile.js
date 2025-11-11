@@ -1,3 +1,25 @@
+// Correction du champ data d'une image existante (pour fixer les doubles préfixes)
+const fixImageData = async (req, res) => {
+	if (!req.user.id)
+		return res.json({ status: 'error', type: 'auth', message: 'Not logged in', data: null });
+	const { id, data } = req.body;
+	if (!id || !data || typeof data !== 'string') {
+		return res.json({ status: 'error', type: 'profile', message: 'Requête invalide', data: null });
+	}
+	try {
+		// On ne modifie que si l'image appartient à l'utilisateur
+		const images = await require('../models/userModel').getImagesById(id, req.user.id);
+		if (!images.length) {
+			return res.json({ status: 'error', type: 'profile', message: 'Image non trouvée', data: null });
+		}
+		// Correction du champ data
+		const db = require('../config/database');
+		await db.query('UPDATE images SET data = $1 WHERE id = $2 AND user_id = $3', [data, id, req.user.id]);
+		return res.json({ status: 'success', message: 'Image corrigée', data: { id, data } });
+	} catch (err) {
+		return res.json({ status: 'error', type: 'profile', message: 'Erreur serveur', data: err });
+	}
+};
 // Upload image de profil
 const uploadProfileImage = async (req, res) => {
 	if (!req.user.id)
@@ -330,4 +352,5 @@ module.exports = {
 	deleteImage,
 	blacklisted,
 	uploadProfileImage
+  ,fixImageData
 }
