@@ -335,7 +335,10 @@ const deleteImage = async (req, res) => {
 	if (!req.body.id || isNaN(req.body.id))
 		return res.json({ status: 'error', type: 'profile', message: 'Invalid request', data: null })
 	try {
-		const result = await userModel.getImagesById(req.body.id, req.user.id)
+		const imageId = parseInt(req.body.id, 10);
+		const userId = req.user.id;
+		console.log('[deleteImage] id:', imageId, 'user_id:', userId);
+		const result = await userModel.getImagesById(imageId, userId);
 		if (result.length) {
 			// Only unlink if link is a real local filename
 			if (result[0].link && result[0].link !== 'false' && !isExternal(result[0].link)) {
@@ -345,15 +348,16 @@ const deleteImage = async (req, res) => {
 					return res.json({ status: 'error', type: 'profile', message: 'Fatal error', data: err })
 				}
 			}
-			const delRes = await userModel.delImage(req.body.id, req.user.id)
+			const delRes = await userModel.delImage(imageId, userId);
+			console.log('[deleteImage] delRes:', delRes);
 			if (!req.body.profile) {
-				await userModel.setImages(req.user.id)
+				await userModel.setImages(userId);
 			}
 			if (delRes)
 				return res.json({ status: 'success', type: 'profile', message: 'Image deleted', data: null })
-			return res.json({ status: 'error', type: 'profile', message: 'Something went wrong', data: null })
+			return res.json({ status: 'error', type: 'profile', message: `Suppression échouée (id: ${imageId}, user_id: ${userId})`, data: null })
 		} else {
-			return res.json({ status: 'error', type: 'profile', message: 'Something went wrong', data: null })
+			return res.json({ status: 'error', type: 'profile', message: `Image non trouvée pour suppression (id: ${imageId}, user_id: ${userId})`, data: null })
 		}
 	} catch (err) {
 		return res.json({ status: 'error', type: 'profile', message: 'Fatal error', data: err })
