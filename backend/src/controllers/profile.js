@@ -331,6 +331,7 @@ const uploadCover = async (req, res) => {
 // DELETE IMAGES
 
 const deleteImage = async (req, res) => {
+	console.log('=== DELETE IMAGE ROUTE CALLED ===');
 	if (!req.user.id)
 		return res.json({ status: 'error', type: 'auth', message: 'Not logged in', data: null })
 	if (!req.body.id || isNaN(req.body.id))
