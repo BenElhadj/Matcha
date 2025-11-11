@@ -170,6 +170,7 @@ const updateProfile = async (req, res) => {
 							try {
 								await tagsModel.insertTags(element)
 							} catch (err) {
+								console.error('[deleteImage] Fatal error:', err);
 								return res.json({ status: 'error', type: 'profile', message: 'Fatal error', data: err })
 							}
 						}
