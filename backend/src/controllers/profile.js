@@ -188,30 +188,25 @@ const uploadImages = async (req, res) => {
 	if (!req.user.id)
 		return res.json({ status: 'error', type: 'auth', message: 'Not logged in', data: null })
 	try {
-		const images = await userModel.getImages(req.user.id)
-		if (images.length < 5) {
-			// Always store as base64 in `data` and set `link` to 'false'
-			const mime = req.file?.mimetype || 'image/png'
-			const data = req.file ? `data:${mime};base64,${req.file.buffer.toString('base64')}` : null
-			const link = 'false'
-			let user = {
-				id: req.user.id,
-				link,
-				data,
-				profile: false,
-				cover: false
-			}
-			try {
-				await userModel.insertImages(user)
-			} catch (dbErr) {
-				return res.json({ status: 'error', type: 'profile', message: 'Erreur insertion DB', data: dbErr })
-			}
-			// Récupérer toutes les images à jour
-			const newImages = await userModel.getImages(req.user.id)
-			return res.json({ status: 'success', type: 'profile', message: 'Image Updated', data: { images: newImages, user_id: req.user.id } })
-		} else {
-			return res.json({ status: 'error', type: 'profile', message: 'User already has 5 photos', data: null })
+		// Always store as base64 in `data` and set `link` to 'false'
+		const mime = req.file?.mimetype || 'image/png'
+		const data = req.file ? `data:${mime};base64,${req.file.buffer.toString('base64')}` : null
+		const link = 'false'
+		let user = {
+			id: req.user.id,
+			link,
+			data,
+			profile: false,
+			cover: false
 		}
+		try {
+			await userModel.insertImages(user)
+		} catch (dbErr) {
+			return res.json({ status: 'error', type: 'profile', message: 'Erreur insertion DB', data: dbErr })
+		}
+		// Récupérer toutes les images à jour
+		const newImages = await userModel.getImages(req.user.id)
+		return res.json({ status: 'success', type: 'profile', message: 'Image Updated', data: { images: newImages, user_id: req.user.id } })
 	} catch (err) {
 		return res.json({ status: 'error', type: 'profile', message: 'Fatal error', data: err })
 	}
