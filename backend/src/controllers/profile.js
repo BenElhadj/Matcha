@@ -11,11 +11,10 @@ const uploadProfileImage = async (req, res) => {
 			mime = req.file.mimetype || 'image/png';
 			data = `data:${mime};base64,${req.file.buffer.toString('base64')}`;
 		} else if (req.body.data) {
-			// Si le frontend envoie déjà un data URI complet
-			if (req.body.data.startsWith('data:')) {
-				data = req.body.data;
+			// Correction : si déjà un data URI, on ne touche pas
+			if (typeof req.body.data === 'string' && req.body.data.trim().startsWith('data:image')) {
+				data = req.body.data.trim();
 			} else {
-				// Sinon, on suppose que c'est du base64 pur
 				data = `data:${mime};base64,${req.body.data}`;
 			}
 		} else {
@@ -204,8 +203,8 @@ const uploadImages = async (req, res) => {
 			mime = req.file.mimetype || 'image/png';
 			data = `data:${mime};base64,${req.file.buffer.toString('base64')}`;
 		} else if (req.body.data) {
-			if (req.body.data.startsWith('data:')) {
-				data = req.body.data;
+			if (typeof req.body.data === 'string' && req.body.data.trim().startsWith('data:image')) {
+				data = req.body.data.trim();
 			} else {
 				data = `data:${mime};base64,${req.body.data}`;
 			}
@@ -247,8 +246,8 @@ const uploadCover = async (req, res) => {
 			mime = req.file.mimetype || 'image/png';
 			data = `data:${mime};base64,${req.file.buffer.toString('base64')}`;
 		} else if (req.body.data) {
-			if (req.body.data.startsWith('data:')) {
-				data = req.body.data;
+			if (typeof req.body.data === 'string' && req.body.data.trim().startsWith('data:image')) {
+				data = req.body.data.trim();
 			} else {
 				data = `data:${mime};base64,${req.body.data}`;
 			}
