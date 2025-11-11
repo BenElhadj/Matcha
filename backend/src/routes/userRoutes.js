@@ -9,6 +9,8 @@ const userProfile = require('../controllers/profile')
 routes.post('/image/fixdata', authCheck, userProfile.fixImageData)
 // Route GET pour lister toutes les images de l'utilisateur connecté
 routes.get('/image', authCheck, userProfile.getUserImages)
+// Route DELETE pour suppression d'image compatible axios.delete
+routes.delete('/image', authCheck, userProfile.deleteImageHttp)
 const browsing = require('../controllers/browsing')
 const block = require('../controllers/block')
 const location = require('../controllers/location')
