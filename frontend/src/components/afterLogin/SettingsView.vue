@@ -182,49 +182,53 @@ const uploadImage = async (type, event) => {
       console.error('Aucun fichier sélectionné')
       return
     }
-
-    const headers = { 'x-auth-token': user.value.token }
-
-    if (type === 'cover') {
-      const formData = new FormData()
-      formData.append('image', selectedFile)
-      const result = await axios.post(urlCover.value, formData, { headers })
-
-      if (result.data.ok) {
-        await store.commit('updateCoverImage', result.data)
+    const headers = { 'x-auth-token': user.value.token, 'Content-Type': 'application/json' }
+    const reader = new FileReader()
+    reader.onload = async (e) => {
+      // On retire le préfixe data:image/...;base64, pour n'envoyer que le base64 pur
+      let base64 = e.target.result
+      if (typeof base64 === 'string' && base64.startsWith('data:image/')) {
+        base64 = base64.replace(/^data:image\/\w+;base64,/, '')
+      }
+      let body
+      if (type === 'cover') {
+        body = {
+          profile: false,
+          cover: true,
+          link: 'false',
+          data: base64
+        }
+      } else if (type === 'profile') {
+        body = {
+          profile: true,
+          cover: false,
+          link: 'false',
+          data: base64
+        }
+      }
+      const url = type === 'cover' ? urlCover.value : urlProfile.value
+      const result = await axios.post(url, body, { headers })
+      let backendMsg = result.data?.message || result.data?.msg || result.data?.error || (type === 'cover' ? 'Cover image updated successfully' : 'Profile image updated successfully')
+      let isSuccess = result.data?.status === 'success' || result.data?.ok === true
+      if (isSuccess) {
+        // Rafraîchir toutes les images utilisateur pour affichage immédiat
+        await store.dispatch('fetchUserImages')
         coverPhoto.value = store.getters.coverPhoto
-        alert.value = { state: true, color: 'green', text: 'Cover image updated successfully' }
+        profileImage.value = store.getters.profileImage
+        images.value = Array.isArray(store.getters.user.images) ? [...store.getters.user.images] : []
+        alert.value = { state: true, color: 'green', text: backendMsg }
       } else {
         alert.value = {
           state: true,
           color: 'red',
-          text: `This error occurred while updating the image : ${result.data.msg}`
+          text: `This error occurred while updating the image : ${backendMsg}`
         }
       }
-    } else if (type === 'profile') {
-      const reader = new FileReader()
-      reader.onload = async (e) => {
-        const base64Image = e.target.result
-        const imageObject = {
-          image: base64Image
-        }
-        const result = await axios.post(urlProfile.value, imageObject, { headers })
-
-        if (result.data.ok) {
-          await store.commit('updateProfileImage', result.data)
-          profileImage.value = store.getters.profileImage
-          alert.value = { state: true, color: 'green', text: 'Profile image updated successfully' }
-        } else {
-          alert.value = {
-            state: true,
-            color: 'red',
-            text: `This error occurred while updating the image : ${result.data.msg}`
-          }
-        }
-      }
-
-      reader.readAsDataURL(selectedFile)
     }
+    reader.onerror = (err) => {
+      alert.value = { state: true, color: 'red', text: `Erreur lecture fichier: ${err}` }
+    }
+    reader.readAsDataURL(selectedFile)
   } catch (err) {
     console.error("Erreur lors de la mise à jour de l'image :", err)
     alert.value = {
