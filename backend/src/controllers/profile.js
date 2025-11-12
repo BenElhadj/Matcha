@@ -78,13 +78,13 @@ const uploadProfileImage = async (req, res) => {
 			return res.json({ status: 'error', type: 'profile', message: 'Aucun fichier ou base64 reçu', data: null });
 		}
 			const link = 'false';
-			// Mettre tous les cover à 0 (pour n'avoir qu'une seule cover active)
-			await userModel.updateCoverPic(req.user.id);
-			// Insérer la nouvelle image de profil comme cover uniquement
-			await userModel.insertImages({ id: req.user.id, link, data, profile: false, cover: true });
+			// Mettre tous les profile à 0 (pour n'avoir qu'un seul avatar actif)
+			await userModel.updateProfilePic(req.user.id);
+			// Insérer la nouvelle image de profil comme avatar uniquement
+			await userModel.insertImages({ id: req.user.id, link, data, profile: true, cover: false });
 			// Récupérer toutes les images à jour
 			const images = await userModel.getImages(req.user.id);
-			return res.json({ status: 'success', type: 'profile', message: 'Image de couverture (avatar) ajoutée', data: { images, user_id: req.user.id } });
+			return res.json({ status: 'success', type: 'profile', message: 'Photo de profil (avatar) ajoutée', data: { images, user_id: req.user.id } });
 	} catch (err) {
 		console.error('Erreur uploadProfileImage:', err);
 		return res.json({ status: 'error', type: 'profile', message: 'Erreur serveur: ' + (err.message || err), data: err });
