@@ -374,7 +374,19 @@ const deleteImage = async (req, res) => {
 	   } catch (err) {
 		   // Toujours renvoyer la liste à jour même en cas d'erreur
 		   const images = await require('../models/userModel').getImages(req.user.id);
-		   return res.json({ status: 'error', type: 'profile', message: 'Erreur serveur lors de la suppression', data: { images } })
+		   // Vérifie si l'image existe encore dans la liste à jour
+		   const imageId = req.body && req.body.id ? parseInt(req.body.id, 10) : null;
+		   const imageStillExists = imageId && images.some(img => img.id === imageId);
+		   let msg;
+		   let status;
+		   if (!imageStillExists) {
+			   msg = "Image supprimée ou déjà absente.";
+			   status = 'success';
+		   } else {
+			   msg = "Erreur serveur lors de la suppression";
+			   status = 'error';
+		   }
+		   return res.json({ status, type: 'profile', message: msg, data: { images } })
 	   }
 }
 
