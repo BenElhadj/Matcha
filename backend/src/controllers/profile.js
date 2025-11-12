@@ -49,16 +49,18 @@ const uploadProfileImage = async (req, res) => {
 		let mime = 'image/png';
 		if (req.file) {
 			mime = req.file.mimetype || 'image/png';
-			data = `data:${mime};base64,${req.file.buffer.toString('base64')}`;
+			   data = req.file.buffer.toString('base64');
 		} else if (req.body.data) {
 			let incoming = req.body.data;
 			if (typeof incoming === 'string') incoming = incoming.trim();
-			// Supprime tout préfixe data:image/*;base64, pour ne garder que la base64 brute
-			if (typeof incoming === 'string') {
-				data = incoming.replace(/^data:image\/[a-zA-Z0-9+]+;base64,/, '').replace(/\s+/g, '');
-			} else {
-				data = '';
-			}
+			// Si déjà un data URI complet, on nettoie les espaces et on garde
+			   if (typeof incoming === 'string' && incoming.startsWith('data:image/')) {
+				   // On retire le préfixe data:image/...;base64, et les espaces
+				   data = incoming.replace(/^data:image\/\w+;base64,/, '').replace(/\s+/g, '');
+			   } else {
+				   // On nettoie juste les espaces
+				   data = String(incoming).replace(/\s+/g, '');
+			   }
 		} else {
 			return res.json({ status: 'error', type: 'profile', message: 'Aucun fichier ou base64 reçu', data: null });
 		}
@@ -244,13 +246,13 @@ const uploadImages = async (req, res) => {
 		let mime = 'image/png';
 		if (req.file) {
 			mime = req.file.mimetype || 'image/png';
-			data = req.file.buffer.toString('base64');
+			   data = req.file.buffer.toString('base64');
 		} else if (req.body.data) {
-			if (typeof req.body.data === 'string') {
-				data = req.body.data.trim().replace(/^data:image\/[a-zA-Z0-9+]+;base64,/, '').replace(/\s+/g, '');
-			} else {
-				data = '';
-			}
+			   if (typeof req.body.data === 'string' && req.body.data.trim().startsWith('data:image/')) {
+				   data = req.body.data.trim().replace(/^data:image\/\w+;base64,/, '').replace(/\s+/g, '');
+			   } else {
+				   data = String(req.body.data).replace(/\s+/g, '');
+			   }
 		} else {
 			return res.json({ status: 'error', type: 'profile', message: 'Aucun fichier ou base64 reçu', data: null });
 		}
@@ -287,13 +289,13 @@ const uploadCover = async (req, res) => {
 		let mime = 'image/png';
 		if (req.file) {
 			mime = req.file.mimetype || 'image/png';
-			data = req.file.buffer.toString('base64');
+			   data = req.file.buffer.toString('base64');
 		} else if (req.body.data) {
-			if (typeof req.body.data === 'string') {
-				data = req.body.data.trim().replace(/^data:image\/[a-zA-Z0-9+]+;base64,/, '').replace(/\s+/g, '');
-			} else {
-				data = '';
-			}
+			   if (typeof req.body.data === 'string' && req.body.data.trim().startsWith('data:image/')) {
+				   data = req.body.data.trim().replace(/^data:image\/\w+;base64,/, '').replace(/\s+/g, '');
+			   } else {
+				   data = String(req.body.data).replace(/\s+/g, '');
+			   }
 		} else {
 			return res.json({ status: 'error', type: 'profile', message: 'Aucun fichier ou base64 reçu', data: null });
 		}

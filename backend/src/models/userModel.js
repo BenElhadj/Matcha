@@ -167,8 +167,12 @@ const getImagesByUid = async (user_id) => {
 const insertImages = async (user) => {
     // Par défaut, image de galerie (profile=0, cover=0)
     // Accepts either link (URL) or data (base64)
+    // Conversion robuste des booléens (accepte true, 'true', 1, '1')
+    const toBool = v => v === true || v === 1 || v === '1' || v === 'true';
+    const profile = toBool(user.profile) ? 1 : 0;
+    const cover = toBool(user.cover) ? 1 : 0;
     const query = `INSERT INTO images (user_id, link, data, profile, cover) VALUES ($1, $2, $3, $4, $5) RETURNING *`;
-    const result = await db.query(query, [user.id, user.link || null, user.data || null, user.profile ? 1 : 0, user.cover ? 1 : 0]);
+    const result = await db.query(query, [user.id, user.link || null, user.data || null, profile, cover]);
     return result.rows[0];
 }
 
