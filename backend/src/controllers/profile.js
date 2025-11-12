@@ -260,11 +260,11 @@ const uploadImages = async (req, res) => {
 		// On récupère profile/cover du body (booléen ou string)
 		const isProfile = req.body.profile === true || req.body.profile === 'true' || req.body.profile === 1 || req.body.profile === '1';
 		const isCover = req.body.cover === true || req.body.cover === 'true' || req.body.cover === 1 || req.body.cover === '1';
-		// Si profile, on met à jour les anciennes images profile:true
+		// Si profile, on met TOUJOURS à jour les anciennes images profile:true (même s'il y en a déjà une)
 		if (isProfile) {
 			await require('../config/database').query('UPDATE images SET profile = false WHERE user_id = $1 AND profile = true', [req.user.id]);
 		}
-		// Si cover, on met à jour les anciennes images cover:true
+		// Si cover, on met TOUJOURS à jour les anciennes images cover:true
 		if (isCover) {
 			await require('../config/database').query('UPDATE images SET cover = false WHERE user_id = $1 AND cover = true', [req.user.id]);
 		}
