@@ -358,9 +358,11 @@ const deleteImage = async (req, res) => {
 			if (!req.body.profile) {
 				await userModel.setImages(userId);
 			}
+			// Récupérer la liste à jour après suppression
+			const images = await require('../models/userModel').getImages(userId);
 			if (delRes)
-				return res.json({ status: 'success', type: 'profile', message: 'Image deleted', data: null })
-			return res.json({ status: 'error', type: 'profile', message: `Suppression échouée (id: ${imageId}, user_id: ${userId})`, data: null })
+				return res.json({ status: 'success', type: 'profile', message: 'Image deleted', data: { images } })
+			return res.json({ status: 'error', type: 'profile', message: `Suppression échouée (id: ${imageId}, user_id: ${userId})`, data: { images } })
 		} else {
 			return res.json({ status: 'error', type: 'profile', message: `Image non trouvée pour suppression (id: ${imageId}, user_id: ${userId})`, data: null })
 		}
