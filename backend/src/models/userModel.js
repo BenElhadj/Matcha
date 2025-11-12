@@ -134,8 +134,8 @@ const isValidImage = (img) => {
 };
 
 const getImages = async (id) => {
-    // Correction : utiliser false pour les champs cover/profile (type BOOLEAN en SQL)
-    const query = `SELECT *, COALESCE(link, '') AS link, COALESCE(data, '') AS data FROM images WHERE user_id = $1 AND cover = false AND profile = false`;
+    // Correction : retourner toutes les images de l'utilisateur (profil, cover, galerie)
+    const query = `SELECT *, COALESCE(link, '') AS link, COALESCE(data, '') AS data FROM images WHERE user_id = $1`;
     const result = await db.query(query, [id]);
     return result.rows.filter(isValidImage).map(img => ({
         ...img,
