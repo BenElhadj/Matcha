@@ -30,11 +30,19 @@ export const user = {
     updateTags: (state, tags) => (state.user.tags = tags.map(cur => cur.text.toLowerCase()).join(',')),
 
     updateUser: (state, user) => {
-      state.user = user;
+      // Pour conserver la réactivité sur les propriétés, on assigne chaque champ
+      if (!state.user) state.user = {};
+      for (const key in user) {
+        state.user[key] = user[key];
+      }
+      // Si images n'est pas dans user, on garde l'ancien tableau
+      if (!user.images && state.user.images) {
+        user.images = state.user.images;
+      }
       try {
-        localStorage.setItem('user', JSON.stringify(user));
-        if (user.images) {
-          localStorage.setItem('user_images', JSON.stringify(user.images));
+        localStorage.setItem('user', JSON.stringify(state.user));
+        if (state.user.images) {
+          localStorage.setItem('user_images', JSON.stringify(state.user.images));
         }
       } catch (e) {
         console.error('Erreur lors de la sauvegarde user dans localStorage:', e);
@@ -188,19 +196,14 @@ export const user = {
   },
   actions: {
     fetchUserImages: async ({ commit, state }) => {
-      // Optimisation : ne refetch pas si déjà présent
-      if (state.user.images && state.user.images.length) return;
+      // Toujours rafraîchir les images depuis le backend (route /api/users/image)
       try {
         const token = state.user.token || localStorage.getItem('token')
-        const userId = state.user.id || JSON.parse(localStorage.getItem('user') || '{}').id
-        const url = `${import.meta.env.VITE_APP_API_URL}/api/users/show/${userId}`
+        const url = `${import.meta.env.VITE_APP_API_URL}/api/users/image`
         const headers = { 'x-auth-token': token }
         const res = await axios.get(url, { headers })
-        if (res.data && Array.isArray(res.data.images)) {
-          commit('updateUser', { ...state.user, images: res.data.images })
-        } else if (res.data && res.data.images) {
-          commit('updateUser', { ...state.user, images: [res.data.images] })
-        }
+        const images = res.data?.data?.images || []
+        commit('updateUser', { ...state.user, images })
       } catch (err) {
         console.error('Erreur lors du rafraîchissement des images utilisateur:', err)
       }

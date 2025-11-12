@@ -1,6 +1,6 @@
 <template>
   <q-page class="page-container">
-  <q-page-container v-if="user && user.username">
+    <q-page-container v-if="user && user.username">
       <div>
         <div class="profile__cover">
           <img :src="coverPhoto" alt="Cover Photo" class="cover__img" />
@@ -83,20 +83,22 @@
 
           <q-tab-panels v-model="activeTab" animated class="bg-grey-2 text-black">
             <q-tab-panel name="tab-profile" v-if="activeTab === 'tab-profile'">
-              <profile-form
+              <ProfileForm
                 ref="form"
                 :user="user"
                 @sync-user="syncUser"
                 @update-user="updateUser"
-              ></profile-form>
+              />
             </q-tab-panel>
 
             <q-tab-panel name="tab-photo" v-if="activeTab === 'tab-photo'">
-              <profile-gallery :images="filteredImages"></profile-gallery>
+              <ProfileGallery
+                :images="images"
+              />
             </q-tab-panel>
 
             <q-tab-panel name="tab-history" v-if="activeTab === 'tab-history'">
-              <profile-history
+              <ProfileHistory
                 :history="history"
                 :total="historyTotal"
                 @fetch-more="fetchMoreHistory"
@@ -104,35 +106,33 @@
             </q-tab-panel>
 
             <q-tab-panel name="tab-setting" v-if="activeTab === 'tab-setting'">
-              <profile-settings></profile-settings>
+              <ProfileSettings />
             </q-tab-panel>
           </q-tab-panels>
         </q-card>
       </div>
-      <AlertView :alert="alert"></AlertView>
+      <AlertView :alert="alert" />
     </q-page-container>
-  <LoaderView v-else />
+    <LoaderView v-else />
   </q-page>
 </template>
 
 <script setup>
+import ProfileForm from '@/components/afterLogin/ProfileForm.vue'
+import ProfileGallery from '@/components/afterLogin/ProfileGallery.vue'
+import ProfileHistory from '@/components/afterLogin/ProfileHistory.vue'
+import ProfileSettings from '@/components/afterLogin/ProfileSettings.vue'
 import AlertView from '@/views/AlertView.vue'
 import LoaderView from '@/views/LoaderView.vue'
 import utility from '@/utility.js'
-import ProfileEditor from '@/components/afterLogin/ProfileEditor.vue'
-import ProfileTabs from '@/components/afterLogin/ProfileTabs.vue'
-import ProfileForm from '@/components/afterLogin/ProfileForm.vue'
-import ProfileSettings from '@/components/afterLogin/ProfileSettings.vue'
 import { getImageSrc } from '@/utility.js'
-import ProfileGallery from '@/components/afterLogin/ProfileGallery.vue'
-import ProfileHistory from './ProfileHistory.vue'
-
 import axios from 'axios'
 import { useStore } from 'vuex'
 import { ref, computed, onMounted, watch } from 'vue'
 
 const store = useStore()
-const user = ref(store.getters.user)
+const user = computed(() => store.getters.user)
+const images = ref([])
 const error = ref(null)
 // loaded supprimé, on se base sur user du store
 const activeTab = ref('tab-profile')
@@ -143,6 +143,15 @@ const alert = ref({
   color: '',
   text: ''
 })
+
+// Synchronise images avec user.images pour forcer la réactivité
+watch(
+  () => user.value && user.value.images,
+  (newImages) => {
+    images.value = Array.isArray(newImages) ? [...newImages] : []
+  },
+  { immediate: true, deep: true }
+)
 
 const fileInputProfile = ref('')
 const fileInputCover = ref('')
@@ -237,10 +246,7 @@ const changeTab = (tab) => {
   activeTab.value = tab
 }
 
-const filteredImages = computed(() => {
-  if (!user.value.images) return []
-  return user.value.images.filter((cur) => !cur.cover)
-})
+// Affichage de toutes les images sans filtrage
 
 const updateUser = async () => {
   try {
@@ -287,13 +293,14 @@ const fetchUser = async () => {
   }
 }
 
-
 const fetchHistory = async (reset = false) => {
   try {
     const token = user.value.token || localStorage.getItem('token')
     const headers = { 'x-auth-token': token }
     const offset = reset ? 0 : historyOffset.value
-    const url = `${import.meta.env.VITE_APP_API_URL || ''}/api/browse/allhistory?offset=${offset}&limit=${historyLimit}`
+    const url = `${
+      import.meta.env.VITE_APP_API_URL || ''
+    }/api/browse/allhistory?offset=${offset}&limit=${historyLimit}`
     const { data } = await axios.get(url, { headers })
     if (data && data.history) {
       if (reset) {
@@ -314,6 +321,8 @@ const fetchMoreHistory = () => {
 }
 
 onMounted(async () => {
+  // Toujours rafraîchir les images utilisateur
+  await store.dispatch('fetchUserImages')
   // Si user déjà dans le store, on affiche direct
   if (user.value && user.value.username) {
     // fetch en arrière-plan pour update

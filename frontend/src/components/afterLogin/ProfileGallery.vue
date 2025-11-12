@@ -20,7 +20,7 @@
       </h3>
       <div class="row q-gutter-md mt-4">
         <div
-          v-for="image in paginatedImages"
+          v-for="image in props.images"
           :key="image.id"
           class="col-xs-12 col-sm-6 col-md-4 img_container"
         >
@@ -37,10 +37,25 @@
           </q-btn>
           <img :src="getImageSrc(image || {})" class="image full-width" loading="lazy" />
         </div>
+        <!-- BOUTON + CSS POUR UPLOAD -->
+        <div 
+          class="col-xs-12 col-sm-6 col-md-4 img_container gallery-plus-container"
+          v-if="user.id.toString() === (props.userToto?.id ?? user.id).toString()"
+          >
+          <input
+            type="file"
+            id="gallery-upload"
+            ref="galleryInputRef"
+            accept="image/*"
+            @change="onGalleryPhotoChange"
+            style="display: none"
+          />
+          <div class="gallery-plus-btn" @click="onGalleryUploadClick">
+            <span class="plus-sign">+</span>
+          </div>
+        </div>
       </div>
-      <div class="row justify-center q-mt-md" v-if="canShowMore">
-        <q-btn color="primary" label="Show more" @click="showMore" />
-      </div>
+      <!-- Pagination supprimée : toutes les images sont affichées -->
       <AlertView :alert="alert" />
     </q-page-container>
   </q-page>
@@ -61,11 +76,7 @@ const user = computed(() => store.getters.user)
 const alert = ref({ state: false, color: '', text: '' })
 const username = ref('')
 const photoInputRef = ref(null)
-const page = ref(1)
-const pageSize = 12
-const paginatedImages = computed(() => (props.images || []).slice(0, page.value * pageSize))
-const canShowMore = computed(() => (props.images || []).length > paginatedImages.value.length)
-const showMore = () => { page.value++ }
+// Pagination supprimée : on affiche toutes les images reçues via props.images
 if (props.userToto?.username ?? false) {
   username.value = props.userToto.username
 } else {
@@ -118,6 +129,46 @@ const deleteImg = async (image) => {
     console.error('err deleteImg in frontend/ProfileGallery.vue ===> ', err)
   }
 }
+// Pour le bouton + (upload galerie)
+const galleryInputRef = ref(null)
+const onGalleryUploadClick = () => {
+  if (galleryInputRef.value) galleryInputRef.value.click()
+}
+const onGalleryPhotoChange = async (e) => {
+  const file = e.target.files[0]
+  if (!file) return
+  const formData = new FormData()
+  formData.append('image', file) // champ attendu par le backend
+  const token = user.value.token || localStorage.getItem('token')
+  const url = `${import.meta.env.VITE_APP_API_URL}/api/users/image`
+  try {
+    const res = await axios.post(url, formData, {
+      headers: {
+        'x-auth-token': token
+        // NE PAS mettre Content-Type, axios le gère pour FormData
+      }
+    })
+    // Message backend
+    let backendMsg =
+      res.data?.message || res.data?.msg || res.data?.error || 'Réponse inconnue du serveur'
+    let isSuccess = res.data?.status === 'success' || res.data?.ok === true
+    alert.value = {
+      state: true,
+      color: isSuccess ? 'green' : 'red',
+      text: backendMsg
+    }
+    if (isSuccess) {
+      await store.dispatch('fetchUserImages')
+    }
+  } catch (err) {
+    let backendMsg =
+      err?.response?.data?.message ||
+      err?.response?.data?.msg ||
+      err?.response?.data?.error ||
+      "Erreur lors de l'upload"
+    alert.value = { state: true, color: 'red', text: backendMsg }
+  }
+}
 </script>
 
 <style scoped>
@@ -136,5 +187,38 @@ const deleteImg = async (image) => {
   top: 0;
   right: 0;
   transform: translate(25%, -25%) scale(0.8);
+}
+</style>
+<style scoped>
+.gallery-plus-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+}
+.gallery-plus-btn {
+  width: 180px;
+  height: 220px;
+  border-radius: 15px;
+  background: #eee;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s;
+  font-size: 64px;
+  font-weight: bold;
+  color: #888;
+  border: 2px dashed #bbb;
+}
+.gallery-plus-btn:hover {
+  background: #e0e0e0;
+  color: #333;
+  border-color: #888;
+}
+.plus-sign {
+  font-size: 77px;
+  line-height: 5px;
+  user-select: none;
 }
 </style>
