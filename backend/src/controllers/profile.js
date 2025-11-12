@@ -332,43 +332,50 @@ const uploadCover = async (req, res) => {
 
 const deleteImage = async (req, res) => {
 	console.log('=== DELETE IMAGE ROUTE CALLED ===');
-	if (!req.user.id)
-		return res.json({ status: 'error', type: 'auth', message: 'Not logged in', data: null })
-	if (!req.body.id || isNaN(req.body.id))
-		return res.json({ status: 'error', type: 'profile', message: 'Invalid request', data: null })
-	try {
-	const imageId = parseInt(req.body.id, 10);
-	const userId = req.user.id;
-	// Log toutes les images de l'utilisateur avant suppression
-	const allImages = await require('../models/userModel').getImages(userId);
-	console.log('[deleteImage] Images en base pour user', userId, ':', allImages.map(img => ({id: img.id, link: img.link, data: img.data && img.data.substring(0,30)})));
-	console.log('[deleteImage] id:', imageId, 'user_id:', userId);
-	const result = await userModel.getImagesById(imageId, userId);
-		if (result.length) {
-			// Only unlink if link is a real local filename
-			if (result[0].link && result[0].link !== 'false' && !isExternal(result[0].link)) {
-				try {
-					await unlinkAsync(resolve(dirname(dirname(__dirname)), 'uploads', result[0].link))
-				} catch (err) {
-					return res.json({ status: 'error', type: 'profile', message: 'Fatal error', data: err })
-				}
-			}
-			const delRes = await userModel.delImage(imageId, userId);
-			console.log('[deleteImage] delRes:', delRes);
-			if (!req.body.profile) {
-				await userModel.setImages(userId);
-			}
-			// Récupérer la liste à jour après suppression
-			const images = await require('../models/userModel').getImages(userId);
-			if (delRes)
-				return res.json({ status: 'success', type: 'profile', message: 'Image deleted', data: { images } })
-			return res.json({ status: 'error', type: 'profile', message: `Suppression échouée (id: ${imageId}, user_id: ${userId})`, data: { images } })
-		} else {
-			return res.json({ status: 'error', type: 'profile', message: `Image non trouvée pour suppression (id: ${imageId}, user_id: ${userId})`, data: null })
-		}
-	} catch (err) {
-		return res.json({ status: 'error', type: 'profile', message: 'Fatal error', data: err })
-	}
+	   if (!req.user.id)
+		   return res.json({ status: 'error', type: 'auth', message: 'Not logged in', data: { images: [] } })
+	   if (!req.body.id || isNaN(req.body.id)) {
+		   const images = await require('../models/userModel').getImages(req.user.id);
+		   return res.json({ status: 'error', type: 'profile', message: 'Invalid request', data: { images } })
+	   }
+	   try {
+		   const imageId = parseInt(req.body.id, 10);
+		   const userId = req.user.id;
+		   const allImages = await require('../models/userModel').getImages(userId);
+		   const result = await userModel.getImagesById(imageId, userId);
+		   let fileError = null;
+		   if (result.length) {
+			   // Only unlink if link is a real local filename
+			   if (result[0].link && result[0].link !== 'false' && !isExternal(result[0].link)) {
+				   try {
+					   await unlinkAsync(resolve(dirname(dirname(__dirname)), 'uploads', result[0].link))
+				   } catch (err) {
+					   // Ne bloque pas la suppression en base, mais note l'erreur
+					   fileError = err;
+				   }
+			   }
+			   const delRes = await userModel.delImage(imageId, userId);
+			   if (!req.body.profile) {
+				   await userModel.setImages(userId);
+			   }
+			   // Récupérer la liste à jour après suppression
+			   const images = await require('../models/userModel').getImages(userId);
+			   if (delRes) {
+				   let msg = 'Image supprimée.';
+				   if (fileError) msg += ' (Fichier déjà supprimé ou erreur fichier, image supprimée en base)';
+				   return res.json({ status: 'success', type: 'profile', message: msg, data: { images } })
+			   }
+			   return res.json({ status: 'error', type: 'profile', message: `Suppression échouée (id: ${imageId}, user_id: ${userId})`, data: { images } })
+		   } else {
+			   // Image déjà supprimée ou inexistante, on renvoie la liste à jour
+			   const images = await require('../models/userModel').getImages(userId);
+			   return res.json({ status: 'error', type: 'profile', message: `Image déjà supprimée ou non trouvée (id: ${imageId}, user_id: ${userId})`, data: { images } })
+		   }
+	   } catch (err) {
+		   // Toujours renvoyer la liste à jour même en cas d'erreur
+		   const images = await require('../models/userModel').getImages(req.user.id);
+		   return res.json({ status: 'error', type: 'profile', message: 'Erreur serveur lors de la suppression', data: { images } })
+	   }
 }
 
 const blacklisted = async (req, res) => {
