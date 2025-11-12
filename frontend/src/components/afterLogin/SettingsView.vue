@@ -94,7 +94,9 @@
             <q-tab-panel name="tab-photo" v-if="activeTab === 'tab-photo'">
               <ProfileGallery
                 :images="images"
+                @update:images="onImagesUpdate"
               />
+
             </q-tab-panel>
 
             <q-tab-panel name="tab-history" v-if="activeTab === 'tab-history'">
@@ -152,7 +154,12 @@ watch(
   },
   { immediate: true, deep: true }
 )
-
+// Met à jour la liste d'images et le store quand la galerie change
+const onImagesUpdate = (newImages) => {
+  images.value = Array.isArray(newImages) ? [...newImages] : []
+  // Met à jour le store pour garder la cohérence globale
+  store.commit('updateUser', { ...user.value, images: images.value })
+}
 const fileInputProfile = ref('')
 const fileInputCover = ref('')
 const urlProfile = ref('')

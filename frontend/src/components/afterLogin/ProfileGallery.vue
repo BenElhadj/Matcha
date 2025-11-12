@@ -69,6 +69,9 @@ import { getImageSrc } from '../../utility.js'
 import axios from 'axios'
 import AlertView from '../../views/AlertView.vue'
 
+// Pour émettre un événement vers le parent (SettingsView)
+const emit = defineEmits(['update:images'])
+
 const store = useStore()
 const route = useRoute()
 const props = defineProps({ images: Array, userToto: Object })
@@ -112,21 +115,31 @@ const onUploadClick = () => {
 
 const deleteImg = async (image) => {
   try {
-    const url = `${import.meta.env.VITE_APP_API_URL}/api/users/image/del`
+    const url = `${import.meta.env.VITE_APP_API_URL}/api/users/image`
     const headers = { 'x-auth-token': user.value.token }
-    const data = {
-      id: image.id,
-      profile: image.profile
+    const data = { id: image.id }
+    // axios.delete accepte le body via l'option 'data'
+    const res = await axios.delete(url, { headers, data })
+    // Utilise la liste d'images retournée pour mettre à jour la galerie
+    if (res.data?.data?.images) {
+      emit('update:images', res.data.data.images)
     }
-    const res = await axios.post(url, data, { headers })
-    if (res.data.ok) {
-      await store.dispatch('delImg', image.id)
-      alert.value = { state: true, color: 'green', text: 'Photo has been removed' }
-    } else {
-      alert.value = { state: true, color: 'red', text: 'Oups.. something went wrong' }
+    alert.value = {
+      state: true,
+      color: res.data.status === 'success' ? 'green' : 'red',
+      text: res.data.message || (res.data.status === 'success' ? 'Photo supprimée !' : 'Erreur suppression')
     }
   } catch (err) {
-    console.error('err deleteImg in frontend/ProfileGallery.vue ===> ', err)
+    let backendMsg =
+      err?.response?.data?.message ||
+      err?.response?.data?.msg ||
+      err?.response?.data?.error ||
+      'Erreur lors de la suppression'
+    // Si le backend renvoie la liste d'images même en erreur, on la prend
+    if (err?.response?.data?.data?.images) {
+      emit('update:images', err.response.data.data.images)
+    }
+    alert.value = { state: true, color: 'red', text: backendMsg }
   }
 }
 // Pour le bouton + (upload galerie)
