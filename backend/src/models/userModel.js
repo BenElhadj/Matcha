@@ -207,6 +207,7 @@ const insertCover = async (user_id, imgName) => {
 const delImage = async (id, user_id) => {
     const query = `DELETE FROM images WHERE id = $1 AND user_id = $2`;
     const result = await db.query(query, [id, user_id]);
+    console.log(`[BACKEND][delImage] Suppression image id=${id}, user_id=${user_id}, lignes supprimées:`, result.rowCount);
     return result.rowCount;
 }
 

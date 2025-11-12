@@ -388,14 +388,16 @@ const blacklisted = async (req, res) => {
 
 // GET toutes les images de l'utilisateur connecté
 const getUserImages = async (req, res) => {
-    if (!req.user.id)
-        return res.json({ status: 'error', type: 'auth', message: 'Not logged in', data: null });
-    try {
-        const images = await require('../models/userModel').getImages(req.user.id);
-        return res.json({ status: 'success', data: { images } });
-    } catch (err) {
-        return res.json({ status: 'error', type: 'profile', message: 'Erreur serveur', data: err });
-    }
+	if (!req.user.id)
+		return res.json({ status: 'error', type: 'auth', message: 'Not logged in', data: null });
+	try {
+		const images = await require('../models/userModel').getImages(req.user.id);
+		console.log('[BACKEND][getUserImages] Images lues en BDD:', images.map(img => ({id: img.id, link: img.link, data: img.data && img.data.substring(0,30)})));
+		return res.json({ status: 'success', message: `Images récupérées (${images.length})`, data: { images } });
+	} catch (err) {
+		console.error('[BACKEND][getUserImages] Erreur:', err);
+		return res.json({ status: 'error', type: 'profile', message: 'Erreur serveur lors de la récupération des images', data: err });
+	}
 };
 
 // Route DELETE compatible avec axios.delete (data dans req.body)
