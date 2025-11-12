@@ -78,8 +78,8 @@ const uploadProfileImage = async (req, res) => {
 			return res.json({ status: 'error', type: 'profile', message: 'Aucun fichier ou base64 reçu', data: null });
 		}
 			const link = 'false';
-			// Mettre tous les profile à 0 (pour n'avoir qu'un seul avatar actif)
-			await userModel.updateProfilePic(req.user.id);
+			// Mettre toutes les images profile:true à false pour ce user
+			await require('../config/database').query('UPDATE images SET profile = false WHERE user_id = $1 AND profile = true', [req.user.id]);
 			// Insérer la nouvelle image de profil comme avatar uniquement
 			await userModel.insertImages({ id: req.user.id, link, data, profile: true, cover: false });
 			// Récupérer toutes les images à jour
@@ -312,10 +312,8 @@ const uploadCover = async (req, res) => {
 		} else {
 			return res.json({ status: 'error', type: 'profile', message: 'Aucun fichier ou base64 reçu', data: null });
 		}
-		const result = await userModel.getCover(req.user.id);
-		if (result.length) {
-			await userModel.delCover(result[0].id, req.user.id);
-		}
+		// Mettre toutes les images cover:true à false pour ce user
+		await require('../config/database').query('UPDATE images SET cover = false WHERE user_id = $1 AND cover = true', [req.user.id]);
 		const link = 'false';
 		// Insérer la nouvelle cover
 		await userModel.insertImages({ id: req.user.id, link, data, profile: false, cover: true });
