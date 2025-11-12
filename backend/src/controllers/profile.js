@@ -246,23 +246,34 @@ const uploadImages = async (req, res) => {
 		let mime = 'image/png';
 		if (req.file) {
 			mime = req.file.mimetype || 'image/png';
-			   data = req.file.buffer.toString('base64');
+			data = req.file.buffer.toString('base64');
 		} else if (req.body.data) {
-			   if (typeof req.body.data === 'string' && req.body.data.trim().startsWith('data:image/')) {
-				   data = req.body.data.trim().replace(/^data:image\/\w+;base64,/, '').replace(/\s+/g, '');
-			   } else {
-				   data = String(req.body.data).replace(/\s+/g, '');
-			   }
+			if (typeof req.body.data === 'string' && req.body.data.trim().startsWith('data:image/')) {
+				data = req.body.data.trim().replace(/^data:image\/\w+;base64,/, '').replace(/\s+/g, '');
+			} else {
+				data = String(req.body.data).replace(/\s+/g, '');
+			}
 		} else {
 			return res.json({ status: 'error', type: 'profile', message: 'Aucun fichier ou base64 reçu', data: null });
 		}
 		const link = 'false';
+		// On récupère profile/cover du body (booléen ou string)
+		const isProfile = req.body.profile === true || req.body.profile === 'true' || req.body.profile === 1 || req.body.profile === '1';
+		const isCover = req.body.cover === true || req.body.cover === 'true' || req.body.cover === 1 || req.body.cover === '1';
+		// Si profile, on met à jour les anciennes images profile:true
+		if (isProfile) {
+			await require('../config/database').query('UPDATE images SET profile = false WHERE user_id = $1 AND profile = true', [req.user.id]);
+		}
+		// Si cover, on met à jour les anciennes images cover:true
+		if (isCover) {
+			await require('../config/database').query('UPDATE images SET cover = false WHERE user_id = $1 AND cover = true', [req.user.id]);
+		}
 		let user = {
 			id: req.user.id,
 			link,
 			data,
-			profile: false,
-			cover: false
+			profile: !!isProfile,
+			cover: !!isCover
 		}
 		try {
 			await userModel.insertImages(user)
