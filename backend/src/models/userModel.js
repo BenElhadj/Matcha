@@ -223,9 +223,47 @@ const setImages = async (user_id) => {
 
 // get Blocked  users 
 const getBlocked = async (id) => {
-    const query = `SELECT blocked.blocked AS blocked_id, users.username AS username, users.first_name AS first_name, users.last_name AS last_name, users.gender AS gender, users.birthdate AS birthdate, COALESCE(images.link, images.data, '') AS avatar, blocked.created_at AS blocked_at, get_rating(users.id) AS rating FROM blocked JOIN users ON blocked.blocked = users.id LEFT JOIN images ON users.id = images.user_id AND images.profile = TRUE WHERE blocked.blocker = $1`;
+    const query = `
+        SELECT 
+            blocked.blocked AS blocked_id, 
+            users.username AS username, 
+            users.first_name AS first_name, 
+            users.last_name AS last_name, 
+            users.gender AS gender, 
+            users.birthdate AS birthdate, 
+            images.link AS link, 
+            images.data AS data, 
+            blocked.created_at AS blocked_at, 
+            get_rating(users.id) AS rating 
+        FROM blocked 
+        JOIN users ON blocked.blocked = users.id 
+        LEFT JOIN images ON users.id = images.user_id AND images.profile = TRUE 
+        WHERE blocked.blocker = $1
+    `;
     const result = await db.query(query, [id]);
-    return result.rows;
+    // On applique la même logique que le frontend pour choisir l'avatar
+    const isValid = v => v && v !== 'false' && v !== '' && v !== null && v !== undefined;
+    return result.rows.map(row => {
+        let avatar = '';
+        if (isValid(row.link)) {
+            avatar = row.link;
+        } else if (isValid(row.data)) {
+            avatar = row.data;
+        } else {
+            avatar = '';
+        }
+        return {
+            blocked_id: row.blocked_id,
+            username: row.username,
+            first_name: row.first_name,
+            last_name: row.last_name,
+            gender: row.gender,
+            birthdate: row.birthdate,
+            avatar,
+            blocked_at: row.blocked_at,
+            rating: row.rating
+        };
+    });
 }
 
 // Check if a specific user is already blocked by the current user
