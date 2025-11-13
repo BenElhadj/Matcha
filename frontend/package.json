@@ -8,6 +8,8 @@
     "serve": "vite preview",
     "test": "vitest run",
     "test:ui": "vitest"
+    ,
+    "postbuild": "cp ./dist/index.html ./dist/404.html"
   },
   "dependencies": {
     "@mdi/font": "^7.4.47",
