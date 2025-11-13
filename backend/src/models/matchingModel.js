@@ -1,13 +1,47 @@
 const db = require('../config/database')
 
 const getFollowing = async (user_id) => {
-    const query = `SELECT matches.matched as matched_id, matches.created_at as match_date, users.username as username, COALESCE(images.link, images.data, '') as profile_image, images.profile as profile FROM matches INNER JOIN users ON matches.matched = users.id LEFT JOIN images ON matches.matched = images.user_id WHERE matches.matcher = $1`
+    const query = `SELECT matches.matched as matched_id, matches.created_at as match_date, users.username as username,
+        (
+            SELECT CASE
+                WHEN i.link IS NOT NULL AND i.link != '' THEN i.link
+                WHEN i.data IS NOT NULL AND i.data != '' THEN i.data
+                WHEN i.base64 IS NOT NULL AND i.base64 != '' THEN i.base64
+                ELSE ''
+            END
+            FROM images i
+            WHERE i.user_id = matches.matched AND i.profile = true
+            LIMIT 1
+        ) as profile_image,
+        (
+            SELECT i.profile FROM images i WHERE i.user_id = matches.matched AND i.profile = true LIMIT 1
+        ) as profile
+    FROM matches
+    INNER JOIN users ON matches.matched = users.id
+    WHERE matches.matcher = $1`
     const result = await db.query(query, [user_id])
     return result.rows
 }
 
 const getFollowers = async (user_id) => {
-    const query = `SELECT matches.matcher as matcher_id, matches.created_at as match_date, users.username as username, COALESCE(images.link, images.data, '') as profile_image, images.profile as profile FROM matches INNER JOIN users ON matches.matcher = users.id LEFT JOIN images ON matches.matcher = images.user_id WHERE matches.matched = $1`
+    const query = `SELECT matches.matcher as matcher_id, matches.created_at as match_date, users.username as username,
+        (
+            SELECT CASE
+                WHEN i.link IS NOT NULL AND i.link != '' THEN i.link
+                WHEN i.data IS NOT NULL AND i.data != '' THEN i.data
+                WHEN i.base64 IS NOT NULL AND i.base64 != '' THEN i.base64
+                ELSE ''
+            END
+            FROM images i
+            WHERE i.user_id = matches.matcher AND i.profile = true
+            LIMIT 1
+        ) as profile_image,
+        (
+            SELECT i.profile FROM images i WHERE i.user_id = matches.matcher AND i.profile = true LIMIT 1
+        ) as profile
+    FROM matches
+    INNER JOIN users ON matches.matcher = users.id
+    WHERE matches.matched = $1`
     const result = await db.query(query, [user_id])
     return result.rows
 }
