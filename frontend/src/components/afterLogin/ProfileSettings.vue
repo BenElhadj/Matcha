@@ -64,7 +64,11 @@
             <img
               style="width: 150px"
               src="@/assets/Settings/blocked.png"
-              @click="blacklist.length === 0 ? noBlacklist() : (blackListDialog = true)"
+              @click="
+                Array.isArray(blacklist) && blacklist.length === 0
+                  ? noBlacklist()
+                  : (blackListDialog = true)
+              "
             />
           </div>
           <span>Click here to view blocked users</span>
@@ -248,18 +252,21 @@
         transition-show="rotate"
         transition-hide="rotate"
       >
-        <div v-if="blacklist.length > 0" class="q-pa-md" style="background-color: white">
+        <div
+          v-if="Array.isArray(blacklist) && blacklist.length > 0"
+          class="q-pa-md"
+          style="background-color: white"
+        >
           <q-item
             v-for="banned in blacklist"
             :key="banned.id"
             class="blacklist_item mx-2"
             style="width: 340px"
           >
-            <q-expansion-item
-              class="bg-grey-3"
-              dropdown-icon="mdi-chevron-down !important"
-              icon="mdi-chevron-double-right"
-            >
+            <q-expansion-item class="bg-grey-3">
+              <template v-slot:expand-icon>
+                <q-icon name="mdi-chevron-down" />
+              </template>
               <template v-slot:header>
                 <q-item-section avatar>
                   <q-avatar>
@@ -351,7 +358,7 @@ const newPwd = ref('')
 const confNewPwd = ref('')
 const oldEmail = ref('')
 const newEmail = ref('')
-const blacklist = ref(null)
+const blacklist = ref([])
 const blackListDialog = ref(false)
 const latitude = computed(() => (location.value ? Number(location.value.lat) : 0))
 const longitude = computed(() => (location.value ? Number(location.value.lng) : 0))
@@ -379,7 +386,19 @@ const swapLocation = ref({
 
 const fetchBlacklist = async () => {
   try {
-    blacklist.value = await utility.sync('users/getblocked')
+    const res = await utility.sync('users/getblocked')
+    // console.log('Résultat fetchBlacklist:', res)
+    // Toujours afficher le log, même si la liste est vide ou non tableau
+    if (Array.isArray(res)) {
+      blacklist.value = res
+      if (res.length === 0) {
+        alert.value = { state: true, color: 'green', text: "you haven't blocked anyone" }
+      }
+    } else {
+      // Si la réponse n'est pas un tableau, log et affiche une alerte d'erreur
+      alert.value = { state: true, color: 'red', text: 'Erreur: réponse inattendue du serveur' }
+      blacklist.value = []
+    }
   } catch (error) {
     console.error("Une erreur s'est produite :", error)
   }
@@ -526,9 +545,9 @@ const unBlock = async (banned) => {
   }
 }
 
-// Defer blacklist fetch until the dialog is opened
-watch(blackListDialog, (open) => {
-  if (open) fetchBlacklist()
+// Récupère la blacklist dès l'ouverture de la page
+onMounted(() => {
+  fetchBlacklist()
 })
 </script>
 

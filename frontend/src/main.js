@@ -3,6 +3,7 @@ import { store } from '@/stores/store'
 import '@mdi/font/css/materialdesignicons.min.css';
 import Vue3TagsInput from 'vue3-tags-input'
 import { Quasar } from 'quasar'
+import iconSet from 'quasar/icon-set/mdi-v6'
 import router from '@/router/index'
 import { api } from '@/boot/axios' // Ajoutez cette ligne
 import 'quasar/src/css/index.sass' 
@@ -27,7 +28,9 @@ const app = createApp(App)
 // Ajoutez axios à l'application
 app.config.globalProperties.$api = api
 
-app.use(Quasar)
+app.use(Quasar, {
+	iconSet: iconSet,
+})
 app.use(Vue3TagsInput)
 app.use(store)
 app.use(router)
