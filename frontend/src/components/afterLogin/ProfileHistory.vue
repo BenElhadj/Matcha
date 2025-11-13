@@ -21,15 +21,21 @@
             :class="getNotifIcon(entry.type)[2]"
             :icon="getNotifIcon(entry.type)[1]"
           >
-            <q-avatar clickable v-ripple avatar @click="redirectToUser(entry.his_id)">
-              <img :src="entry.profile_image" />
-            </q-avatar>
+            <div class="row items-center no-wrap">
+              <AppAvatar
+                :image="entry.profile_image"
+                @click="redirectToUser(entry.his_id)"
+                size="small"
+              />
+              <div class="q-ml-sm">
+                <strong>{{ entry.first_name }} {{ entry.last_name }}</strong>
+              </div>
+            </div>
             <q-item-section right>
               {{ getHistoryAction(entry.type, entry.first_name, entry.last_name) }}
               <br />
-              <span class="text-caption">{{
-                moment(entry.match_date).format('D MMMM, YYYY, h:mm A')
-              }}</span>
+              <span class="text-caption">{{ moment(entry.match_date).fromNow() }}</span>
+              <!-- {{ entry }} -->
             </q-item-section>
           </q-timeline-entry>
           <q-timeline-entry
@@ -54,6 +60,7 @@
 </template>
 
 <script setup>
+import AppAvatar from '@/components/common/AppAvatar.vue'
 import { ref, computed } from 'vue'
 import { useStore } from 'vuex'
 import { useRoute, useRouter } from 'vue-router'
@@ -96,7 +103,6 @@ const fetchHistory = async () => {
   return filtered
 }
 
-
 const onShowMore = async () => {
   if (isLoading.value || !hasMore.value) return
   isLoading.value = true
@@ -106,7 +112,9 @@ const onShowMore = async () => {
 import { onMounted } from 'vue'
 onMounted(() => {
   isLoading.value = true
-  fetchHistory().finally(() => { isLoading.value = false })
+  fetchHistory().finally(() => {
+    isLoading.value = false
+  })
 })
 
 const redirectToUser = (hisId) => {
