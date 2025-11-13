@@ -151,7 +151,7 @@
                 <div class="cards-grid">
                   <div v-for="user in sorted" :key="user.user_id" class="user">
                     <router-link :to="{ name: 'userprofile', params: { id: user.user_id } }">
-                      <user-card :user="user" />
+                      <user-card :user="user" :current-location="userLocation" />
                     </router-link>
                   </div>
                 </div>

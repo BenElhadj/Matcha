@@ -115,7 +115,8 @@
 import ProfileForm from '@/components/afterLogin/ProfileForm.vue'
 import ProfileGallery from '@/components/afterLogin/ProfileGallery.vue'
 import ProfileHistory from '@/components/afterLogin/ProfileHistory.vue'
-import ProfileSettings from '@/components/afterLogin/ProfileSettings.vue'
+import { defineAsyncComponent } from 'vue'
+const ProfileSettings = defineAsyncComponent(() => import('@/components/afterLogin/ProfileSettings.vue'))
 import AlertView from '@/views/AlertView.vue'
 import LoaderView from '@/views/LoaderView.vue'
 import utility from '@/utility.js'

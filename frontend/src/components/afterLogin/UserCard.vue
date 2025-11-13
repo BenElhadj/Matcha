@@ -102,6 +102,10 @@ const props = defineProps({
   user: {
     type: Object,
     default: () => ({})
+  },
+  currentLocation: {
+    type: Object,
+    default: () => ({ lat: 0, lng: 0 })
   }
 })
 
@@ -172,8 +176,8 @@ const age = computed(() => {
 
 const distance = computed(() => {
   const from = {
-    lat: store.getters.location.lat,
-    lng: store.getters.location.lng
+    lat: props.currentLocation?.lat,
+    lng: props.currentLocation?.lng
   }
   const to = {
     lat: props.user.lat,

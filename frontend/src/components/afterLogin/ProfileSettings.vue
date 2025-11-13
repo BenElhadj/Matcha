@@ -238,7 +238,8 @@
               style="margin: 700px 0px 0px important"
               :latitude="latitude"
               :longitude="longitude"
-              api-key="AIzaSyAHVSMrIeymA40C-a9ap0zCQzrHXkycXX8"
+              :apiKey="googleKey"
+              :mapId="googleMapId"
               @location-updated="locationUpdated"
               v-if="locDialog"
             ></MapLocationSelector>
@@ -259,6 +260,7 @@
         >
           <q-item
             v-for="banned in blacklist"
+            @before-mount="console.log('Avatar reçu pour', banned.username, ':', banned.avatar)"
             :key="banned.id"
             class="blacklist_item mx-2"
             style="width: 340px"
@@ -269,45 +271,44 @@
               </template>
               <template v-slot:header>
                 <q-item-section avatar>
-                  <q-avatar>
-                    <img :src="getFullPath(banned.avatar)" />
-                  </q-avatar>
+                  <AppAvatar :image="banned.avatar" size="small" />
                 </q-item-section>
                 <q-item-section>
-                  {{ banned.username }}
-                </q-item-section>
+                  <div class="text-weight-bold">{{ banned.first_name }} {{ banned.last_name }}</div>
+                  <div class="text-caption text-grey">@{{ banned.username }}</div>
 
-                <div class="note">
-                  <p class="caption text-capitalize rating_value">
-                    {{ banned.rating ? banned.rating.toFixed(1) : '0.0' }}
-                  </p>
-                  <q-rating
-                    :color="
-                      user.gender === 'male'
-                        ? 'blue-3'
-                        : user.gender === 'female'
-                        ? 'pink-2'
-                        : 'blue-5'
-                    "
-                    :color-selected="
-                      user.gender === 'male'
-                        ? 'blue-9'
-                        : user.gender === 'female'
-                        ? 'pink-8'
-                        : 'pink-4'
-                    "
-                    :modelValue="banned.rating && !isNaN(banned.rating) ? banned.rating : 0"
-                    icon="mdi-heart-outline"
-                    icon-selected="mdi-heart"
-                    icon-half="mdi-heart-half-full"
-                    max="7"
-                    readonly
-                    dense
-                    size="1.3em"
-                    half-increments
-                    class="rating"
-                  />
-                </div>
+                  <div class="row items-center q-mt-xs">
+                    <q-rating
+                      :color="
+                        user.gender === 'male'
+                          ? 'blue-3'
+                          : user.gender === 'female'
+                          ? 'pink-2'
+                          : 'blue-5'
+                      "
+                      :color-selected="
+                        user.gender === 'male'
+                          ? 'blue-9'
+                          : user.gender === 'female'
+                          ? 'pink-8'
+                          : 'pink-4'
+                      "
+                      :modelValue="banned.rating && !isNaN(banned.rating) ? banned.rating : 0"
+                      icon="mdi-heart-outline"
+                      icon-selected="mdi-heart"
+                      icon-half="mdi-heart-half-full"
+                      max="7"
+                      readonly
+                      dense
+                      size="1.3em"
+                      half-increments
+                      class="rating"
+                    />
+                    <span class="q-ml-sm text-weight-bold">{{
+                      banned.rating ? banned.rating.toFixed(1) : '0.0'
+                    }}</span>
+                  </div>
+                </q-item-section>
               </template>
               <q-card>
                 <q-card-section>
@@ -342,7 +343,12 @@ import { useStore } from 'vuex'
 import axios from 'axios'
 import utility from '@/utility'
 import AlertView from '@/views/AlertView.vue'
-const MapLocationSelector = defineAsyncComponent(() => import('vue-google-maps-location-selector'))
+
+import AppAvatar from '@/components/common/AppAvatar.vue'
+import MapLocationSelector from '@/components/common/MapLocationSelector.vue'
+
+const googleKey = import.meta.env.VITE_APP_GOOGLE_KEY || ''
+const googleMapId = import.meta.env.VITE_APP_GOOGLE_MAP_ID || ''
 
 const store = useStore()
 const user = computed(() => store.getters.user)
@@ -384,29 +390,28 @@ const swapLocation = ref({
   lng: location.value.lng
 })
 
+
+
 const fetchBlacklist = async () => {
   try {
     const res = await utility.sync('users/getblocked')
-    // console.log('Résultat fetchBlacklist:', res)
-    // Toujours afficher le log, même si la liste est vide ou non tableau
+    // console.log('Réponse brute de fetchBlacklist:', res)
     if (Array.isArray(res)) {
       blacklist.value = res
+      // console.log('Blacklist alimentée:', blacklist.value)
       if (res.length === 0) {
         alert.value = { state: true, color: 'green', text: "you haven't blocked anyone" }
       }
     } else {
-      // Si la réponse n'est pas un tableau, log et affiche une alerte d'erreur
       alert.value = { state: true, color: 'red', text: 'Erreur: réponse inattendue du serveur' }
       blacklist.value = []
     }
-  } catch (error) {
-    console.error("Une erreur s'est produite :", error)
+  }
+  catch (err) {
+    alert.value = { state: true, color: 'red', text: 'Erreur lors de la récupération de la blacklist.' }
+    blacklist.value = []
   }
 }
-const noBlacklist = async () => {
-  alert.value = { state: true, color: 'green', text: "you haven't blocked anyone" }
-}
-
 const rules = {
   email: [(v) => !!v || 'Email field is required', (v) => /.+@.+/.test(v) || 'Invalid email'],
   passRules: [(v) => !!v || 'Password field is required'],
@@ -424,35 +429,43 @@ const rules = {
 }
 
 const validPwd = computed(() => {
-  return rules.newPwd.every((rule) => rule(newPwd.value) === true)
+  return (
+    rules.newPwd.every((rule) => rule(newPwd.value) === true) &&
+    rules.passRules.every((rule) => rule(oldPwd.value) === true) &&
+    newPwd.value === confNewPwd.value &&
+    newPwd.value.length > 0 &&
+    oldPwd.value.length > 0 &&
+    confNewPwd.value.length > 0
+  )
 })
 
 const savePass = async () => {
-  if (validPwd) {
-    if (newPwd.value !== confNewPwd.value) {
-      alert.value = { state: true, color: 'red', text: 'enter your current email first' }
-      return
+  if (!validPwd.value) {
+    alert.value = { state: true, color: 'red', text: 'Please fill all fields correctly!' }
+    return
+  }
+  try {
+    const url = `${import.meta.env.VITE_APP_API_URL}/api/users/changepassword`
+    const headers = { 'x-auth-token': user.value.token }
+    const data = {
+      password: oldPwd.value,
+      newPassword: newPwd.value,
+      confNewPassword: confNewPwd.value
     }
-    try {
-      const url = `${import.meta.env.VITE_APP_API_URL}/api/users/changepassword`
-      const headers = { 'x-auth-token': user.value.token }
-      const data = {
-        password: oldPwd.value,
-        newPassword: newPwd.value,
-        confNewPassword: confNewPwd.value
+    const res = await axios.post(url, data, { headers })
+    if (res.data.status === 'success') {
+      alert.value = { state: true, color: 'green', text: 'Your password has been updated' }
+      closePass()
+    } else {
+      alert.value = {
+        state: true,
+        color: 'red',
+        text: res.data.message || 'Error updating password'
       }
-      const res = await axios.post(url, data, { headers })
-      if (res.data.ok) {
-        alert.value = { state: true, color: 'green', text: 'Your password has been updated' }
-        closePass()
-      } else {
-        alert.value = { state: true, color: 'red', text: res.data.msg }
-      }
-    } catch (err) {
-      console.error('err savePass in frontend/ProfileSettings.vue ===> ', err)
     }
-  } else {
-    alert.value = { state: true, color: 'red', text: 'Please fill all fields!' }
+  } catch (err) {
+    alert.value = { state: true, color: 'red', text: 'Server error' }
+    console.error('err savePass in frontend/ProfileSettings.vue ===> ', err)
   }
 }
 
@@ -464,33 +477,40 @@ const closePass = () => {
 }
 
 const validEmail = computed(() => {
-  return rules.email.every((rule) => rule(newEmail.value) === true)
+  return (
+    rules.email.every((rule) => rule(newEmail.value) === true) &&
+    rules.email.every((rule) => rule(oldEmail.value) === true) &&
+    rules.passRules.every((rule) => rule(pwd.value) === true) &&
+    newEmail.value.length > 0 &&
+    oldEmail.value.length > 0 &&
+    pwd.value.length > 0
+  )
 })
 
 const saveEmail = async () => {
-  if (validEmail) {
-    try {
-      const url = `${import.meta.env.VITE_APP_API_URL}/api/users/changeemail`
-      const headers = { 'x-auth-token': user.value.token }
-      const data = {
-        email: newEmail.value,
-        password: pwd.value
-      }
-      const res = await axios.post(url, data, { headers })
-
-      pwd.value = ''
-      if (res.data.ok) {
-        alert.value = { state: true, color: 'green', text: 'Your email has been updated' }
-        store.getters.user.email = newEmail.value
-        closeEmail()
-      } else {
-        alert.value = { state: true, color: 'red', text: res.data.msg }
-      }
-    } catch (err) {
-      console.error('err saveEmail in frontend/ProfileSettings.vue ===> ', err)
+  if (!validEmail.value) {
+    alert.value = { state: true, color: 'red', text: 'Please fill all fields correctly!' }
+    return
+  }
+  try {
+    const url = `${import.meta.env.VITE_APP_API_URL}/api/users/changeemail`
+    const headers = { 'x-auth-token': user.value.token }
+    const data = {
+      email: newEmail.value,
+      password: pwd.value
     }
-  } else {
-    alert.value = { state: true, color: 'red', text: 'Please fill all fields!' }
+    const res = await axios.post(url, data, { headers })
+    pwd.value = ''
+    if (res.data.status === 'success') {
+      alert.value = { state: true, color: 'green', text: 'Your email has been updated' }
+      store.getters.user.email = newEmail.value
+      closeEmail()
+    } else {
+      alert.value = { state: true, color: 'red', text: res.data.message || 'Error updating email' }
+    }
+  } catch (err) {
+    alert.value = { state: true, color: 'red', text: 'Server error' }
+    console.error('err saveEmail in frontend/ProfileSettings.vue ===> ', err)
   }
 }
 
@@ -501,27 +521,25 @@ const closeEmail = () => {
   pwd.value = ''
 }
 
-const googleLoaded = () => {
-  return typeof window.google === 'object' && typeof window.google.maps === 'object'
-}
-
-const flag = ref(googleLoaded())
 const openLoc = () => {
   locDialog.value = true
-  flag.value = googleLoaded()
 }
 
 const locationUpdated = (newLocation) => {
-  swapLocation.value = newLocation
+  // Defensive copy to avoid reactivity issues
+  swapLocation.value = { ...newLocation }
 }
 
 const changeLoc = async () => {
   locDialog.value = false
   const url = `${import.meta.env.VITE_APP_API_URL}/api/users/location`
   const headers = { 'x-auth-token': user.value.token }
-  const res = await axios.post(url, swapLocation.value, { headers })
+  // Only send a plain object, not a ref
+  const payload = { lat: swapLocation.value.lat, lng: swapLocation.value.lng }
+  const res = await axios.post(url, payload, { headers })
   if (res && res.data && !res.data.msg) {
-    store.commit('locate', location)
+    // Only commit the new location object, not the computed property
+    store.commit('locate', payload)
     alert.value = { state: true, color: 'green', text: 'Your location has been updated' }
   } else {
     alert.value = {
@@ -530,18 +548,32 @@ const changeLoc = async () => {
       text: res.data.msg ? res.data.msg : 'Oops... something went wrong!'
     }
   }
+  // Reset swapLocation after update
+  swapLocation.value = { lat: location.value.lat, lng: location.value.lng }
 }
 
 const unBlock = async (banned) => {
-  const { blocked_id, username } = banned
+  const { blocked_id } = banned
   const url = `${import.meta.env.VITE_APP_API_URL}/api/users/unblock`
   const headers = { 'x-auth-token': user.value.token }
-  const result = await axios.post(url, { id: blocked_id }, { headers })
-  if (result.data.ok) {
-    fetchBlacklist()
-    alert.value = { state: true, color: 'green', text: `${username} has been unblocked` }
-  } else {
-    alert.value = { state: true, color: 'red', text: result.data.msg }
+  try {
+    const result = await axios.post(url, { id: blocked_id }, { headers })
+    if (result.data && result.data.status === 'success') {
+      fetchBlacklist()
+      alert.value = {
+        state: true,
+        color: 'green',
+        text: result.data.message || 'Utilisateur débloqué.'
+      }
+    } else {
+      alert.value = {
+        state: true,
+        color: 'red',
+        text: result.data && result.data.message ? result.data.message : 'Erreur lors du déblocage.'
+      }
+    }
+  } catch (err) {
+    alert.value = { state: true, color: 'red', text: 'Erreur serveur lors du déblocage.' }
   }
 }
 
@@ -569,8 +601,8 @@ onMounted(() => {
 }
 
 .color_picker {
-  width: 4rem;
-  height: 4rem;
+  width: 2rem;
+  height: 2rem;
   margin: 1vw 2vw;
   border-radius: 5px;
   cursor: pointer;
