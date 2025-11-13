@@ -92,19 +92,11 @@
             </q-tab-panel>
 
             <q-tab-panel name="tab-photo" v-if="activeTab === 'tab-photo'">
-              <ProfileGallery
-                :images="images"
-                @update:images="onImagesUpdate"
-              />
-
+              <ProfileGallery :images="images" @update:images="onImagesUpdate" />
             </q-tab-panel>
 
             <q-tab-panel name="tab-history" v-if="activeTab === 'tab-history'">
-              <ProfileHistory
-                :history="history"
-                :total="historyTotal"
-                @fetch-more="fetchMoreHistory"
-              />
+              <ProfileHistory />
             </q-tab-panel>
 
             <q-tab-panel name="tab-setting" v-if="activeTab === 'tab-setting'">
@@ -208,14 +200,22 @@ const uploadImage = async (type, event) => {
       }
       const url = type === 'cover' ? urlCover.value : urlProfile.value
       const result = await axios.post(url, body, { headers })
-      let backendMsg = result.data?.message || result.data?.msg || result.data?.error || (type === 'cover' ? 'Cover image updated successfully' : 'Profile image updated successfully')
+      let backendMsg =
+        result.data?.message ||
+        result.data?.msg ||
+        result.data?.error ||
+        (type === 'cover'
+          ? 'Cover image updated successfully'
+          : 'Profile image updated successfully')
       let isSuccess = result.data?.status === 'success' || result.data?.ok === true
       if (isSuccess) {
         // Rafraîchir toutes les images utilisateur pour affichage immédiat
         await store.dispatch('fetchUserImages')
         coverPhoto.value = store.getters.coverPhoto
         profileImage.value = store.getters.profileImage
-        images.value = Array.isArray(store.getters.user.images) ? [...store.getters.user.images] : []
+        images.value = Array.isArray(store.getters.user.images)
+          ? [...store.getters.user.images]
+          : []
         alert.value = { state: true, color: 'green', text: backendMsg }
       } else {
         alert.value = {

@@ -253,7 +253,6 @@ onMounted(() => {
   border-radius: 50%;
   background: #f5f5f5;
   display: block;
-  max-width: 150px;
   max-height: 150px;
   min-width: 0;
   min-height: 0;
