@@ -69,9 +69,11 @@ const showUsers = async (req, res) => {
 		   })
 
 		   // Add images for each user with proper format (base64 ou lien)
+		   const defaultProfile = '/default/defaut_profile.txt';
 		   for (let i = 0; i < result.length; i++) {
-			   const images = await userModel.getImagesByUid(result[i].user_id);
-			   result[i].images = images
+			   const userId = result[i].user_id || result[i].id;
+			   let images = await userModel.getImagesByUid(userId);
+			   images = images
 				   .map(img => {
 					   const validLink = img.link && img.link !== 'false' && img.link !== '' && img.link !== null && img.link !== undefined;
 					   const validData = img.data && img.data !== 'false' && img.data !== '' && img.data !== null && img.data !== undefined;
@@ -84,11 +86,26 @@ const showUsers = async (req, res) => {
 					   }
 				   })
 				   .filter(Boolean);
-			   // Add profile image for backward compatibility
-			   const profileImg = images.find(img => img.profile);
-			   if (profileImg) {
-				   result[i].name = profileImg.data ? `data:image/png;base64,${profileImg.data}` : (profileImg.link || null);
+			   // Si aucune image valide, injecter une image par défaut
+			   if (!images.length) {
+				   images = [{ link: defaultProfile, data: null, profile: true }];
 			   }
+			   result[i].images = images;
+			   // Champ profile_image explicite (jamais null)
+			   const profileImg = images.find(img => img.profile) || images[0];
+			   if (profileImg) {
+				   if (profileImg.data && profileImg.data.startsWith('data:image')) {
+					   result[i].profile_image = profileImg.data;
+				   } else if (profileImg.link && profileImg.link !== 'false' && profileImg.link !== '') {
+					   result[i].profile_image = profileImg.link;
+				   } else {
+					   result[i].profile_image = defaultProfile;
+				   }
+			   } else {
+				   result[i].profile_image = defaultProfile;
+			   }
+			   // Toujours fournir user_id
+			   result[i].user_id = userId;
 		   }
 
 		   res.json(result)
