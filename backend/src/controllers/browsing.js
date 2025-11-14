@@ -16,64 +16,77 @@ const showUsers = async (req, res) => {
 	if (!user.id)
 		return res.json({ msg: 'Not logged in' })
 	try {
-		let result = await userModel.getUserBrow()
-		let userTags = user.tags
-		const userLoc = {
-			lat: user.lat,
-			lng: user.lng
-		}
-		const commonTags = a => {
-			if (!a || !a.length) return 0
-			const tags = a.split(',')
-			return userTags.split(',').filter(val => -1 !== tags.indexOf(val)).length
-		}
-		result = result.map(cur => {
-			delete cur.password
-			delete cur.vkey
-			delete cur.rkey
-			delete cur.verified
-			delete cur.email
-			delete cur.google_id
-			return cur
-		}).filter(cur => {
-			if (!req.body.filter) return true;
-			return user.looking === 'all' || cur.gender === user.looking;
-		}).sort((a, b) => {
-			const aLoc = { lat: a.lat, lng: a.lng }
-			const bLoc = { lat: b.lat, lng: b.lng }
-			const disDelta = distance(userLoc, aLoc) - distance(userLoc, bLoc)
-			if (!disDelta && userTags && userTags.length) {
-				const disTag = commonTags(b.tags) - commonTags(a.tags)
-				return !disTag ? b.rating - a.rating : disTag
-			} else {
-				return !disDelta ? b.rating - a.rating : disDelta
-			}
-		})
-		
-		// Add images for each user with proper format
-		for (let i = 0; i < result.length; i++) {
-			const images = await userModel.getImagesByUid(result[i].user_id);
-			result[i].images = images
-				.map(img => {
-					const validLink = img.link && img.link !== 'false' && img.link !== '' && img.link !== null && img.link !== undefined;
-					const validData = img.data && img.data !== 'false' && img.data !== '' && img.data !== null && img.data !== undefined;
-					if (validLink) {
-						return { ...img, link: img.link, data: null };
-					} else if (validData) {
-						return { ...img, link: null, data: `data:image/png;base64,${img.data}` };
-					} else {
-						return null;
-					}
-				})
-				.filter(Boolean);
-			// Add profile image for backward compatibility
-			const profileImg = images.find(img => img.profile);
-			if (profileImg) {
-				result[i].name = profileImg.data ? `data:image/png;base64,${profileImg.data}` : (profileImg.link || null);
-			}
-		}
-		
-		res.json(result)
+		   let result = await userModel.getUserBrow()
+		   let userTags = user.tags
+		   const userLoc = {
+			   lat: user.lat,
+			   lng: user.lng
+		   }
+		   const commonTags = a => {
+			   if (!a || !a.length) return 0
+			   const tags = a.split(',')
+			   return userTags.split(',').filter(val => -1 !== tags.indexOf(val)).length
+		   }
+		   // Ajout des infos de like/match pour chaque user
+		   // Récupérer la liste des users likés/matchés par l'utilisateur courant
+		   let likedUsers = []
+		   let matchedUsers = []
+		   try {
+			   likedUsers = (await matchingModel.getFollowing(user.id)).map(u => String(u.matched_id || u.user_id || u.id))
+			   matchedUsers = (await matchingModel.getFollowers(user.id)).map(u => String(u.matcher_id || u.user_id || u.id))
+		   } catch (e) {}
+
+		   result = result.map(cur => {
+			   delete cur.password
+			   delete cur.vkey
+			   delete cur.rkey
+			   delete cur.verified
+			   delete cur.email
+			   delete cur.google_id
+			   // Ajout des flags pour le front (like/match)
+			   const curId = String(cur.user_id || cur.id)
+			   cur.isLiked = likedUsers.includes(curId)
+			   cur.isMatched = matchedUsers.includes(curId)
+			   return cur
+		   }).filter(cur => {
+			   if (!req.body.filter) return true;
+			   return user.looking === 'all' || cur.gender === user.looking;
+		   }).sort((a, b) => {
+			   const aLoc = { lat: a.lat, lng: a.lng }
+			   const bLoc = { lat: b.lat, lng: b.lng }
+			   const disDelta = distance(userLoc, aLoc) - distance(userLoc, bLoc)
+			   if (!disDelta && userTags && userTags.length) {
+				   const disTag = commonTags(b.tags) - commonTags(a.tags)
+				   return !disTag ? b.rating - a.rating : disTag
+			   } else {
+				   return !disDelta ? b.rating - a.rating : disDelta
+			   }
+		   })
+
+		   // Add images for each user with proper format (base64 ou lien)
+		   for (let i = 0; i < result.length; i++) {
+			   const images = await userModel.getImagesByUid(result[i].user_id);
+			   result[i].images = images
+				   .map(img => {
+					   const validLink = img.link && img.link !== 'false' && img.link !== '' && img.link !== null && img.link !== undefined;
+					   const validData = img.data && img.data !== 'false' && img.data !== '' && img.data !== null && img.data !== undefined;
+					   if (validLink) {
+						   return { ...img, link: img.link, data: null };
+					   } else if (validData) {
+						   return { ...img, link: null, data: `data:image/png;base64,${img.data}` };
+					   } else {
+						   return null;
+					   }
+				   })
+				   .filter(Boolean);
+			   // Add profile image for backward compatibility
+			   const profileImg = images.find(img => img.profile);
+			   if (profileImg) {
+				   result[i].name = profileImg.data ? `data:image/png;base64,${profileImg.data}` : (profileImg.link || null);
+			   }
+		   }
+
+		   res.json(result)
 	} catch (err) {
 		return res.json({ msg: 'Fatal error', err })
 	}
