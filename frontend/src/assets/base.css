@@ -1,3 +1,10 @@
+/* Correction curseur global : force le curseur par défaut partout sauf sur les éléments interactifs */
+* {
+  cursor: default !important;
+}
+input, textarea, [contenteditable="true"], button, a, select, .cursor-pointer, .like-btn-absolute {
+  cursor: pointer !important;
+}
 /* color palette from <https://github.com/vuejs/theme> */
 :root {
   --vt-c-white: #ffffff;

@@ -2,68 +2,78 @@
   <q-layout>
     <q-page padding>
       <h1 class="q-pb-md" style="margin-top: -10px; text-align: center">Notifications</h1>
-      <q-infinite-scroll @load="onLoadMore" :offset="300">
-        <template v-for="(entry, i) in notifs" :key="entry.id || i">
-          <div class="q-my-sm">
-            <div class="row justify-center items-start q-pa-sm">
-              <div class="col-3 text-center">
-                <q-tooltip anchor="bottom middle" self="top middle">
-                  <template #activator="{ on }">
-                    <strong class="mt-2 d-block grey--text" v-on="on">{{
-                      fromNow(entry.date)
-                    }}</strong>
-                  </template>
-                  <span>{{ formatTime(entry.date) }}</span>
-                </q-tooltip>
+      <div class="notif-list-outer">
+        <NotifFilterTabs>
+          <template #all>
+            <q-infinite-scroll @load="onLoadMore" :offset="300">
+              <div class="notif-list">
+                <template v-for="(entry, i) in notifs" :key="entry.id || i">
+                  <NotifTooltip
+                    :notif="entry"
+                    :avatar-src="getNotifProfileSrc(entry)"
+                    @click="openNotification(entry)"
+                  />
+                </template>
               </div>
-              <div style="font-family: 'Elliane' !important" class="col-9">
-                <q-card class="notif_bubble" clickable @click="openNotification(entry)">
-                  <q-card-section>
-                    <div class="row items-center">
-                      <AppAvatar
-                        :image="getNotifProfileSrc(entry)"
-                        :userId="entry.id_from"
-                        :showPresence="true"
-                        size="small"
-                      />
-                      <div class="q-ml-md">
-                        <span class="text-h6 text-weight-bold timeline_link">{{
-                          entry.username
-                        }}</span>
-                        <q-icon small style="font-size: 16px !important" class="mr-2 q-ml-xl">
-                          <span :class="getNotifIcon(entry.type)"></span>&nbsp;
-                        </q-icon>
-                        <div class="subtitle">
-                          <span class="text-weight-bold">{{ getNotifMsg(entry) }}</span>
-                          <span class="text-weight-bold">{{
-                            ' on ' + moment(entry.date).format('D MMMM, YYYY, h:mm A')
-                          }}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </q-card-section>
-                </q-card>
+              <div v-if="!hasMore && notifs.length" class="end-history">
+                <q-icon name="mdi-history" size="32px" class="q-mr-sm" />
+                <div class="text-subtitle1">
+                  <span v-if="notifs.length === 1">First notification — no previous history.</span>
+                  <span v-else>You’ve reached the start of your notification history.</span>
+                </div>
               </div>
-            </div>
-          </div>
-        </template>
-        <div v-if="!hasMore && notifs.length" class="end-history">
-          <q-icon name="mdi-history" size="32px" class="q-mr-sm" />
-          <div class="text-subtitle1">
-            <span v-if="notifs.length === 1">First notification — no previous history.</span>
-            <span v-else>You’ve reached the start of your notification history.</span>
-          </div>
-        </div>
-        <div v-else-if="!hasMore && !notifs.length" class="end-history">
-          <q-icon name="mdi-history" size="32px" class="q-mr-sm" />
-          <div class="text-subtitle1">No notifications yet.</div>
-        </div>
-        <template #loading>
-          <div class="q-my-md flex items-center justify-center">
-            <LoaderView />
-          </div>
-        </template>
-      </q-infinite-scroll>
+              <div v-else-if="!hasMore && !notifs.length" class="end-history">
+                <q-icon name="mdi-history" size="32px" class="q-mr-sm" />
+                <div class="text-subtitle1">No notifications yet.</div>
+              </div>
+              <template #loading>
+                <div class="q-my-md flex items-center justify-center">
+                  <LoaderView />
+                </div>
+              </template>
+            </q-infinite-scroll>
+          </template>
+          <template #likes>
+            <q-infinite-scroll @load="onLoadMore" :offset="300">
+              <div class="notif-list">
+                <template v-for="(entry, i) in notifsLikes" :key="entry.id || i">
+                  <NotifTooltip
+                    :notif="entry"
+                    :avatar-src="getNotifProfileSrc(entry)"
+                    @click="openNotification(entry)"
+                  />
+                </template>
+              </div>
+            </q-infinite-scroll>
+          </template>
+          <template #views>
+            <q-infinite-scroll @load="onLoadMore" :offset="300">
+              <div class="notif-list">
+                <template v-for="(entry, i) in notifsViews" :key="entry.id || i">
+                  <NotifTooltip
+                    :notif="entry"
+                    :avatar-src="getNotifProfileSrc(entry)"
+                    @click="openNotification(entry)"
+                  />
+                </template>
+              </div>
+            </q-infinite-scroll>
+          </template>
+          <template #block>
+            <q-infinite-scroll @load="onLoadMore" :offset="300">
+              <div class="notif-list">
+                <template v-for="(entry, i) in notifsBlock" :key="entry.id || i">
+                  <NotifTooltip
+                    :notif="entry"
+                    :avatar-src="getNotifProfileSrc(entry)"
+                    @click="openNotification(entry)"
+                  />
+                </template>
+              </div>
+            </q-infinite-scroll>
+          </template>
+        </NotifFilterTabs>
+      </div>
     </q-page>
   </q-layout>
 </template>
@@ -74,7 +84,8 @@ import { useStore } from 'vuex'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 import utility from '@/utility.js'
-import AppAvatar from '@/components/common/AppAvatar.vue'
+import NotifFilterTabs from './NotifFilterTabs.vue'
+import NotifTooltip from './NotifTooltip.vue'
 import moment from 'moment'
 import { getSocket } from '@/boot/socketClient'
 import LoaderView from '@/views/LoaderView.vue'
@@ -91,6 +102,23 @@ const currentUser = computed(() => store.getters.user)
 const notif = computed(() => store.getters.notif)
 // Garder l'ordre tel que renvoyé par le store (pagination + append non saccadé)
 const notifs = computed(() => (Array.isArray(notif.value) ? notif.value : []))
+// Filtres par type
+const likeTypes = [
+  'like',
+  'like_back',
+  'unlike',
+  'you_like',
+  'he_like',
+  'you_like_back',
+  'he_like_back',
+  'you_unlike',
+  'he_unlike'
+]
+const viewTypes = ['visit', 'you_visit', 'he_visit']
+const blockTypes = ['block', 'you_block', 'he_block', 'signal', 'report']
+const notifsLikes = computed(() => notifs.value.filter((n) => likeTypes.includes(n.type)))
+const notifsViews = computed(() => notifs.value.filter((n) => viewTypes.includes(n.type)))
+const notifsBlock = computed(() => notifs.value.filter((n) => blockTypes.includes(n.type)))
 const { fromNow, formatTime, getNotifMsg, getNotifIcon } = utility
 
 // Resolve an image value (string/object) into a usable src
@@ -265,6 +293,23 @@ const openNotification = async (entry) => {
 </script>
 
 <style scoped>
+.notif-list-outer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.notif-list {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  width: 100%;
+  max-width: 420px;
+  min-width: 420px;
+  margin: 0 auto;
+}
+</style>
+
+<style scoped>
 .timeline_link {
   text-decoration: none;
 }
@@ -281,7 +326,7 @@ const openNotification = async (entry) => {
 
 .notif_bubble {
   margin-top: -0.6rem;
-  border-radius: 14px;
+  border-radius: 8px;
   border: 1px solid rgba(0, 0, 0, 0.06);
   box-shadow: 0 1px 6px rgba(0, 0, 0, 0.04);
   transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;

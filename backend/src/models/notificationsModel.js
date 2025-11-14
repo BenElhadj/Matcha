@@ -1,11 +1,13 @@
 const db = require('../config/database')
 
 const insertNotifVis = async (user_id, id) => {
+    if (user_id === id) return; // Ne pas notifier soi-même
     const query = `INSERT INTO notifications (type, id_from, id_to) VALUES ('visit', $1, $2)`
     await db.query(query, [user_id, id])
 }
 
 const insertNotif = async (type, user_id, id) => {
+    if (user_id === id) return; // Ne pas notifier soi-même
     const query = `INSERT INTO notifications (type, id_from, id_to) VALUES ($1::text, $2, $3)`
     await db.query(query, [type, user_id, id])
 }
@@ -16,6 +18,7 @@ const delNotif = async (id, user_id) => {
 }
 
 const insertNotifConv = async (type, id_from, id_to, id_conversation) => {
+    if (id_from === id_to) return; // Ne pas notifier soi-même
     const query = `INSERT INTO notifications (type, id_from, id_to, id_conversation) VALUES ($1::text, $2, $3, $4)`
     await db.query(query, [type, id_from, id_to, id_conversation])
 }
@@ -26,7 +29,7 @@ const insertNotifConv = async (type, id_from, id_to, id_conversation) => {
 // excluding blocked users. Returns rows ordered by notification date desc.
 const getNotif = async (id, limit = 50, offset = 0, includeBlocked = false) => {
         const query = includeBlocked ? `
-    SELECT n.id, n.id_from, n.date, n.is_read, n.type, u.username, i.link as profile_image, i.profile, i.cover
+    SELECT n.id, n.id_from, n.date, n.is_read, n.type, u.username, u.first_name, u.last_name, i.link as profile_image, i.profile, i.cover
         FROM (
             SELECT DISTINCT ON (id_from) id, id_from, created_at as date, is_read, type, id_conversation
             FROM notifications
@@ -38,7 +41,7 @@ const getNotif = async (id, limit = 50, offset = 0, includeBlocked = false) => {
         ORDER BY n.date DESC
         LIMIT $2 OFFSET $3
         ` : `
-    SELECT n.id, n.id_from, n.date, n.is_read, n.type, u.username, i.link as profile_image, i.profile, i.cover
+    SELECT n.id, n.id_from, n.date, n.is_read, n.type, u.username, u.first_name, u.last_name, i.link as profile_image, i.profile, i.cover
         FROM (
             SELECT DISTINCT ON (id_from) id, id_from, created_at as date, is_read, type, id_conversation
             FROM notifications
@@ -61,30 +64,30 @@ const getNotif = async (id, limit = 50, offset = 0, includeBlocked = false) => {
 
 // Get ALL notifications for a user (no collapsing), with pagination.
 const getNotifAll = async (id, limit = 50, offset = 0, includeBlocked = false) => {
-                                const query = includeBlocked ? `
-                                SELECT n.id, n.id_from, n.created_at as date, n.is_read, n.type, u.username,
-                                                         i.link as profile_image, i.profile, i.cover
-                                FROM notifications n
-                                LEFT JOIN users u ON n.id_from = u.id
-                                LEFT JOIN images i ON n.id_from = i.user_id AND i.profile = TRUE
-                                WHERE n.id_to = $1
-                                ORDER BY n.created_at DESC
-                                LIMIT $2 OFFSET $3
-                                ` : `
-                                SELECT n.id, n.id_from, n.created_at as date, n.is_read, n.type, u.username,
-                                                         i.link as profile_image, i.profile, i.cover
-                                FROM notifications n
-                                LEFT JOIN users u ON n.id_from = u.id
-                                LEFT JOIN images i ON n.id_from = i.user_id AND i.profile = TRUE
-                                WHERE n.id_to = $1
-                                    AND n.id_from NOT IN (
-                                                SELECT blocker FROM blocked WHERE blocked = $1
-                                                UNION
-                                                SELECT blocked FROM blocked WHERE blocker = $1
-                                    )
-                                ORDER BY n.created_at DESC
-                                LIMIT $2 OFFSET $3
-                                `
+    const query = includeBlocked ? `
+        SELECT n.id, n.id_from, n.created_at as date, n.is_read, n.type, u.username, u.first_name, u.last_name,
+               i.link as profile_image, i.profile, i.cover
+        FROM notifications n
+        LEFT JOIN users u ON n.id_from = u.id
+        LEFT JOIN images i ON n.id_from = i.user_id AND i.profile = TRUE
+        WHERE n.id_to = $1
+        ORDER BY n.created_at DESC
+        LIMIT $2 OFFSET $3
+    ` : `
+        SELECT n.id, n.id_from, n.created_at as date, n.is_read, n.type, u.username, u.first_name, u.last_name,
+               i.link as profile_image, i.profile, i.cover
+        FROM notifications n
+        LEFT JOIN users u ON n.id_from = u.id
+        LEFT JOIN images i ON n.id_from = i.user_id AND i.profile = TRUE
+        WHERE n.id_to = $1
+          AND n.id_from NOT IN (
+                SELECT blocker FROM blocked WHERE blocked = $1
+                UNION
+                SELECT blocked FROM blocked WHERE blocker = $1
+          )
+        ORDER BY n.created_at DESC
+        LIMIT $2 OFFSET $3
+    `
                 const result = await db.query(query, [id, limit, offset])
                 return result.rows
 }

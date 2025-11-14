@@ -73,17 +73,19 @@ const getAllNotif = async (req, res) => {
 			console.warn('[notif:getAllNotif] unexpected result type, coercing to []')
 			result = []
 		}
-		result = result.map(r => ({
-			id: r.id,
-			id_from: r.id_from, // compat ancien front
-			from: r.id_from,    // compat éventuelle
-			type: r.type,
-			username: r.username,
-			date: r.date,
-			is_read: r.is_read,
-			profile_image: r.profile_image || null,
-			cover: r.cover || null
-		}))
+		   result = result.map(r => ({
+			   id: r.id,
+			   id_from: r.id_from, // compat ancien front
+			   from: r.id_from,    // compat éventuelle
+			   type: r.type,
+			   username: r.username,
+			   first_name: r.first_name || '',
+			   last_name: r.last_name || '',
+			   date: r.date,
+			   is_read: r.is_read,
+			   profile_image: r.profile_image || null,
+			   cover: r.cover || null
+		   }))
 
 		res.json({ status: 'success', type: 'notification', message: 'Notifications fetched', data: {
 			items: result,

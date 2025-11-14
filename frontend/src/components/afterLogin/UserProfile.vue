@@ -656,15 +656,18 @@ const fetchUser = async (id) => {
         user.value = { ...res.data, rating: Number(res.data.rating) }
         const profileImg = res.data.images.find((cur) => cur.profile === 1)
 
-        const data = {
-          date: new Date(),
-          id_from: store.state.user.id,
-          username: store.state.user.username,
-          profile_image: profileImg ? profileImg.name : 'default/defaut_profile.txt',
-          id_to: id,
-          type: 'visit'
+        // Ne pas notifier si on visite son propre profil
+        if (store.state.user.id !== id) {
+          const data = {
+            date: new Date(),
+            id_from: store.state.user.id,
+            username: store.state.user.username,
+            profile_image: profileImg ? profileImg.name : 'default/defaut_profile.txt',
+            id_to: id,
+            type: 'visit'
+          }
+          socket && socket.emit('visit', data)
         }
-        socket && socket.emit('visit', data)
         loading.value = false
       } catch (err) {
         console.error(err)
