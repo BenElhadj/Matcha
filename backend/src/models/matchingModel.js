@@ -1,49 +1,45 @@
 const db = require('../config/database')
 
 const getFollowing = async (user_id) => {
-    const query = `SELECT matches.matched as matched_id, matches.created_at as match_date, users.username as username,
-        (
-            SELECT CASE
-                WHEN i.link IS NOT NULL AND i.link != '' THEN i.link
-                WHEN i.data IS NOT NULL AND i.data != '' THEN i.data
-                WHEN i.base64 IS NOT NULL AND i.base64 != '' THEN i.base64
-                ELSE ''
-            END
-            FROM images i
-            WHERE i.user_id = matches.matched AND i.profile = true
-            LIMIT 1
-        ) as profile_image,
-        (
-            SELECT i.profile FROM images i WHERE i.user_id = matches.matched AND i.profile = true LIMIT 1
-        ) as profile
-    FROM matches
-    INNER JOIN users ON matches.matched = users.id
-    WHERE matches.matcher = $1`
+    const query = `SELECT matches.matched as matched_id, matches.created_at as match_date, users.username as username, images.link, images.data, images.profile as profile FROM matches INNER JOIN users ON matches.matched = users.id LEFT JOIN images ON matches.matched = images.user_id AND images.profile = true WHERE matches.matcher = $1`
     const result = await db.query(query, [user_id])
-    return result.rows
+    // Correction: profile_image = data:image/png;base64,... si data existe, sinon link, sinon ''
+    return result.rows.map(row => {
+        let profile_image = '';
+        if (row.data && row.data !== 'false' && row.data !== '') {
+            profile_image = row.data.startsWith('data:image') ? row.data : `data:image/png;base64,${row.data}`;
+        } else if (row.link && row.link !== 'false' && row.link !== '') {
+            profile_image = row.link;
+        }
+        return {
+            matched_id: row.matched_id,
+            match_date: row.match_date,
+            username: row.username,
+            profile_image,
+            profile: row.profile
+        };
+    });
 }
 
 const getFollowers = async (user_id) => {
-    const query = `SELECT matches.matcher as matcher_id, matches.created_at as match_date, users.username as username,
-        (
-            SELECT CASE
-                WHEN i.link IS NOT NULL AND i.link != '' THEN i.link
-                WHEN i.data IS NOT NULL AND i.data != '' THEN i.data
-                WHEN i.base64 IS NOT NULL AND i.base64 != '' THEN i.base64
-                ELSE ''
-            END
-            FROM images i
-            WHERE i.user_id = matches.matcher AND i.profile = true
-            LIMIT 1
-        ) as profile_image,
-        (
-            SELECT i.profile FROM images i WHERE i.user_id = matches.matcher AND i.profile = true LIMIT 1
-        ) as profile
-    FROM matches
-    INNER JOIN users ON matches.matcher = users.id
-    WHERE matches.matched = $1`
+    const query = `SELECT matches.matcher as matcher_id, matches.created_at as match_date, users.username as username, images.link, images.data, images.profile as profile FROM matches INNER JOIN users ON matches.matcher = users.id LEFT JOIN images ON matches.matcher = images.user_id AND images.profile = true WHERE matches.matched = $1`
     const result = await db.query(query, [user_id])
-    return result.rows
+    // Correction: profile_image = data:image/png;base64,... si data existe, sinon link, sinon ''
+    return result.rows.map(row => {
+        let profile_image = '';
+        if (row.data && row.data !== 'false' && row.data !== '') {
+            profile_image = row.data.startsWith('data:image') ? row.data : `data:image/png;base64,${row.data}`;
+        } else if (row.link && row.link !== 'false' && row.link !== '') {
+            profile_image = row.link;
+        }
+        return {
+            matcher_id: row.matcher_id,
+            match_date: row.match_date,
+            username: row.username,
+            profile_image,
+            profile: row.profile
+        };
+    });
 }
 
 const insertMatche = async (user1, user2) => {
