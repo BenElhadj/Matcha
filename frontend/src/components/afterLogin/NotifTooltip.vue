@@ -39,7 +39,6 @@ const getNotifMsg = utility.getNotifMsg
 const formatTime = utility.formatTime || ((d) => moment(d).format('LLL'))
 const formatDate = (d) => moment(d).format('D MMMM, YYYY, h:mm A')
 
-
 // Affichage direct du nom/prénom ou username
 function getDisplayName(notif) {
   if (notif.last_name && notif.first_name) return `${notif.last_name} ${notif.first_name}`
@@ -57,26 +56,29 @@ function onClick() {
 .notif_bubble {
   width: 100%;
   max-width: 400px;
-  margin: 4px auto; /* réduit la marge verticale */
-  /* border-radius: 10px; */
+  /* margin: 4px auto; réduit la marge verticale */
+  border-radius: 10px;
   box-shadow: none;
+  border-color: #bdbdbd;
   transition: box-shadow 0.2s, border 0.2s;
   border: 1px solid rgba(0, 0, 0, 0.08);
   background: #fff;
+  border: 1px solid #cfcfcf; /* Gris plus clair */
+  margin-bottom: -20px; /* Rapproche les notifications */
   cursor: pointer;
 }
 .notif_card_effect {
   box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.07), 0 1.5px 6px 0 rgba(0, 0, 0, 0.09);
 }
 .notif_card_effect:hover {
-  box-shadow: 0 4px 24px 0 rgba(0, 0, 0, 0.13), 0 3px 12px 0 rgba(0, 0, 0, 0.16);
-  border: 1.5px solid #1976d2;
+  box-shadow: 0 0 20px 6px rgba(0, 0, 0, 0.18), 0 0 0 1px #bdbdbd;
+  border-color: #bdbdbd;
 }
 /* Réduction du gap entre avatar et infos principales */
 .notif-row-main {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 10px;
   /* margin-bottom: 0px; */
 }
 .notif-main-info {
@@ -98,8 +100,7 @@ function onClick() {
 .notif-details {
   display: flex;
   flex-direction: column;
-  gap: 0.5px;
-  margin-left: 50px;
+  margin-left: 55px;
 }
 .notif-msg {
   font-size: 1rem;
@@ -109,7 +110,6 @@ function onClick() {
 }
 .notif-msg-lifted {
   margin-top: -20px;
-  /* margin-bottom: 2px; */
   min-height: 20px;
   align-self: flex-start;
 }
@@ -117,6 +117,5 @@ function onClick() {
   font-size: 0.93rem;
   color: #888;
   font-weight: 400;
-  /* margin-top: 2px; */
 }
 </style>

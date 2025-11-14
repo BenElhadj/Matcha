@@ -302,9 +302,7 @@ const openNotification = async (entry) => {
   display: flex;
   flex-direction: column;
   gap: 32px;
-  width: 100%;
-  max-width: 420px;
-  min-width: 420px;
+  width: 420px;
   margin: 0 auto;
 }
 .end-history {
