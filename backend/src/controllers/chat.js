@@ -146,7 +146,9 @@ const sendMsg = async (req, res) => {
 		try {
 			const conv = convRows[0]
 			const id_to = (conv.id_user1 === msg.id_from) ? conv.id_user2 : conv.id_user1
-			await notifModel.insertNotifConv('chat', msg.id_from, id_to, msg.id_conversation)
+			if (msg.id_from !== id_to) {
+				await notifModel.insertNotifConv('chat', msg.id_from, id_to, msg.id_conversation)
+			}
 		} catch (e) {
 			console.error('sendMsg notif error:', e?.message || e)
 		}

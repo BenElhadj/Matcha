@@ -146,11 +146,23 @@ const updateOneNotif = async (req, res) => {
 	}
 }
 
+// Suppression des notifications de soi à soi (admin)
+const db = require('../config/database');
+const cleanSelfNotif = async (req, res) => {
+  try {
+    await db.query('DELETE FROM notifications WHERE id_from = id_to');
+    res.json({ status: 'success', message: 'Notifications de soi à soi supprimées.' });
+  } catch (err) {
+    res.status(500).json({ status: 'error', message: 'Erreur serveur', error: err });
+  }
+};
+
 module.exports = {
 	insertChatNotif,
 	getAllNotif,
 	updateOneNotif,
 	updateNotif,
+	cleanSelfNotif,
 	// Mark a list of notification IDs as read for the current user
 	updateNotifByIds: async (req, res) => {
 		if (!req.user?.id)

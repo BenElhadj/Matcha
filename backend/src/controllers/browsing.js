@@ -137,7 +137,9 @@ const showUserById = async (req, res) => {
 				data: img.data ? `data:image/png;base64,${img.data}` : null
 			}));
 			await historyModel.insertHistory(req.user.id, req.params.id)
-			await notifModel.insertNotifVis(req.user.id, req.params.id)
+			if (req.user.id !== parseInt(req.params.id, 10)) {
+				await notifModel.insertNotifVis(req.user.id, req.params.id)
+			}
 			// Push a realtime notification to the visited user
 			try {
 				const io = req.app.get('io')

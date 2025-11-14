@@ -11,7 +11,6 @@
         </div>
       </div>
       <div class="notif-details">
-        <!-- <div class="notif-fullname">{{ getDisplayName(notif) }}</div> -->
         <div class="notif-msg notif-msg-lifted">
           {{ getDisplayName(notif) }}{{ getNotifMsg(notif) }}
         </div>
@@ -25,19 +24,15 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
-import axios from 'axios'
 import AppAvatar from '@/components/common/AppAvatar.vue'
 import utility from '@/utility.js'
 import moment from 'moment'
-import { useRouter } from 'vue-router'
 
 const props = defineProps({
   notif: { type: Object, required: true },
   avatarSrc: { type: String, default: '' }
 })
 const emit = defineEmits(['click'])
-const router = useRouter()
 
 const getNotifIcon = utility.getNotifIcon
 const getNotifMsg = utility.getNotifMsg
@@ -52,40 +47,17 @@ function getDisplayName(notif) {
   return ''
 }
 
-function getFullName(notif) {
-  // Si last_name et first_name sont présents, on les affiche
-  if (notif.last_name && notif.first_name) return `${notif.last_name} ${notif.first_name}`
-  // Si username contient un espace, on suppose "Nom Prénom" ou "Prénom Nom"
-  if (notif.username && notif.username.includes(' ')) {
-    const parts = notif.username.trim().split(/\s+/)
-    if (parts.length >= 2) return `${capitalize(parts[0])} ${capitalize(parts[1])}`
-    return capitalize(parts[0])
-  }
-  // Si username contient un point, on suppose "prenom.nom" ou "nom.prenom"
-  if (notif.username && notif.username.includes('.')) {
-    const parts = notif.username.split('.')
-    if (parts.length >= 2) return `${capitalize(parts[0])} ${capitalize(parts[1])}`
-    return capitalize(parts[0])
-  }
-  // Sinon, on retourne le username tel quel
-  if (notif.username) return capitalize(notif.username)
-  return ''
-}
-function capitalize(str) {
-  if (!str) return ''
-  return str.charAt(0).toUpperCase() + str.slice(1)
-}
-
 function onClick() {
   emit('click', props.notif)
 }
 </script>
 
 <style scoped>
+/* Réduction de l'espacement vertical entre les notifications */
 .notif_bubble {
   width: 100%;
   max-width: 400px;
-  margin: 0 auto;
+  margin: 4px auto; /* réduit la marge verticale */
   /* border-radius: 10px; */
   box-shadow: none;
   transition: box-shadow 0.2s, border 0.2s;
@@ -100,11 +72,12 @@ function onClick() {
   box-shadow: 0 4px 24px 0 rgba(0, 0, 0, 0.13), 0 3px 12px 0 rgba(0, 0, 0, 0.16);
   border: 1.5px solid #1976d2;
 }
+/* Réduction du gap entre avatar et infos principales */
 .notif-row-main {
   display: flex;
   align-items: center;
-  gap: 10px;
-  /* margin-bottom: 2px; */
+  gap: 7px;
+  /* margin-bottom: 0px; */
 }
 .notif-main-info {
   display: flex;
@@ -121,16 +94,12 @@ function onClick() {
   overflow: hidden;
   white-space: nowrap;
 }
+/* Réduction du gap vertical dans les détails */
 .notif-details {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  margin-left: 55px;
-}
-.notif-fullname {
-  font-size: 1.02rem;
-  color: #444;
-  font-weight: 500;
+  gap: 0.5px;
+  margin-left: 50px;
 }
 .notif-msg {
   font-size: 1rem;

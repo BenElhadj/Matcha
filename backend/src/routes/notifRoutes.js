@@ -11,4 +11,7 @@ routes.put('/updateByIds', authCheck, notif.updateNotifByIds)
 routes.get('/all', authCheck, notif.getAllNotif)
 routes.get('/debug', authCheck, notif.debug)
 
+// Route admin pour supprimer les notifications de soi à soi
+routes.post('/admin/clean-self-notif', notif.cleanSelfNotif)
+
 module.exports = routes

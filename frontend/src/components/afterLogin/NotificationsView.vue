@@ -307,35 +307,6 @@ const openNotification = async (entry) => {
   min-width: 420px;
   margin: 0 auto;
 }
-</style>
-
-<style scoped>
-.timeline_link {
-  text-decoration: none;
-}
-
-.bubble.grey {
-  border-radius: 5rem;
-  border: 1px solid rgba(0, 0, 0, 0.1) !important;
-  transition: all 0.3s ease-out;
-}
-
-.bubble.grey:hover {
-  border: 1px solid rgba(0, 0, 0, 0.25) !important;
-}
-
-.notif_bubble {
-  margin-top: -0.6rem;
-  border-radius: 8px;
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.04);
-  transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
-}
-.notif_bubble:hover {
-  transform: translateZ(0) scale(1.01);
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
-  border-color: rgba(0, 0, 0, 0.12);
-}
 .end-history {
   display: flex;
   align-items: center;

@@ -24,9 +24,3 @@
 import { ref } from 'vue'
 const tab = ref('all')
 </script>
-
-<style scoped>
-.notif-tabs {
-  margin-bottom: 37px;
-}
-</style>
