@@ -43,11 +43,8 @@ const showUsers = async (req, res) => {
 			   delete cur.verified
 			   delete cur.email
 			   delete cur.google_id
-			   // ID utilisateur fiable
-			   const curId = String(cur.user_id || cur.id)
-			   // Ajout des flags pour le front (like/match)
-			   cur.isLiked = likedUsers.includes(curId)
-			   cur.isMatched = matchedUsers.includes(curId)
+			   // Toujours fournir user_id (clé unique pour le front)
+			   cur.user_id = cur.user_id || cur.id
 			   // Ajout d'un champ profile_image explicite (base64 ou lien)
 			   cur.profile_image = null
 			   if (cur.link && cur.link !== 'false' && cur.link !== '') {
@@ -55,8 +52,6 @@ const showUsers = async (req, res) => {
 			   } else if (cur.data && cur.data !== 'false' && cur.data !== '') {
 				   cur.profile_image = `data:image/png;base64,${cur.data}`
 			   }
-			   // Toujours fournir user_id
-			   cur.user_id = cur.user_id || cur.id
 			   return cur
 		   }).filter(cur => {
 			   if (!req.body.filter) return true;
