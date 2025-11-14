@@ -188,14 +188,18 @@ const getTags = async (req, res) => {
 // get Blocked users 
 
 const getBlocked = async (req, res) => {
-	if (!req.user.id)
-		return res.json({ msg: 'not logged in' })
-	try {
-		const blacklist = await userModel.getBlocked(req.user.id)
-		res.json(blacklist)
+	if (!req.user.id) {
+		console.log('[getBlocked] Pas connecté');
+		return res.json({ msg: 'not logged in' });
 	}
-	catch (err) {
-		return res.json({ msg: 'Fatal error', err })
+	try {
+		console.log('[getBlocked] req.user.id =', req.user.id);
+		const blacklist = await userModel.getBlocked(req.user.id);
+		console.log('[getBlocked] Résultat SQL =', blacklist);
+		res.json(blacklist);
+	} catch (err) {
+		console.error('[getBlocked] Erreur fatale :', err);
+		return res.json({ msg: 'Fatal error', err });
 	}
 }
 

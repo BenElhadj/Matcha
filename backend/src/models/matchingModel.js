@@ -1,13 +1,23 @@
 const db = require('../config/database')
 
 const getFollowing = async (user_id) => {
-    const query = `SELECT matches.matched as matched_id, matches.created_at as match_date, users.username as username, COALESCE(images.link, images.data, '') as profile_image, images.profile as profile FROM matches INNER JOIN users ON matches.matched = users.id LEFT JOIN images ON matches.matched = images.user_id WHERE matches.matcher = $1`
+    const query = `SELECT matches.matched as matched_id, matches.created_at as match_date, users.username as username,
+        COALESCE(images.link, images.data, images.base64, 'false') as profile_image, images.profile as profile
+    FROM matches
+    INNER JOIN users ON matches.matched = users.id
+    LEFT JOIN images ON matches.matched = images.user_id AND images.profile = true
+    WHERE matches.matcher = $1`
     const result = await db.query(query, [user_id])
     return result.rows
 }
 
 const getFollowers = async (user_id) => {
-    const query = `SELECT matches.matcher as matcher_id, matches.created_at as match_date, users.username as username, COALESCE(images.link, images.data, '') as profile_image, images.profile as profile FROM matches INNER JOIN users ON matches.matcher = users.id LEFT JOIN images ON matches.matcher = images.user_id WHERE matches.matched = $1`
+    const query = `SELECT matches.matcher as matcher_id, matches.created_at as match_date, users.username as username,
+        COALESCE(images.link, images.data, images.base64, 'false') as profile_image, images.profile as profile
+    FROM matches
+    INNER JOIN users ON matches.matcher = users.id
+    LEFT JOIN images ON matches.matcher = images.user_id AND images.profile = true
+    WHERE matches.matched = $1`
     const result = await db.query(query, [user_id])
     return result.rows
 }
