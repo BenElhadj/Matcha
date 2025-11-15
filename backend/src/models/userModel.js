@@ -270,6 +270,7 @@ const setImages = async (user_id) => {
 const getBlocked = async (id) => {
     const query = `
         SELECT 
+            blocked.id AS block_row_id,
             blocked.blocked AS blocked_id, 
             users.username AS username, 
             users.first_name AS first_name, 
@@ -285,6 +286,7 @@ const getBlocked = async (id) => {
         JOIN users ON blocked.blocked = users.id 
         LEFT JOIN images ON users.id = images.user_id AND images.profile = TRUE 
         WHERE blocked.blocker = $1
+        ORDER BY blocked.created_at DESC
     `;
     const result = await db.query(query, [id]);
     // On applique la même logique que le frontend pour choisir l'avatar
@@ -299,6 +301,7 @@ const getBlocked = async (id) => {
             avatar = '';
         }
         return {
+            block_row_id: row.block_row_id,
             blocked_id: row.blocked_id,
             username: row.username,
             first_name: row.first_name,
@@ -334,10 +337,10 @@ const reportUser = async (user_id, id) => {
     const query = `INSERT INTO blocked (blocker, blocked, type) VALUES ($1, $2, 'report')`;
     await db.query(query, [user_id, id]);
 }
-// Supprimer un report (type = 'report')
-const unreportUser = async (user_id, id) => {
-    const query = `DELETE FROM blocked WHERE blocker = $1 AND blocked = $2 AND type = 'report'`;
-    await db.query(query, [user_id, id]);
+// Supprimer un report (type = 'report') par id unique
+const unreportUser = async (user_id, block_row_id) => {
+    const query = `DELETE FROM blocked WHERE id = $1 AND blocker = $2 AND type = 'report'`;
+    await db.query(query, [block_row_id, user_id]);
 };
 
 // Unblock user (type = 'block')

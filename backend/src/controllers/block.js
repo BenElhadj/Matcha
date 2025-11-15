@@ -1,26 +1,26 @@
 // Unreport User
 const unreportUser = async (req, res) => {
-	if (!req.user.id) {
-		return res.json({ status: 'error', type: 'report', message: 'Not logged in', data: null });
-	}
-	if (!req.body.id || isNaN(req.body.id)) {
-		return res.json({ status: 'error', type: 'report', message: 'Invalid request', data: null });
-	}
-	try {
-		await userModel.unreportUser(req.user.id, req.body.id);
-		// Vérification de la suppression
-		const check = await require('../utility/startbdd').pool.query(
-			'SELECT * FROM blocked WHERE blocker = $1 AND blocked = $2 AND type = $3',
-			[req.user.id, req.body.id, 'report']
-		);
-		if (check.rows.length === 0) {
-			return res.json({ status: 'success', type: 'report', message: 'Report removed', data: null });
-		} else {
-			return res.json({ status: 'error', type: 'report', message: 'Cannot remove report', data: null });
-		}
-	} catch (err) {
-		return res.json({ status: 'error', type: 'report', message: 'Fatal error', data: err });
-	}
+	   if (!req.user.id) {
+		   return res.json({ status: 'error', type: 'report', message: 'Not logged in', data: null });
+	   }
+	   if (!req.body.block_row_id || isNaN(req.body.block_row_id)) {
+		   return res.json({ status: 'error', type: 'report', message: 'Invalid request', data: null });
+	   }
+	   try {
+		   await userModel.unreportUser(req.user.id, req.body.block_row_id);
+		   // Vérification de la suppression
+		   const check = await require('../utility/startbdd').pool.query(
+			   'SELECT * FROM blocked WHERE id = $1 AND blocker = $2 AND type = $3',
+			   [req.body.block_row_id, req.user.id, 'report']
+		   );
+		   if (check.rows.length === 0) {
+			   return res.json({ status: 'success', type: 'report', message: 'Report removed', data: null });
+		   } else {
+			   return res.json({ status: 'error', type: 'report', message: 'Cannot remove report', data: null });
+		   }
+	   } catch (err) {
+		   return res.json({ status: 'error', type: 'report', message: 'Fatal error', data: err });
+	   }
 };
 const userModel = require('../models/userModel')
 const notifModel = require('../models/notificationsModel')
