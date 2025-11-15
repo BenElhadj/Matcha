@@ -14,7 +14,7 @@
                 plat
                 class="q-btn-primary q-btn-lg"  
                 role="button"
-                style="     margin-top: -100px;   margin-left: -26px;    margin-bottom: -306px;"
+                style="  margin-left: -26px;"
               >
                 Find your happiness here
               </q-btn>         
@@ -77,13 +77,6 @@ export default {
 .custom-slider {
   display: block;
 }
-.custom-title {
-  margin-top: 50px !important;
-}
-
-.custom-age {
-  margin-bottom: 50px !important;
-}
 
 .header_content {
   height: 100%;
@@ -109,7 +102,7 @@ export default {
   font-size: 5em !important;
 }
 
-.q-app .mb-5 {
+.mb-5 {
   font-family: 'Elliane' !important;
 }
 

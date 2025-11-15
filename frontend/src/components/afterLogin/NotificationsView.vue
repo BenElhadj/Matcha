@@ -19,7 +19,7 @@
                 <q-icon name="mdi-history" size="32px" class="q-mr-sm" />
                 <div class="text-subtitle1">
                   <span v-if="notifs.length === 1">First notification — no previous history.</span>
-                  <span v-else>You’ve reached the start of your notification history.</span>
+                  <span v-else>You've reached the start of your notification history.</span>
                 </div>
               </div>
               <div v-else-if="!hasMore && !notifs.length" class="end-history">

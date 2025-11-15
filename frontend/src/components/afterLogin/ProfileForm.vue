@@ -1,8 +1,8 @@
 <template>
   <q-page>
     <q-page-container>
-      <h1 class="q-pb-md" style="margin-top: -10px; text-align: center">Profile</h1>
-      <h3 style="margin-top: -70px; margin-bottom: 100px; text-align: center">
+      <h1 class="q-pb-md" style="text-align: center">Profile</h1>
+      <h3 style="margin-bottom: 100px; text-align: center">
         {{ user.username }}
       </h3>
 
@@ -42,7 +42,7 @@
         />
       </div>
 
-      <q-form @submit.prevent="updateUser" class="q-gutter-md" style="margin-top: 70px" v-if="user">
+      <q-form @submit.prevent="updateUser" class="q-gutter-md" v-if="user">
         <q-input
           id="username"
           v-model="user.username"

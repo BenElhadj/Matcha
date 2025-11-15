@@ -1,10 +1,12 @@
-/* Correction curseur global : force le curseur par défaut partout sauf sur les éléments interactifs */
-* {
-  cursor: default !important;
+@font-face {
+  font-family: 'Elliane';
+  src: url('../assets/fonts/Elliane-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
 }
-input, textarea, [contenteditable="true"], button, a, select, .cursor-pointer, .like-btn-absolute {
-  cursor: pointer !important;
-}
+
+/* Correction : suppression du curseur global forcé, on laisse le comportement natif */
 /* color palette from <https://github.com/vuejs/theme> */
 :root {
   --vt-c-white: #ffffff;
@@ -26,13 +28,6 @@ input, textarea, [contenteditable="true"], button, a, select, .cursor-pointer, .
   --vt-c-text-light-2: rgba(60, 60, 60, 0.66);
   --vt-c-text-dark-1: var(--vt-c-white);
   --vt-c-text-dark-2: rgba(235, 235, 235, 0.64);
-}
-
-/* semantic color variables for this project */
-:root {
-  --color-background: var(--vt-c-white);
-  --color-background-soft: var(--vt-c-white-soft);
-  --color-background-mute: var(--vt-c-white-mute);
 
   --color-border: var(--vt-c-divider-light-2);
   --color-border-hover: var(--vt-c-divider-light-1);
@@ -43,19 +38,6 @@ input, textarea, [contenteditable="true"], button, a, select, .cursor-pointer, .
   --section-gap: 160px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-background: var(--vt-c-black);
-    --color-background-soft: var(--vt-c-black-soft);
-    --color-background-mute: var(--vt-c-black-mute);
-
-    --color-border: var(--vt-c-divider-dark-2);
-    --color-border-hover: var(--vt-c-divider-dark-1);
-
-    --color-heading: var(--vt-c-text-dark-1);
-    --color-text: var(--vt-c-text-dark-2);
-  }
-}
 
 *,
 *::before,
@@ -66,13 +48,26 @@ input, textarea, [contenteditable="true"], button, a, select, .cursor-pointer, .
 }
 
 body {
+  font-family: 'Elliane', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  font-variant-ligatures: none;
+}
+
+
+
+input, textarea, [contenteditable="true"], button, a, select, .cursor-pointer, .like-btn-absolute {
+  cursor: pointer !important;
+}
+
+::selection {
+  background: #b3d4fc;
+  color: #222;
+}
+body {
   min-height: 100vh;
   color: var(--color-text);
   background: var(--color-background);
   transition: color 0.5s, background-color 0.5s;
   line-height: 1.6;
-  font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu,
-    Cantarell, 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
   font-size: 15px;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;

@@ -14,8 +14,8 @@
         />
         <q-btn round color="primary" icon="mdi-camera-plus" @click="onUploadClick" />
       </div>
-      <h1 class="q-pb-md" style="margin-top: -10px; text-align: center">Gallery</h1>
-      <h3 style="margin-top: -70px; margin-bottom: 100px; text-align: center">
+      <h1 class="q-pb-md" style="text-align: center">Gallery</h1>
+      <h3 style="margin-bottom: 100px; text-align: center">
         {{ username }}
       </h3>
       <div class="row q-gutter-md mt-4">

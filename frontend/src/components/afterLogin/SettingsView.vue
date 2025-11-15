@@ -65,7 +65,7 @@
       </div>
 
       <q-separator spacing class="separator-margin"></q-separator>
-      <div class="centered-tabs" style="max-width: 800px">
+      <div class="centered-tabs" style="max-width: 900px">
         <q-card>
           <q-tabs
             v-model="activeTab"
@@ -365,7 +365,7 @@ const syncUser = (updatedUser) => {
 }
 .page-container {
   font-family: 'Elliane' !important;
-  color: black;
+  color: rgb(0, 0, 0);
   margin-top: -87px !important;
   margin-bottom: 0px !important;
 }
@@ -376,7 +376,7 @@ const syncUser = (updatedUser) => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 2em;
+  /* margin-bottom: 2em; */
 }
 .profile__cover {
   width: 100%;
@@ -407,7 +407,7 @@ const syncUser = (updatedUser) => {
   background: rgba(211, 211, 211, 0.3);
 }
 .centered-tabs {
-  max-width: 800px;
+  max-width: 400px;
   margin: 0 auto;
 }
 </style>

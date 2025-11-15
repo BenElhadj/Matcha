@@ -8,6 +8,7 @@ import router from '@/router/index'
 import { api } from '@/boot/axios' // Ajoutez cette ligne
 import 'quasar/src/css/index.sass' 
 import App from '@/App.vue'
+import '@/assets/base.css'
 import { connectSocket } from '@/boot/socketClient'
 
 // Silence noisy console output in production (keep errors)

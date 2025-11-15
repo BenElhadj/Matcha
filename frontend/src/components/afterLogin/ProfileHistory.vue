@@ -1,11 +1,11 @@
 <template>
   <q-page class="q-pa-lg">
     <q-page-container>
-      <h1 style="margin-top: -40px; text-align: center">History</h1>
-      <h3 style="margin-top: -50px; margin-bottom: 20px; text-align: center">
+      <h1 style="text-align: center">History</h1>
+      <h3 style="margin-bottom: 100px; text-align: center">
         {{ user.username }}
       </h3>
-      <q-timeline align="top" label="Loose" center class="timeline_container q-gutter-md">
+      <q-timeline align="top" label="Loose" center class="q-gutter-md">
         <q-timeline color="secondary">
           <q-timeline-entry heading style="margin: 10px; text-align: center">
             Her you can see all your history of actions on the website
@@ -127,9 +127,6 @@ const redirectToUser = (hisId) => {
 </script>
 
 <style>
-.timeline_container {
-  margin-top: 20px;
-}
 
 .timeline_link {
   text-decoration: none;
@@ -143,9 +140,5 @@ const redirectToUser = (hisId) => {
 
 .bubble.grey:hover {
   border: 1px solid rgba(0, 0, 0, 0.25) !important;
-}
-
-.v-timeline-item__body {
-  margin-top: -0.8rem !important;
 }
 </style>

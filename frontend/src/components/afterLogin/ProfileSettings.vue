@@ -1,8 +1,8 @@
 <template>
   <q-page>
     <q-page-container>
-      <h1 class="q-pb-md" style="margin-top: -10px; text-align: center">Settings</h1>
-      <h3 style="margin-top: -70px; margin-bottom: 70px; text-align: center">
+      <h1 class="q-pb-md" style="text-align: center">Settings</h1>
+      <h3 style="margin-bottom: 100px; text-align: center">
         {{ user.username }}
       </h3>
 

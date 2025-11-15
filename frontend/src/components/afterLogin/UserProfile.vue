@@ -57,82 +57,77 @@
 
       <q-separator spacing class="separator-margin"></q-separator>
 
-      <div class="centered-tabs" style="max-width: 800px">
+      <div :color="`grey lighten`" class="centered-tabs" style="max-width: 900px">
         <q-card>
-          <q-tabs
-            v-model="activeTab"
-            class="bg-grey-2 text-grey q-tabs__content"
-            active-color="primary"
-            indicator-color="bg-grey-2"
-          >
-            <div class="row q-flex q-mb-md" style="flex: 1; justify-content: flex-end; width: 100%">
+          <q-tabs v-model="activeTab" class="text-grey q-tabs__content" active-color="primary">
+            <div class="row q-flex" style="flex: 1; justify-content: flex-end; width: 100%">
               <q-tab name="tab-profile" label="Profile"></q-tab>
               <q-tab name="tab-photo" label="Photos"></q-tab>
             </div>
 
-            <div class="row q-mb-md" style="flex: 1; width: 100%">
-              <q-separator style="margin-left: 50px"></q-separator>
-
-              <q-btn flat @click="onLikeClick">
-                <img class="icon-size" :class="{ 'pop-like': animateLike }" :src="likeIcon" />
+            <div class="row" style="flex: 1; width: 100%; margin-top: 0; margin-bottom: 0;">
+              <q-btn flat @click="onLikeClick" style="margin-top: 0; margin-bottom: 0;">
+              <img class="icon-size" :class="{ 'pop-like': animateLike }" :src="likeIcon" style="margin-top: 0; margin-bottom: 0;" />
               </q-btn>
 
-              <q-btn flat>
-                <img
-                  class="icon-size"
-                  @click="goToChat"
-                  :src="userCanChat ? chatFalse : chatTrue"
-                />
+              <q-btn flat style="margin-top: 0; margin-bottom: 0;">
+              <img
+                class="icon-size"
+                @click="goToChat"
+                :src="userCanChat ? chatFalse : chatTrue"
+                style="margin-top: 0; margin-bottom: 0;"
+              />
               </q-btn>
 
-              <div class="flex" style="display: flex; align-items: center; justify-content: center">
-                <q-tooltip top class="status_container">
-                  <span>You can block or report</span>
-                </q-tooltip>
-                <q-fab
-                  vertical-actions-align="right"
-                  text-color="black"
-                  direction="right"
-                  icon="mdi-chevron-double-right"
-                  active-icon="mdi-window-close"
+              <div style="margin-top: 0; margin-bottom: 0;">
+              <q-tooltip top class="status_container">
+                <span>You can block or report</span>
+              </q-tooltip>
+              <q-fab
+                vertical-actions-align="right"
+                text-color="black"
+                direction="right"
+                icon="mdi-chevron-double-right"
+                active-icon="mdi-window-close"
+                flat
+                square
+                padding="md sm md lg"
+                label-position="left"
+                label="."
+                bg-color="red"
+                class="icon-banir"
+                style="margin-top: -8px; margin-bottom: 0;"
+              >
+                <q-fab-action
                   flat
                   square
-                  padding="md sm md lg"
-                  label-position="left"
-                  label="."
-                  bg-color="red"
-                  class="icon-banir"
-                >
-                  <q-fab-action
-                    flat
-                    square
-                    external-label
-                    color="warning"
-                    @click="confirmAlert('Report')"
-                    class="icon-report"
+                  external-label
+                  color="warning"
+                  @click="confirmAlert('Report')"
+                  class="icon-report"
                   >
-                    <q-tooltip bottom class="status_container">
-                      <span>Report</span>
-                    </q-tooltip>
-                  </q-fab-action>
-                  <q-fab-action
-                    flat
-                    square
-                    external-label
-                    color="red"
-                    @click="confirmAlert('Block')"
-                    class="icon-block"
+                  <q-tooltip bottom class="status_container">
+                    <span>Report</span>
+                  </q-tooltip>
+                </q-fab-action>
+                <q-fab-action
+                  flat
+                  square
+                  external-label
+                  color="red"
+                  @click="confirmAlert('Block')"
+                  class="icon-block"
                   >
-                    <q-tooltip bottom class="status_container">
-                      <span>Block</span>
-                    </q-tooltip>
-                  </q-fab-action>
-                </q-fab>
+                  <q-tooltip bottom class="status_container">
+                    <span>Block</span>
+                  </q-tooltip>
+                </q-fab-action>
+              </q-fab>
               </div>
             </div>
           </q-tabs>
 
-          <q-separator spacing class="separator-margin"></q-separator>
+          <q-separator horizontal spacing class="separator-margin"></q-separator>
 
           <q-tab-panels v-model="activeTab" animated class="bg-grey-2 text-black">
             <q-tab-panel name="tab-profile">
@@ -473,14 +468,14 @@ const userTags = computed(() => {
   return tags.split(',')
 })
 
-const getProfileImage = () => {
-  const cachedDefault = utility.getCachedDefault ? utility.getCachedDefault('profile') : null
-  const base = import.meta.env.BASE_URL || '/'
-  const defaultImage = cachedDefault || `${base}default/defaut_profile.txt`
-  if (!user.value || !user.value.images) return defaultImage
-  const image = user.value.images.find((cur) => cur.profile === 1) || user.value.images[0]
-  return getImageSrc(image, defaultImage)
-}
+// const getProfileImage = () => {
+//   const cachedDefault = utility.getCachedDefault ? utility.getCachedDefault('profile') : null
+//   const base = import.meta.env.BASE_URL || '/'
+//   const defaultImage = cachedDefault || `${base}default/defaut_profile.txt`
+//   if (!user.value || !user.value.images) return defaultImage
+//   const image = user.value.images.find((cur) => cur.profile === 1) || user.value.images[0]
+//   return getImageSrc(image, defaultImage)
+// }
 
 function actionForType(type) {
   // DB-only: default/he_like -> like; you_like/you_like_back -> unlike
@@ -739,22 +734,24 @@ onBeforeUnmount(() => {})
 <style scoped>
 .icon-banir {
   background-image: url('@/assets/Block/banir.png');
-  background-size: 40px !important;
+  background-size: 30px !important;
   background-position: center bottom;
   background-repeat: no-repeat;
 }
 .icon-block {
   background-image: url('@/assets/Block/block.png');
-  background-size: 25px;
+  background-size: 20px;
   background-repeat: no-repeat;
+  margin-left: -7px;
 }
 .icon-report {
   background-image: url('@/assets/Block/report.png');
-  background-size: 25px;
+  background-size: 20px;
   background-repeat: no-repeat;
+  margin-left: -7px;
 }
 .icon-size {
-  width: 42px;
+  width: 37px;
   transition: transform 120ms ease;
 }
 .icon-size.pop-like {
@@ -776,6 +773,7 @@ onBeforeUnmount(() => {})
   align-items: center;
   justify-content: space-evenly;
   padding: 0;
+  background-color: #f6f6f6 !important;
 }
 .separator-margin {
   margin-left: -2000px;
