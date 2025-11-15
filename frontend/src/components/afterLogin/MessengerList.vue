@@ -1,8 +1,13 @@
 <template>
-  <div class="q-pa-md" style="max-width: 280px">
-    <q-list style="background-color: WhiteSmoke">
+  <div
+    class="q-pa-md"
+    style="max-width: 270px; min-width: 170px; width: 100%; box-sizing: border-box"
+  >
+    <q-list
+      style="background-color: WhiteSmoke; min-width: 170px; max-width: 100%; border-radius: 18px"
+    >
       <q-item>
-        <q-item-section style="padding-left: -5px; !important">Discussions</q-item-section>
+        <q-item-section style="padding-left: -5px !important">Discussions</q-item-section>
       </q-item>
       <q-item
         v-if="sortedConvos.length == 0"
@@ -186,8 +191,7 @@ watch(
 )
 
 // Presence class for the avatar overlay
-const presenceClass = (convo) =>
-  lastSeen.value[convo.user_id] === 'online' ? 'online' : 'offline'
+const presenceClass = (convo) => (lastSeen.value[convo.user_id] === 'online' ? 'online' : 'offline')
 
 function refreshMethods() {
   updateConnectedUsers()

@@ -5,7 +5,7 @@
         <q-layout class="row wrap justify-start">
           <div class="col-auto filters-panel">
             <div class="px-5">
-              <q-layout class="column">
+              <q-layout class="column q-gutter-md">
                 <div class="row items-center justify-between q-mb-md">
                   <h4 class="title q-ma-none">Search</h4>
                   <div class="row items-center">
@@ -15,7 +15,7 @@
                 </div>
                 <q-input
                   v-model="recherche"
-                  class="location_input mb-5"
+                  class="location_input"
                   color="primary"
                   hide-details
                   outlined
@@ -28,7 +28,7 @@
                     <q-icon name="mdi-magnify"></q-icon>
                   </template>
                 </q-input>
-                <h4 class="title mb-4">Gender</h4>
+                <h4 class="title">Gender</h4>
                 <q-btn-toggle
                   v-model="gender"
                   spread
@@ -43,19 +43,19 @@
                     { label: 'All', value: 'all' }
                   ]"
                 />
-                <h4 class="title mb-3">Distance</h4>
+                <h4 class="title">Distance</h4>
                 <q-range
                   v-model="distance"
                   :min="0"
-                  :max="maxDis"
+                    :max="Math.round(maxDis)"
                   :step="step"
                   label-always
                   thumb-label="always"
                   thumb-size="30"
-                  class="custom-slider mx-3 mb-5 pt-3"
+                  class="custom-slider"
                 ></q-range>
 
-                <h4 class="title mb-3">Age</h4>
+                <h4 class="title">Age</h4>
                 <q-range
                   v-model="age"
                   :min="18"
@@ -64,25 +64,25 @@
                   label-always
                   thumb-label="always"
                   thumb-size="25"
-                  class="custom-slider mx-3 mb-4 pt-3"
+                  class="custom-slider"
                 ></q-range>
 
-                <h4 class="title mb-3">Rating</h4>
+                <h4 class="title">Rating</h4>
                 <q-range
                   v-model="rating"
                   :min="0"
-                  :max="ratingCap"
+                    :max="Number(ratingCap).toFixed(2)"
                   :step="0.1"
                   label-always
                   thumb-label="always"
                   thumb-size="25"
-                  class="mx-3 mb-5 pt-3"
+                  class="custom-slider"
                 ></q-range>
 
-                <h4 class="title mb-4">Location</h4>
+                <h4 class="title">Location</h4>
                 <q-input
                   v-model="location"
-                  class="location_input mb-5"
+                  class="location_input"
                   label="City or Town"
                   color="primary"
                   hide-details
@@ -95,7 +95,7 @@
                   </template>
                 </q-input>
 
-                <h4 class="title mb-4">Interests</h4>
+                <h4 class="title">Interests</h4>
                 <q-select
                   v-model="interests"
                   :options="allTags"
@@ -106,7 +106,7 @@
                   outlined
                 />
 
-                <div class="row justify-between mb-4">
+                <div class="row justify-between">
                   <h4 class="title">Sort by</h4>
                   <q-btn
                     @click="changeSort"
@@ -129,8 +129,8 @@
                   class="sort_select"
                 />
 
-                <div class="row justify-between mb-4">
-                  <h4 class="title mb-4">Reset all</h4>
+                <div class="row justify-between">
+                  <h4 class="title">Reset all</h4>
                   <q-btn
                     @click="reset"
                     flat
@@ -701,6 +701,11 @@ a {
   z-index: 2;
   /* Overlay now only covers the grid area, so it can block clicks on cards while leaving filters clickable */
   pointer-events: auto;
+}
+
+.custom-slider {
+  margin-top: 25px;
+  margin-bottom: -10px;
 }
 
 .filters-panel {
