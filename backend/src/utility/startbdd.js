@@ -1,3 +1,28 @@
+// Vérifie si une table existe et si toutes les colonnes attendues sont présentes
+const ensureTableStructure = async (tableName, expectedColumns, createTableQuery, insertSampleDataFn, resetSequenceFn) => {
+  // Vérifier si la table existe
+  const tableCheck = await pool.query(`SELECT to_regclass('public.${tableName}') as exists;`);
+  if (tableCheck.rows[0].exists) {
+    // Vérifier les colonnes existantes
+    const columnsRes = await pool.query(`SELECT column_name FROM information_schema.columns WHERE table_name='${tableName}';`);
+    const existingColumns = columnsRes.rows.map(r => r.column_name);
+    const missing = expectedColumns.filter(col => !existingColumns.includes(col));
+    if (missing.length > 0) {
+      console.log(`La table ${tableName} existe mais il manque les colonnes : ${missing.join(', ')}. Suppression...`);
+      await pool.query(`DROP TABLE ${tableName} CASCADE;`);
+    }
+  }
+  // Création de la table si absente ou supprimée
+  await pool.query(createTableQuery);
+  // Remplissage si vide
+  const countQuery = `SELECT COUNT(*) AS count FROM ${tableName}`;
+  const countResult = await pool.query(countQuery);
+  const rowCount = parseInt(countResult.rows[0].count);
+  if (rowCount === 0 && insertSampleDataFn) {
+    await insertSampleDataFn();
+    if (resetSequenceFn) await resetSequenceFn();
+  }
+};
 require('dotenv').config();
 const { Pool } = require('pg')
 
@@ -72,18 +97,13 @@ const createUserTable = async () => {
         reports INTEGER DEFAULT 0
       );
     `;
-
     await pool.query(createTableQuery);
-    console.log('Users table created or already exists');
+    console.log('Users table created successfully!');
 
-    const checkDataQuery = 'SELECT COUNT(*) as count FROM users';
-    const result = await pool.query(checkDataQuery);
-    const rowCount = parseInt(result.rows[0].count);
-    
-    console.log(`Users table currently has ${rowCount} rows`);
-
-    if (rowCount === 0) {
-      console.log('Inserting sample data into users table...');
+    const expectedColumns = [
+      'id','first_name','last_name','username','email','password','created_at','gender','looking','birthdate','biography','tags','address','city','country','postal_code','phone','status','lat','lng','vkey','rkey','verified','google_id','reports'
+    ];
+    const insertSampleData = async () => {
       const insertTableQuery = `
         INSERT INTO users (first_name, last_name, username, email, password, created_at, gender, looking, birthdate, biography, tags, address, city, country, postal_code, phone, status, lat, lng, vkey, rkey, verified, google_id, reports) VALUES
         ('Test', 'Admin', 'AdminTest', '42projetsweb@gmail.com', '$2a$10$LG21UOau1qzQ9nCIWNq7iuAltnSsgoPCWHFl5H33PsBRqs0ghyUZK', '2023-07-07 03:09:20', 'male', 'all', '1990-04-09', 'je suis timide', 'Music, Cinema, Geek, Development, Sports', '5 Passage Bullourde', 'Paris', 'France', '75011', '0605868051', '2023-07-07 03:09:20', '48.841463', '2.3614006', '', '', true, '', 0),
@@ -589,18 +609,24 @@ const createUserTable = async () => {
       `;
       await pool.query(insertTableQuery);
       console.log('Sample data inserted into users table');
-      
-      await resetSequence('users', 'id');
+    };
+    await ensureTableStructure('users', expectedColumns, createTableQuery, insertSampleData, async () => await resetSequence('users', 'id'));
+    const countQuery = 'SELECT COUNT(*) AS count FROM users';
+    const countResult = await pool.query(countQuery);
+    const rowCount = parseInt(countResult.rows[0].count);
+    console.log(`Users table currently has ${rowCount} rows`);
+    if (rowCount === 0) {
+      console.log('Users table was empty and has been filled with sample data.');
     } else {
-      console.log('Users table already contains data, skipping insertion');
+      console.log('Users table already contains data.');
     }
-    console.log('✅ Users table created');
-
+    console.log('✅ Users table created\n');
   } catch (error) {
     console.error('Error creating user table:', error);
     throw error;
   }
 };
+
 
 const createBlockedTable = async () => {
   try {
@@ -610,83 +636,59 @@ const createBlockedTable = async () => {
         id SERIAL PRIMARY KEY,
         blocker INTEGER NOT NULL,
         blocked INTEGER NOT NULL,
-        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        type VARCHAR(16) NOT NULL DEFAULT 'block'
       );
     `;
-    
     await pool.query(createTableQuery);
     console.log('Blocked table created successfully!');
-    
-    const countQuery = 'SELECT COUNT(*) AS count FROM blocked';
-    const countResult = await pool.query(countQuery);
-    const rowCount = parseInt(countResult.rows[0].count);
-    
-        const insertTableQuery = `
-          INSERT INTO history (visitor, visited, created_at, type) VALUES
-          (1, 67, '2023-08-02 01:59:53', 'visit'),
-          (23, 1, '2023-08-03 02:18:46', 'visit'),
-          (1, 61, '2023-08-03 02:25:00', 'visit'),
-          (12, 1, '2023-08-03 04:05:02', 'visit'),
-          (1, 74, '2023-08-03 04:05:33', 'visit'),
-          (4, 1, '2023-08-03 15:48:10', 'visit'),
-          (1, 61, '2023-08-03 15:50:31', 'visit'),
-          (5, 1, '2023-08-03 16:18:52', 'visit'),
-          (1, 5, '2023-08-03 16:19:37', 'visit'),
-          (1, 5, '2023-08-03 16:21:46', 'visit'),
-          (1, 5, '2023-08-03 16:22:06', 'visit'),
-          (1, 55, '2023-08-03 16:22:11', 'visit')
-          -- ...existing sample data, all with type 'visit'
-        `;
-    if (rowCount === 0) {
-      console.log('Inserting sample data into blocked table...');
+
+    const expectedColumns = ['id','blocker','blocked','created_at','type'];
+    const insertSampleData = async () => {
       const insertTableQuery = `
-        INSERT INTO blocked (blocker, blocked, created_at) VALUES
-         (1, 214, '2023-05-04 16:56:13'),
-        (2, 65, '2023-05-04 16:56:13'),
-        (1, 55, '2023-05-04 16:56:13'),
-        (3, 41, '2023-05-04 16:56:13'),
-        (1, 44, '2023-05-04 16:56:13'),
-        (304, 1, '2023-05-04 16:56:13'),
-        (1, 85, '2023-05-04 16:56:13'),
-        (465, 1, '2023-05-04 16:56:13'),
-        (1, 56, '2023-05-04 16:56:13'),
-        (76, 1, '2023-05-04 16:56:13'),
-        (1, 77, '2023-05-04 16:56:13'),
-        (97, 1, '2023-05-04 16:56:13'),
-        (1, 88, '2023-05-04 16:56:13'),
-        (108, 1, '2023-05-04 16:56:13'),
-        (2, 30, '2023-05-04 16:56:13'),
-        (3, 247, '2023-05-04 16:56:13'),
-        (2, 41, '2023-05-04 16:56:13'),
-        (4, 2, '2023-05-04 16:56:13'),
-        (2, 352, '2023-05-04 16:56:13'),
-        (185, 2, '2023-05-04 16:56:13'),
-        (2, 306, '2023-05-04 16:56:13'),
-        (176, 2, '2023-05-04 16:56:13'),
-        (2, 307, '2023-05-04 16:56:13'),
-        (407, 2, '2023-05-04 16:56:13'),
-        (2, 228, '2023-05-04 16:56:13'),
-        (208, 2, '2023-05-04 16:56:13'),
-        (73, 494, '2023-05-04 16:56:13'),
-        (36, 5, '2023-05-04 16:56:13'),
-        (206, 63, '2023-05-04 16:56:13'),
-        (323, 487, '2023-05-04 16:56:13'),
-        (188, 3, '2023-05-04 16:56:13'),
-        (5, 184, '2023-05-04 16:56:13'),
-        (384, 6, '2023-05-04 16:56:13'),
-        (36, 5, '2023-05-04 16:56:13'),
-        (77, 275, '2023-05-04 16:56:13'),
-        (395, 8, '2023-05-04 16:56:13'),
-        (298, 5, '2023-05-04 16:56:13');
+        INSERT INTO blocked (blocker, blocked, created_at, type) VALUES
+        (1, 214, '2023-05-04 16:56:13', 'block'),
+        (2, 65, '2023-05-04 16:56:13', 'block'),
+        (1, 55, '2023-05-04 16:56:13', 'block'),
+        (3, 41, '2023-05-04 16:56:13', 'block'),
+        (384, 6, '2023-05-04 16:56:13', 'block'),
+        (36, 5, '2023-05-04 16:56:13', 'block'),
+        (77, 275, '2023-05-04 16:56:13', 'block'),
+        (395, 8, '2023-05-04 16:56:13', 'block'),
+        (1, 55, '2023-05-04 16:56:13', 'block'),
+        (3, 41, '2023-05-04 16:56:13', 'report'),
+        (1, 44, '2023-05-04 16:56:13', 'report'),
+        (304, 1, '2023-05-04 16:56:13', 'report'),
+        (1, 85, '2023-05-04 16:56:13', 'block'),
+        (465, 1, '2023-05-04 16:56:13', 'report'),
+        (1, 56, '2023-05-04 16:56:13', 'report'),
+        (76, 1, '2023-05-04 16:56:13', 'report'),
+        (1, 77, '2023-05-04 16:56:13', 'report'),
+        (97, 1, '2023-05-04 16:56:13', 'report'),
+        (1, 88, '2023-05-04 16:56:13', 'report'),
+        (108, 1, '2023-05-04 16:56:13', 'block'),
+        (2, 30, '2023-05-04 16:56:13', 'block'),
+        (3, 247, '2023-05-04 16:56:13', 'report'),
+        (2, 41, '2023-05-04 16:56:13', 'report'),
+        (4, 2, '2023-05-04 16:56:13', 'report'),
+        (2, 352, '2023-05-04 16:56:13', 'report'),
+        (185, 2, '2023-05-04 16:56:13', 'report'),
+        (298, 5, '2023-05-04 16:56:13', 'block');
       `;
       await pool.query(insertTableQuery);
       console.log('Sample data inserted into blocked table');
-      
-      await resetSequence('blocked', 'id');
+    };
+    await ensureTableStructure('blocked', expectedColumns, createTableQuery, insertSampleData, async () => await resetSequence('blocked', 'id'));
+    const countQuery = 'SELECT COUNT(*) AS count FROM blocked';
+    const countResult = await pool.query(countQuery);
+    const rowCount = parseInt(countResult.rows[0].count);
+    console.log(`Blocked table currently has ${rowCount} rows`);
+    if (rowCount === 0) {
+      console.log('Blocked table was empty and has been filled with sample data.');
     } else {
       console.log('Blocked table already contains data.');
     }
-    console.log('✅ Blocked table created');
+    console.log('✅ Blocked table created\n');
   } catch (error) {
     console.error('Error creating blocked table:', error);
   }
@@ -719,19 +721,19 @@ const createChatTable = async () => {
       console.log('Inserting sample data into chat table...');
       const insertTableQuery = `
         INSERT INTO chat (id_conversation, id_from, message, created_at, is_read) VALUES  
-        (1, 1, 'Salut', '2020-06-15 17:07:11', false),
+        (2, 1, 'Salut', '2020-06-15 17:07:11', false),
         (1, 2, 'Salut', '2020-06-15 17:07:11', false),
-        (1, 1, 'Ca va ?', '2020-06-15 17:07:11', false),
+        (1, 3, 'Ca va ?', '2020-06-15 17:07:11', false),
         (1, 2, 'Ca va et toi ?', '2020-06-15 17:07:11', false),
-        (1, 1, 'Ca va bien merci', '2020-06-15 17:07:11', false),
+        (1, 2, 'Ca va bien merci', '2020-06-15 17:07:11', false),
         (1, 2, 'Tu fais quoi ?', '2020-06-15 17:07:11', false),
-        (1, 1, 'Je suis en train de coder', '2020-06-15 17:07:11', false),
+        (2, 1, 'Je suis en train de coder', '2020-06-15 17:07:11', false),
         (1, 2, 'Ok', '2020-06-15 17:07:11', false),
-        (1, 1, 'Et toi ?', '2020-06-15 17:07:11', false),
+        (2, 1, 'Et toi ?', '2020-06-15 17:07:11', false),
         (1, 2, 'Je suis en train de coder', '2020-06-15 17:07:11', false),
-        (1, 1, 'Ok', '2020-06-15 17:07:11', false),
-        (1, 1, 'im here', '2023-10-21 02:55:44', true),
-        (1, 1, 'hello', '2023-10-21 02:55:47', true),
+        (11, 51, 'Ok', '2020-06-15 17:07:11', false),
+        (1, 11, 'im here', '2023-10-21 02:55:44', true),
+        (151, 1, 'hello', '2023-10-21 02:55:47', true),
         (1, 2, 'yo', '2023-10-21 02:56:27', true),
         (1, 2, 'how are you', '2023-10-21 02:56:33', true),
         (2, 475, 'hjdfgvpbh', '2023-10-21 03:04:37', true),
@@ -759,8 +761,8 @@ const createChatTable = async () => {
         (1, 2, 'bjr', '2023-10-22 00:26:36', false),
         (15, 29, 'salut', '2023-10-22 06:39:04', false),
         (15, 29, 'tu ne repond pas', '2023-10-22 06:53:11', true),
-        (1, 1, 'cc mon gars', '2023-10-22 06:53:59', false),
-        (1, 1, 'ça vas?', '2023-10-22 06:54:05', false),
+        (1, 50, 'cc mon gars', '2023-10-22 06:53:59', false),
+        (54, 1, 'ça vas?', '2023-10-22 06:54:05', false),
         (12, 1, 'OK comme tu veux', '2023-10-24 19:36:33', false);
       `;
       await pool.query(insertTableQuery);
@@ -770,7 +772,7 @@ const createChatTable = async () => {
     } else {
       console.log('Chat table already contains data.');
     }
-    console.log('✅ Chat table created');
+    console.log('✅ Chat table created\n');
   } catch (error) {
     console.error('Error creating chat table:', error);
   }
@@ -830,7 +832,7 @@ const createConversationsTable = async () => {
     } else {
       console.log('Conversations table already contains data.');
     }
-    console.log('✅ Conversations table created');
+    console.log('✅ Conversations table created\n');
   } catch (error) {
     console.error('Error creating conversations table:', error);
   }
@@ -844,26 +846,17 @@ const createHistoryTable = async () => {
         id SERIAL PRIMARY KEY,
         visitor INTEGER NOT NULL,
         visited INTEGER NOT NULL,
-        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        type VARCHAR(20) NOT NULL DEFAULT 'visit'
       );
     `;
     await pool.query(createTableQuery);
     console.log('History table created successfully!');
-    // Ensure 'type' column exists for visit actions
-    try {
-      await pool.query("ALTER TABLE history ADD COLUMN IF NOT EXISTS type VARCHAR(20) NOT NULL DEFAULT 'visit';");
-      console.log("Ensured 'type' column exists in history table.");
-    } catch (err) {
-      console.error("Error ensuring 'type' column in history table:", err);
-    }
-    const countQuery = 'SELECT COUNT(*) AS count FROM history';
-    const countResult = await pool.query(countQuery);
-    const rowCount = parseInt(countResult.rows[0].count);
-    console.log(`History table currently has ${rowCount} rows`);
-    if (rowCount === 0) {
-      console.log('Inserting sample data into history table...');
+
+    const expectedColumns = ['id','visitor','visited','created_at','type'];
+    const insertSampleData = async () => {
       const insertTableQuery = `
-        INSERT INTO history (visitor, visited, created_at) VALUES
+        INSERT INTO history (visitor, visited, created_at, type) VALUES
         (1, 67, '2023-08-02 01:59:53'),
         (23, 1, '2023-08-03 02:18:46'),
         (1, 61, '2023-08-03 02:25:00'),
@@ -1235,7 +1228,7 @@ const createHistoryTable = async () => {
         (140, 1, '2023-10-14 05:29:12'),
         (1, 29, '2023-10-14 06:06:27'),
         (1, 429, '2023-10-14 11:48:53'),
-        (1, 1, '2023-10-15 21:33:59'),
+        (452, 1, '2023-10-15 21:33:59'),
         (1, 426, '2023-10-15 22:14:42'),
         (1, 2, '2023-10-15 22:21:00'),
         (1, 2, '2023-10-15 22:23:07'),
@@ -1561,7 +1554,7 @@ const createHistoryTable = async () => {
         (478, 1, '2023-10-22 06:42:42'),
         (2, 340, '2023-10-22 06:44:17'),
         (2, 19, '2023-10-22 06:44:38'),
-        (1, 1, '2023-10-22 10:34:05'),
+        (152, 1, '2023-10-22 10:34:05'),
         (1, 43, '2023-10-22 14:38:12'),
         (1, 43, '2023-10-22 19:35:46'),
         (1, 43, '2023-10-22 19:36:05'),
@@ -1588,9 +1581,9 @@ const createHistoryTable = async () => {
         (1, 5, '2023-10-25 04:35:45'),
         (3, 1, '2023-10-25 04:44:13'),
         (3, 21, '2023-10-25 04:49:24'),
-        (1, 1, '2023-10-25 17:53:21'),
+        (143, 1, '2023-10-25 17:53:21'),
         (1, 16, '2023-10-25 18:01:00'),
-        (1, 1, '2023-10-25 18:01:10'),
+        (178, 1, '2023-10-25 18:01:10'),
         (1, 16, '2023-10-25 18:12:35'),
         (1, 429, '2023-10-25 19:43:05'),
         (1, 16, '2023-10-26 00:00:19'),
@@ -1613,7 +1606,7 @@ const createHistoryTable = async () => {
         (1, 43, '2023-10-26 20:53:41'),
         (1, 43, '2023-10-26 20:54:21'),
         (1, 43, '2023-10-26 22:10:47'),
-        (1, 1, '2023-10-26 22:15:46'),
+        (129, 1, '2023-10-26 22:15:46'),
         (1, 5, '2023-10-26 22:15:53'),
         (1, 43, '2023-10-26 22:41:50'),
         (1, 22, '2023-10-26 22:42:16'),
@@ -1738,8 +1731,8 @@ const createHistoryTable = async () => {
         (1, 5, '2023-10-27 03:16:29'),
         (1, 5, '2023-10-27 03:16:50'),
         (1, 5, '2023-10-27 03:22:01'),
-        (1, 1, '2023-10-27 03:26:39'),
-        (1, 1, '2023-10-27 03:26:51'),
+        (415, 1, '2023-10-27 03:26:39'),
+        (71, 1, '2023-10-27 03:26:51'),
         (1, 43, '2023-10-27 03:27:13'),
         (1, 43, '2023-10-27 03:31:21'),
         (1, 43, '2023-10-27 03:31:35'),
@@ -1990,11 +1983,18 @@ const createHistoryTable = async () => {
       `;
       await pool.query(insertTableQuery);
       console.log('Sample data inserted into history table');
-      await resetSequence('history', 'id');
+    };
+    await ensureTableStructure('history', expectedColumns, createTableQuery, insertSampleData, async () => await resetSequence('history', 'id'));
+    const countQuery = 'SELECT COUNT(*) AS count FROM history';
+    const countResult = await pool.query(countQuery);
+    const rowCount = parseInt(countResult.rows[0].count);
+    console.log(`History table currently has ${rowCount} rows`);
+    if (rowCount === 0) {
+      console.log('History table was empty and has been filled with sample data.');
     } else {
       console.log('History table already contains data.');
     }
-    console.log('✅ History table created');
+    console.log('✅ History table created\n');
   } catch (error) {
     console.error('Error creating history table:', error);
   }
@@ -2014,18 +2014,10 @@ const createImagesTable = async () => {
         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
     `;
-
     await pool.query(createTableQuery);
     console.log('Images table created successfully!');
-
-    const countQuery = 'SELECT COUNT(*) AS count FROM images';
-    const countResult = await pool.query(countQuery);
-    const rowCount = parseInt(countResult.rows[0].count);
-
-    console.log(`Images table currently has ${rowCount} rows`);
-
-    if (rowCount === 0) {
-      console.log('Inserting sample data into images table...');
+    const expectedColumns = ['id','user_id','link','data','profile','cover','created_at'];
+    const insertSampleData = async () => {
       const insertTableQuery = `
         INSERT INTO images (user_id, link, data, profile, cover, created_at) VALUES
         (1, false, '/9j/4AAQSkZJRgABAQAAAQABAAD/2wCEAAkGBxISEhUSEhAVEhUWFRYWFRUVEBAVFhUVFRUWFhUV
@@ -18913,11 +18905,18 @@ YBoAIzE0d+KUGcGaO9AwkDNKIxPFGeaAT6mgAPoM08zg57Ue1LAEUAHtR35NE0dvSgYcmjtR7igT
       `;
       await pool.query(insertTableQuery);
       console.log('Sample data inserted into images table');
-      await resetSequence('images', 'id');
+    };
+    await ensureTableStructure('images', expectedColumns, createTableQuery, insertSampleData, async () => await resetSequence('images', 'id'));
+    const countQuery = 'SELECT COUNT(*) AS count FROM images';
+    const countResult = await pool.query(countQuery);
+    const rowCount = parseInt(countResult.rows[0].count);
+    console.log(`Images table currently has ${rowCount} rows`);
+    if (rowCount === 0) {
+      console.log('Images table was empty and has been filled with sample data.');
     } else {
-      console.log('Image table already contains data.');
+      console.log('Images table already contains data.');
     }
-    console.log('✅ Images table created');
+    console.log('✅ Images table created\n');
   } catch (error) {
     console.error('Error creating Images table:', error);
   }
@@ -18934,18 +18933,11 @@ const createMatchesTable = async () => {
         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
     `;
-    
     await pool.query(createTableQuery);
     console.log('Matches table created successfully!');
 
-    const countQuery = 'SELECT COUNT(*) AS count FROM matches';
-    const countResult = await pool.query(countQuery);
-    const rowCount = parseInt(countResult.rows[0].count);
-    
-    console.log(`Matches table currently has ${rowCount} rows`);
-
-    if (rowCount === 0) {
-      console.log('Inserting sample data into matches table...');
+    const expectedColumns = ['id','matcher','matched','created_at'];
+    const insertSampleData = async () => {
       const insertTableQuery = `
         INSERT INTO matches (matcher, matched, created_at) VALUES
         (1, 61, '2023-08-03 15:50:33'),
@@ -19060,12 +19052,18 @@ const createMatchesTable = async () => {
       `;
       await pool.query(insertTableQuery);
       console.log('Sample data inserted into matches table');
-      
-      await resetSequence('matches', 'id');
+    };
+    await ensureTableStructure('matches', expectedColumns, createTableQuery, insertSampleData, async () => await resetSequence('matches', 'id'));
+    const countQuery = 'SELECT COUNT(*) AS count FROM matches';
+    const countResult = await pool.query(countQuery);
+    const rowCount = parseInt(countResult.rows[0].count);
+    console.log(`Matches table currently has ${rowCount} rows`);
+    if (rowCount === 0) {
+      console.log('Matches table was empty and has been filled with sample data.');
     } else {
       console.log('Matches table already contains data.');
     }
-    console.log('✅ Matches table created');
+    console.log('✅ Matches table created\n');
   } catch (error) {
     console.error('Error creating matches table:', error);
   }
@@ -19378,15 +19376,6 @@ const createNotificationsTable = async () => {
         ('visit', 1, 126, '2023-08-12 00:15:21', true, -1),
         ('visit', 2, 1, '2023-08-12 00:32:40', true, -1),
         ('visit', 1, 2, '2023-08-12 00:44:39', true, -1),
-        ('visit', 1, 2, '2023-08-12 00:45:43', true, -1),
-        ('visit', 1, 2, '2023-08-12 00:46:38', true, -1),
-        ('visit', 1, 2, '2023-08-12 00:47:12', true, -1),
-        ('visit', 1, 2, '2023-08-12 00:47:44', true, -1),
-        ('visit', 1, 2, '2023-08-12 00:47:50', true, -1),
-        ('visit', 1, 2, '2023-08-12 00:55:40', true, -1),
-        ('visit', 1, 2, '2023-08-12 00:56:02', true, -1),
-        ('visit', 1, 2, '2023-08-12 00:56:13', true, -1),
-        ('visit', 1, 2, '2023-08-12 00:56:20', true, -1),
         ('visit', 1, 2, '2023-08-12 00:57:53', true, -1),
         ('visit', 1, 2, '2023-08-12 00:58:16', true, -1),
         ('visit', 1, 2, '2023-08-12 01:05:38', true, -1),
@@ -19401,12 +19390,6 @@ const createNotificationsTable = async () => {
         ('visit', 1, 126, '2023-08-12 13:11:30', true, -1),
         ('visit', 1, 2, '2023-08-12 13:11:37', true, -1),
         ('visit', 1, 2, '2023-08-12 13:12:02', true, -1),
-        ('visit', 1, 2, '2023-08-12 13:13:02', true, -1),
-        ('visit', 1, 2, '2023-08-12 13:31:39', true, -1),
-        ('visit', 1, 2, '2023-08-12 13:34:05', true, -1),
-        ('visit', 1, 2, '2023-08-12 13:34:40', true, -1),
-        ('visit', 1, 2, '2023-08-12 13:36:29', true, -1),
-        ('visit', 1, 2, '2023-08-12 13:41:30', true, -1),
         ('visit', 1, 2, '2023-08-12 14:11:24', true, -1),
         ('visit', 1, 2, '2023-08-12 14:13:33', true, -1),
         ('visit', 1, 429, '2023-08-12 16:58:09', false, -1),
@@ -19414,13 +19397,6 @@ const createNotificationsTable = async () => {
         ('visit', 2, 475, '2023-08-12 17:25:26', true, -1),
         ('visit', 2, 475, '2023-08-12 17:25:31', true, -1),
         ('visit', 2, 475, '2023-08-12 17:25:33', true, -1),
-        ('visit', 1, 429, '2023-08-12 17:25:47', false, -1),
-        ('visit', 1, 429, '2023-08-12 17:26:04', false, -1),
-        ('visit', 1, 429, '2023-08-12 17:26:41', false, -1),
-        ('visit', 1, 429, '2023-08-12 17:27:06', false, -1),
-        ('visit', 1, 429, '2023-08-12 17:33:47', false, -1),
-        ('visit', 1, 429, '2023-08-12 17:35:23', false, -1),
-        ('visit', 1, 429, '2023-08-12 17:35:50', false, -1),
         ('visit', 1, 429, '2023-08-12 17:37:21', false, -1),
         ('visit', 1, 429, '2023-08-12 17:37:29', false, -1),
         ('visit', 1, 429, '2023-08-12 17:43:44', false, -1),
@@ -19451,17 +19427,6 @@ const createNotificationsTable = async () => {
         ('visit', 1, 2, '2023-08-12 18:04:46', true, -1),
         ('visit', 1, 2, '2023-08-12 18:05:30', true, -1),
         ('visit', 1, 2, '2023-08-12 18:05:35', true, -1),
-        ('visit', 1, 2, '2023-08-12 18:05:52', true, -1),
-        ('visit', 1, 2, '2023-08-12 18:06:26', true, -1),
-        ('visit', 1, 2, '2023-08-12 18:07:05', true, -1),
-        ('visit', 1, 2, '2023-08-12 18:13:41', true, -1),
-        ('visit', 1, 2, '2023-08-12 18:15:23', true, -1),
-        ('visit', 1, 2, '2023-08-12 18:15:56', true, -1),
-        ('visit', 1, 2, '2023-08-12 18:17:35', true, -1),
-        ('visit', 1, 2, '2023-08-12 18:18:35', true, -1),
-        ('visit', 1, 2, '2023-08-12 18:18:42', true, -1),
-        ('visit', 1, 2, '2023-08-12 18:20:48', true, -1),
-        ('visit', 1, 2, '2023-08-12 18:21:30', true, -1),
         ('visit', 1, 2, '2023-08-12 18:22:29', true, -1),
         ('visit', 1, 2, '2023-08-12 18:22:59', true, -1),
         ('visit', 1, 2, '2023-08-13 02:22:39', true, -1),
@@ -19568,17 +19533,10 @@ const createNotificationsTable = async () => {
         ('visit', 140, 1, '2023-10-14 05:29:12', true, -1),
         ('visit', 1, 29, '2023-10-14 06:06:27', true, -1),
         ('visit', 1, 429, '2023-10-14 11:48:53', false, -1),
-        ('visit', 1, 1, '2023-10-15 21:33:59', true, -1),
+        ('visit', 19, 1, '2023-10-15 21:33:59', true, -1),
         ('visit', 1, 426, '2023-10-15 22:14:42', false, -1),
         ('visit', 1, 2, '2023-10-15 22:21:00', true, -1),
         ('visit', 1, 2, '2023-10-15 22:23:07', true, -1),
-        ('visit', 1, 2, '2023-10-15 22:23:12', true, -1),
-        ('visit', 1, 2, '2023-10-15 22:26:00', true, -1),
-        ('visit', 1, 2, '2023-10-15 22:26:38', true, -1),
-        ('visit', 1, 2, '2023-10-15 22:26:42', true, -1),
-        ('visit', 1, 2, '2023-10-15 22:29:32', true, -1),
-        ('visit', 1, 2, '2023-10-15 22:31:09', true, -1),
-        ('visit', 1, 2, '2023-10-15 22:31:16', true, -1),
         ('visit', 1, 2, '2023-10-15 22:34:29', true, -1),
         ('visit', 1, 2, '2023-10-15 22:34:38', true, -1),
         ('visit', 1, 2, '2023-10-15 22:35:10', true, -1),
@@ -19645,21 +19603,6 @@ const createNotificationsTable = async () => {
         ('visit', 2, 1, '2023-10-19 00:31:28', true, -1),
         ('visit', 1, 2, '2023-10-19 00:32:45', true, -1),
         ('visit', 1, 2, '2023-10-19 00:40:05', true, -1),
-        ('visit', 1, 2, '2023-10-19 00:40:18', true, -1),
-        ('visit', 1, 2, '2023-10-19 00:40:31', true, -1),
-        ('visit', 1, 2, '2023-10-19 00:41:36', true, -1),
-        ('visit', 1, 2, '2023-10-19 00:41:40', true, -1),
-        ('visit', 1, 2, '2023-10-19 00:41:54', true, -1),
-        ('visit', 1, 2, '2023-10-19 00:41:56', true, -1),
-        ('visit', 1, 2, '2023-10-19 00:42:57', true, -1),
-        ('visit', 1, 2, '2023-10-19 00:43:00', true, -1),
-        ('visit', 1, 2, '2023-10-19 00:43:14', true, -1),
-        ('visit', 1, 2, '2023-10-19 00:50:31', true, -1),
-        ('visit', 1, 2, '2023-10-19 00:50:37', true, -1),
-        ('visit', 1, 2, '2023-10-19 00:50:56', true, -1),
-        ('visit', 1, 2, '2023-10-19 00:51:17', true, -1),
-        ('visit', 1, 2, '2023-10-19 00:51:20', true, -1),
-        ('visit', 1, 2, '2023-10-19 00:51:31', true, -1),
         ('visit', 1, 2, '2023-10-19 00:51:34', true, -1),
         ('visit', 1, 2, '2023-10-19 00:52:30', true, -1),
         ('visit', 1, 2, '2023-10-19 01:25:15', true, -1),
@@ -19691,9 +19634,6 @@ const createNotificationsTable = async () => {
         ('visit', 1, 2, '2023-10-19 03:07:37', true, -1),
         ('visit', 1, 2, '2023-10-19 03:07:44', true, -1),
         ('visit', 1, 2, '2023-10-19 03:08:10', true, -1),
-        ('visit', 1, 2, '2023-10-19 03:08:13', true, -1),
-        ('visit', 1, 2, '2023-10-19 03:08:18', true, -1),
-        ('visit', 1, 2, '2023-10-19 03:08:37', true, -1),
         ('visit', 1, 2, '2023-10-19 11:02:23', true, -1),
         ('visit', 5, 1, '2023-10-19 11:09:58', true, -1),
         ('visit', 5, 1, '2023-10-19 11:11:09', true, -1),
@@ -19725,9 +19665,6 @@ const createNotificationsTable = async () => {
         ('visit', 478, 1, '2023-10-19 20:32:56', true, -1),
         ('visit', 478, 1, '2023-10-19 20:33:14', true, -1),
         ('visit', 478, 1, '2023-10-19 20:35:36', true, -1),
-        ('visit', 478, 1, '2023-10-19 20:36:05', true, -1),
-        ('visit', 478, 1, '2023-10-19 20:36:16', true, -1),
-        ('visit', 478, 1, '2023-10-19 20:37:00', true, -1),
         ('visit', 478, 1, '2023-10-19 20:37:06', true, -1),
         ('visit', 478, 1, '2023-10-19 20:38:17', true, -1),
         ('visit', 2, 1, '2023-10-20 00:17:40', true, -1),
@@ -19737,15 +19674,6 @@ const createNotificationsTable = async () => {
         ('visit', 2, 1, '2023-10-20 00:22:57', true, -1),
         ('visit', 2, 1, '2023-10-20 00:23:13', true, -1),
         ('visit', 5, 1, '2023-10-20 00:23:38', true, -1),
-        ('visit', 2, 1, '2023-10-20 00:25:13', true, -1),
-        ('visit', 2, 1, '2023-10-20 00:25:53', true, -1),
-        ('visit', 2, 1, '2023-10-20 00:26:37', true, -1),
-        ('visit', 2, 1, '2023-10-20 00:31:35', true, -1),
-        ('visit', 2, 1, '2023-10-20 00:32:21', true, -1),
-        ('visit', 2, 1, '2023-10-20 00:33:32', true, -1),
-        ('visit', 2, 1, '2023-10-20 00:36:45', true, -1),
-        ('visit', 2, 1, '2023-10-20 00:38:07', true, -1),
-        ('visit', 2, 1, '2023-10-20 00:39:26', true, -1),
         ('visit', 2, 1, '2023-10-20 00:39:38', true, -1),
         ('visit', 2, 1, '2023-10-20 00:43:35', true, -1),
         ('visit', 2, 1, '2023-10-20 00:47:26', true, -1),
@@ -19940,26 +19868,6 @@ const createNotificationsTable = async () => {
         ('visit', 416, 2, '2023-10-21 04:11:54', true, -1),
         ('visit', 416, 2, '2023-10-21 04:16:06', true, -1),
         ('visit', 416, 2, '2023-10-21 04:16:08', true, -1),
-        ('visit', 416, 2, '2023-10-21 04:16:34', true, -1),
-        ('visit', 416, 2, '2023-10-21 04:17:01', true, -1),
-        ('visit', 416, 2, '2023-10-21 04:17:27', true, -1),
-        ('visit', 416, 2, '2023-10-21 04:17:55', true, -1),
-        ('visit', 416, 2, '2023-10-21 04:18:14', true, -1),
-        ('visit', 416, 2, '2023-10-21 04:18:25', true, -1),
-        ('visit', 416, 2, '2023-10-21 04:18:53', true, -1),
-        ('visit', 416, 2, '2023-10-21 04:20:34', true, -1),
-        ('visit', 416, 2, '2023-10-21 04:21:55', true, -1),
-        ('visit', 416, 2, '2023-10-21 04:23:30', true, -1),
-        ('visit', 416, 2, '2023-10-21 04:24:22', true, -1),
-        ('visit', 416, 2, '2023-10-21 04:26:50', true, -1),
-        ('visit', 416, 2, '2023-10-21 04:27:41', true, -1),
-        ('visit', 416, 2, '2023-10-21 04:28:00', true, -1),
-        ('visit', 416, 2, '2023-10-21 04:28:21', true, -1),
-        ('visit', 416, 2, '2023-10-21 04:32:00', true, -1),
-        ('visit', 416, 2, '2023-10-21 04:33:16', true, -1),
-        ('visit', 416, 2, '2023-10-21 04:34:20', true, -1),
-        ('visit', 416, 2, '2023-10-21 04:36:06', true, -1),
-        ('visit', 416, 2, '2023-10-21 04:36:42', true, -1),
         ('visit', 416, 2, '2023-10-21 04:37:09', true, -1),
         ('visit', 416, 2, '2023-10-21 04:39:10', true, -1),
         ('visit', 126, 1, '2023-10-21 22:27:51', true, -1),
@@ -19975,9 +19883,6 @@ const createNotificationsTable = async () => {
         ('visit', 1, 126, '2023-10-21 23:40:46', true, -1),
         ('visit', 1, 126, '2023-10-21 23:40:58', true, -1),
         ('visit', 2, 416, '2023-10-22 00:54:23', false, -1),
-        ('visit', 2, 416, '2023-10-22 00:55:24', false, -1),
-        ('visit', 2, 416, '2023-10-22 01:03:41', false, -1),
-        ('visit', 2, 416, '2023-10-22 01:23:37', false, -1),
         ('visit', 2, 416, '2023-10-22 02:17:40', false, -1),
         ('visit', 1, 126, '2023-10-22 04:13:42', true, -1),
         ('visit', 29, 1, '2023-10-22 04:54:28', true, -1),
@@ -19995,7 +19900,7 @@ const createNotificationsTable = async () => {
         ('visit', 478, 1, '2023-10-22 06:42:42', true, -1),
         ('visit', 2, 340, '2023-10-22 06:44:17', false, -1),
         ('visit', 2, 19, '2023-10-22 06:44:38', false, -1),
-        ('visit', 1, 1, '2023-10-22 10:34:05', true, -1),
+        ('visit', 81, 1, '2023-10-22 10:34:05', true, -1),
         ('visit', 1, 43, '2023-10-22 14:38:12', false, -1),
         ('visit', 1, 43, '2023-10-22 19:35:46', false, -1),
         ('visit', 1, 43, '2023-10-22 19:36:05', false, -1),
@@ -20023,9 +19928,9 @@ const createNotificationsTable = async () => {
         ('unlike', 1, 5, '2023-10-25 04:35:50', false, -1),
         ('like', 1, 5, '2023-10-25 04:35:53', false, -1),
         ('visit', 3, 21, '2023-10-25 04:49:24', false, -1),
-        ('visit', 1, 1, '2023-10-25 17:53:21', true, -1),
+        ('visit', 197, 1, '2023-10-25 17:53:21', true, -1),
         ('visit', 1, 16, '2023-10-25 18:01:00', false, -1),
-        ('visit', 1, 1, '2023-10-25 18:01:11', true, -1),
+        ('visit', 117, 1, '2023-10-25 18:01:11', true, -1),
         ('visit', 1, 16, '2023-10-25 18:12:35', false, -1),
         ('visit', 1, 429, '2023-10-25 19:43:05', false, -1),
         ('visit', 1, 16, '2023-10-26 00:00:19', false, -1),
@@ -20044,7 +19949,7 @@ const createNotificationsTable = async () => {
         ('visit', 1, 43, '2023-10-26 20:53:41', false, -1),
         ('visit', 1, 43, '2023-10-26 20:54:21', false, -1),
         ('visit', 1, 43, '2023-10-26 22:10:48', false, -1),
-        ('visit', 1, 1, '2023-10-26 22:15:46', true, -1),
+        ('visit', 182, 1, '2023-10-26 22:15:46', true, -1),
         ('visit', 1, 5, '2023-10-26 22:15:53', false, -1),
         ('visit', 1, 43, '2023-10-26 22:41:50', false, -1),
         ('visit', 1, 22, '2023-10-26 22:42:16', false, -1),
@@ -20052,20 +19957,6 @@ const createNotificationsTable = async () => {
         ('visit', 1, 22, '2023-10-26 23:43:56', false, -1),
         ('visit', 1, 22, '2023-10-26 23:46:32', false, -1),
         ('visit', 1, 43, '2023-10-26 23:56:40', false, -1),
-        ('visit', 1, 55, '2023-10-27 00:26:48', false, -1),
-        ('visit', 1, 43, '2023-10-27 00:29:48', false, -1),
-        ('visit', 1, 43, '2023-10-27 00:30:02', false, -1),
-        ('visit', 1, 43, '2023-10-27 00:30:30', false, -1),
-        ('visit', 1, 43, '2023-10-27 00:31:40', false, -1),
-        ('visit', 1, 43, '2023-10-27 00:34:57', false, -1),
-        ('visit', 1, 43, '2023-10-27 00:36:12', false, -1),
-        ('visit', 1, 43, '2023-10-27 00:36:17', false, -1),
-        ('visit', 1, 43, '2023-10-27 00:37:11', false, -1),
-        ('visit', 1, 43, '2023-10-27 00:37:21', false, -1),
-        ('visit', 1, 43, '2023-10-27 00:37:43', false, -1),
-        ('visit', 1, 43, '2023-10-27 00:37:52', false, -1),
-        ('visit', 1, 43, '2023-10-27 00:37:55', false, -1),
-        ('visit', 1, 43, '2023-10-27 00:38:10', false, -1),
         ('visit', 1, 43, '2023-10-27 00:38:16', false, -1),
         ('visit', 1, 43, '2023-10-27 00:38:21', false, -1),
         ('visit', 1, 43, '2023-10-27 00:38:51', false, -1),
@@ -20075,23 +19966,6 @@ const createNotificationsTable = async () => {
         ('visit', 1, 43, '2023-10-27 00:46:42', false, -1),
         ('visit', 281, 216, '2023-10-27 00:47:35', false, -1),
         ('visit', 1, 43, '2023-10-27 00:51:16', false, -1),
-        ('visit', 1, 43, '2023-10-27 00:52:25', false, -1),
-        ('visit', 1, 43, '2023-10-27 00:54:09', false, -1),
-        ('visit', 1, 43, '2023-10-27 00:54:19', false, -1),
-        ('visit', 1, 43, '2023-10-27 00:55:04', false, -1),
-        ('visit', 1, 43, '2023-10-27 00:55:08', false, -1),
-        ('visit', 1, 43, '2023-10-27 00:56:13', false, -1),
-        ('visit', 1, 43, '2023-10-27 00:56:17', false, -1),
-        ('visit', 1, 43, '2023-10-27 00:56:32', false, -1),
-        ('visit', 1, 43, '2023-10-27 00:56:43', false, -1),
-        ('visit', 1, 43, '2023-10-27 00:58:43', false, -1),
-        ('visit', 1, 43, '2023-10-27 01:01:49', false, -1),
-        ('visit', 1, 43, '2023-10-27 01:01:54', false, -1),
-        ('visit', 1, 43, '2023-10-27 01:02:31', false, -1),
-        ('visit', 1, 43, '2023-10-27 01:04:17', false, -1),
-        ('visit', 1, 43, '2023-10-27 01:04:20', false, -1),
-        ('visit', 1, 43, '2023-10-27 01:06:24', false, -1),
-        ('visit', 1, 43, '2023-10-27 01:07:04', false, -1),
         ('visit', 1, 43, '2023-10-27 01:07:58', false, -1),
         ('visit', 1, 43, '2023-10-27 01:08:55', false, -1),
         ('visit', 1, 426, '2023-10-27 01:09:50', false, -1),
@@ -20105,63 +19979,11 @@ const createNotificationsTable = async () => {
         ('visit', 1, 23, '2023-10-27 01:26:10', false, -1),
         ('visit', 1, 23, '2023-10-27 01:26:27', false, -1),
         ('visit', 1, 5, '2023-10-27 01:40:38', false, -1),
-        ('visit', 1, 55, '2023-10-27 01:40:56', false, -1),
-        ('visit', 1, 55, '2023-10-27 01:47:46', false, -1),
-        ('visit', 1, 55, '2023-10-27 01:52:30', false, -1),
-        ('visit', 1, 55, '2023-10-27 02:01:56', false, -1),
-        ('visit', 1, 55, '2023-10-27 02:05:47', false, -1),
-        ('visit', 1, 55, '2023-10-27 02:05:52', false, -1),
-        ('visit', 1, 55, '2023-10-27 02:07:30', false, -1),
-        ('visit', 1, 55, '2023-10-27 02:08:55', false, -1),
-        ('visit', 1, 55, '2023-10-27 02:08:58', false, -1),
-        ('visit', 1, 55, '2023-10-27 02:09:07', false, -1),
-        ('visit', 1, 55, '2023-10-27 02:09:26', false, -1),
-        ('visit', 1, 55, '2023-10-27 02:11:05', false, -1),
         ('visit', 1, 55, '2023-10-27 02:11:18', false, -1),
-        ('visit', 1, 55, '2023-10-27 02:11:28', false, -1),
-        ('visit', 1, 55, '2023-10-27 02:12:45', false, -1),
-        ('visit', 1, 55, '2023-10-27 02:13:01', false, -1),
-        ('visit', 1, 55, '2023-10-27 02:13:23', false, -1),
-        ('visit', 1, 55, '2023-10-27 02:13:27', false, -1),
-        ('visit', 1, 55, '2023-10-27 02:13:57', false, -1),
-        ('visit', 1, 55, '2023-10-27 02:14:01', false, -1),
-        ('visit', 1, 55, '2023-10-27 02:14:30', false, -1),
-        ('visit', 1, 55, '2023-10-27 02:14:34', false, -1),
-        ('visit', 1, 55, '2023-10-27 02:16:47', false, -1),
-        ('visit', 1, 55, '2023-10-27 02:22:04', false, -1),
-        ('visit', 1, 55, '2023-10-27 02:22:22', false, -1),
-        ('visit', 1, 55, '2023-10-27 02:22:27', false, -1),
-        ('visit', 1, 55, '2023-10-27 02:24:10', false, -1),
-        ('visit', 1, 55, '2023-10-27 02:24:13', false, -1),
-        ('visit', 1, 55, '2023-10-27 02:26:47', false, -1),
-        ('visit', 1, 55, '2023-10-27 02:27:04', false, -1),
-        ('visit', 1, 55, '2023-10-27 02:27:42', false, -1),
-        ('visit', 1, 55, '2023-10-27 02:32:39', false, -1),
-        ('visit', 1, 55, '2023-10-27 02:32:43', false, -1),
-        ('visit', 1, 55, '2023-10-27 02:33:34', false, -1),
-        ('visit', 1, 55, '2023-10-27 02:34:35', false, -1),
-        ('visit', 1, 55, '2023-10-27 02:35:09', false, -1),
-        ('visit', 1, 55, '2023-10-27 02:35:15', false, -1),
-        ('visit', 1, 55, '2023-10-27 02:35:42', false, -1),
-        ('visit', 1, 55, '2023-10-27 02:35:46', false, -1),
-        ('visit', 1, 55, '2023-10-27 02:36:24', false, -1),
-        ('visit', 1, 55, '2023-10-27 02:36:28', false, -1),
-        ('visit', 1, 55, '2023-10-27 02:37:44', false, -1),
-        ('visit', 1, 55, '2023-10-27 02:38:34', false, -1),
-        ('visit', 1, 55, '2023-10-27 02:38:37', false, -1),
-        ('visit', 1, 55, '2023-10-27 02:49:03', false, -1),
-        ('visit', 1, 55, '2023-10-27 02:49:08', false, -1),
-        ('visit', 1, 55, '2023-10-27 02:52:29', false, -1),
-        ('visit', 1, 55, '2023-10-27 02:52:53', false, -1),
-        ('visit', 1, 55, '2023-10-27 02:56:47', false, -1),
-        ('visit', 1, 55, '2023-10-27 02:56:50', false, -1),
-        ('visit', 1, 55, '2023-10-27 02:58:33', false, -1),
-        ('visit', 1, 55, '2023-10-27 02:58:36', false, -1),
-        ('visit', 1, 55, '2023-10-27 02:59:25', false, -1),
-        ('visit', 1, 55, '2023-10-27 03:05:51', false, -1),
+        ('visit', 1, 5, '2023-10-27 02:11:28', false, -1),
         ('visit', 1, 55, '2023-10-27 03:06:56', false, -1),
         ('visit', 1, 55, '2023-10-27 03:07:34', false, -1),
-        ('visit', 1, 55, '2023-10-27 03:10:25', false, -1),
+        ('visit', 1, 5, '2023-10-27 03:10:25', false, -1),
         ('visit', 1, 55, '2023-10-27 03:15:10', false, -1),
         ('visit', 1, 5, '2023-10-27 03:15:59', false, -1),
         ('visit', 1, 5, '2023-10-27 03:16:17', false, -1),
@@ -20169,27 +19991,12 @@ const createNotificationsTable = async () => {
         ('visit', 1, 5, '2023-10-27 03:16:29', false, -1),
         ('visit', 1, 5, '2023-10-27 03:16:50', false, -1),
         ('visit', 1, 5, '2023-10-27 03:22:01', false, -1),
-        ('visit', 1, 1, '2023-10-27 03:26:39', false, -1),
-        ('visit', 1, 1, '2023-10-27 03:26:51', false, -1),
+        ('visit', 161, 1, '2023-10-27 03:26:39', false, -1),
+        ('visit', 17, 1, '2023-10-27 03:26:51', false, -1),
         ('visit', 1, 43, '2023-10-27 03:27:13', false, -1),
         ('visit', 1, 43, '2023-10-27 03:31:21', false, -1),
         ('visit', 1, 43, '2023-10-27 03:31:35', false, -1),
         ('visit', 1, 43, '2023-10-27 03:33:30', false, -1),
-        ('visit', 1, 43, '2023-10-27 03:33:35', false, -1),
-        ('visit', 1, 43, '2023-10-27 03:35:20', false, -1),
-        ('visit', 1, 43, '2023-10-27 03:35:23', false, -1),
-        ('visit', 1, 43, '2023-10-27 03:36:31', false, -1),
-        ('visit', 1, 43, '2023-10-27 03:37:05', false, -1),
-        ('visit', 1, 43, '2023-10-27 03:37:57', false, -1),
-        ('visit', 1, 43, '2023-10-27 03:38:00', false, -1),
-        ('visit', 1, 43, '2023-10-27 03:39:07', false, -1),
-        ('visit', 1, 43, '2023-10-27 03:39:10', false, -1),
-        ('visit', 1, 43, '2023-10-27 03:39:23', false, -1),
-        ('visit', 1, 43, '2023-10-27 03:39:27', false, -1),
-        ('visit', 1, 43, '2023-10-27 03:39:56', false, -1),
-        ('visit', 1, 43, '2023-10-27 03:39:59', false, -1),
-        ('visit', 1, 43, '2023-10-27 03:44:39', false, -1),
-        ('visit', 1, 43, '2023-10-27 03:45:14', false, -1),
         ('visit', 1, 43, '2023-10-27 03:56:49', false, -1),
         ('visit', 1, 43, '2023-10-27 03:57:24', false, -1),
         ('visit', 1, 43, '2023-10-27 03:57:28', false, -1),
@@ -20211,22 +20018,8 @@ const createNotificationsTable = async () => {
         ('visit', 126, 23, '2023-10-27 05:42:56', false, -1),
         ('visit', 126, 23, '2023-10-27 05:44:18', false, -1),
         ('visit', 126, 23, '2023-10-27 05:45:08', false, -1),
-        ('visit', 126, 23, '2023-10-27 05:46:11', false, -1),
-        ('visit', 126, 23, '2023-10-27 05:46:20', false, -1),
-        ('visit', 126, 23, '2023-10-27 05:49:10', false, -1),
-        ('visit', 126, 23, '2023-10-27 05:49:35', false, -1),
-        ('visit', 126, 23, '2023-10-27 05:53:26', false, -1),
-        ('visit', 126, 23, '2023-10-27 05:56:02', false, -1),
-        ('visit', 126, 23, '2023-10-27 05:56:18', false, -1),
-        ('visit', 126, 23, '2023-10-27 06:00:26', false, -1),
-        ('visit', 126, 23, '2023-10-27 06:00:30', false, -1),
-        ('visit', 126, 23, '2023-10-27 06:01:57', false, -1),
-        ('visit', 126, 23, '2023-10-27 06:02:05', false, -1),
         ('visit', 126, 23, '2023-10-27 06:02:37', false, -1),
         ('visit', 126, 23, '2023-10-27 06:03:26', false, -1),
-        ('visit', 126, 23, '2023-10-27 07:08:52', false, -1),
-        ('visit', 126, 23, '2023-10-27 07:09:44', false, -1),
-        ('visit', 126, 23, '2023-10-27 07:09:48', false, -1),
         ('visit', 126, 23, '2023-10-27 12:47:28', false, -1),
         ('visit', 281, 216, '2023-10-27 12:47:46', false, -1),
         ('visit', 1, 22, '2023-10-27 12:47:46', false, -1),
@@ -20235,22 +20028,6 @@ const createNotificationsTable = async () => {
         ('visit', 392, 1, '2023-10-27 13:04:16', false, -1),
         ('visit', 392, 1, '2023-10-27 13:13:44', false, -1),
         ('visit', 392, 1, '2023-10-27 13:16:03', false, -1),
-        ('visit', 392, 1, '2023-10-27 13:17:18', false, -1),
-        ('visit', 392, 1, '2023-10-27 13:18:35', false, -1),
-        ('visit', 392, 1, '2023-10-27 13:18:39', false, -1),
-        ('visit', 392, 1, '2023-10-27 13:19:48', false, -1),
-        ('visit', 392, 1, '2023-10-27 13:19:52', false, -1),
-        ('visit', 392, 1, '2023-10-27 13:20:19', false, -1),
-        ('visit', 392, 1, '2023-10-27 13:20:23', false, -1),
-        ('visit', 392, 1, '2023-10-27 13:21:06', false, -1),
-        ('visit', 392, 1, '2023-10-27 13:24:37', false, -1),
-        ('visit', 392, 1, '2023-10-27 13:24:43', false, -1),
-        ('visit', 392, 1, '2023-10-27 13:29:22', false, -1),
-        ('visit', 392, 1, '2023-10-27 13:30:44', false, -1),
-        ('visit', 392, 1, '2023-10-27 13:31:24', false, -1),
-        ('visit', 392, 1, '2023-10-27 14:00:05', false, -1),
-        ('visit', 392, 1, '2023-10-27 14:01:20', false, -1),
-        ('visit', 392, 1, '2023-10-27 14:01:41', false, -1),
         ('visit', 392, 1, '2023-10-27 14:02:14', false, -1),
         ('visit', 392, 1, '2023-10-27 14:03:18', false, -1),
         ('visit', 392, 1, '2023-10-27 14:04:22', false, -1),
@@ -20259,26 +20036,6 @@ const createNotificationsTable = async () => {
         ('visit', 392, 1, '2023-10-27 14:14:43', false, -1),
         ('visit', 392, 1, '2023-10-27 14:16:38', false, -1),
         ('visit', 392, 1, '2023-10-27 14:17:41', false, -1),
-        ('visit', 392, 1, '2023-10-27 14:20:13', false, -1),
-        ('visit', 392, 1, '2023-10-27 14:21:18', false, -1),
-        ('visit', 392, 1, '2023-10-27 14:24:51', false, -1),
-        ('visit', 392, 1, '2023-10-27 14:27:26', false, -1),
-        ('visit', 392, 1, '2023-10-27 15:23:59', false, -1),
-        ('visit', 392, 1, '2023-10-27 16:29:35', false, -1),
-        ('visit', 392, 1, '2023-10-27 16:35:08', false, -1),
-        ('visit', 392, 1, '2023-10-27 16:35:23', false, -1),
-        ('visit', 392, 1, '2023-10-27 16:46:28', false, -1),
-        ('visit', 392, 1, '2023-10-27 16:48:15', false, -1),
-        ('visit', 392, 1, '2023-10-27 16:50:40', false, -1),
-        ('visit', 392, 1, '2023-10-27 17:11:14', false, -1),
-        ('visit', 392, 1, '2023-10-27 17:23:36', false, -1),
-        ('visit', 392, 1, '2023-10-27 17:26:13', false, -1),
-        ('visit', 392, 1, '2023-10-27 17:35:48', false, -1),
-        ('visit', 392, 1, '2023-10-27 17:42:36', false, -1),
-        ('visit', 392, 1, '2023-10-27 17:44:14', false, -1),
-        ('visit', 392, 1, '2023-10-27 17:45:21', false, -1),
-        ('visit', 392, 1, '2023-10-27 17:53:32', false, -1),
-        ('visit', 392, 1, '2023-10-27 17:55:17', false, -1),
         ('visit', 392, 1, '2023-10-27 17:55:38', false, -1),
         ('visit', 392, 1, '2023-10-27 18:00:06', false, -1),
         ('visit', 392, 1, '2023-10-27 18:06:11', false, -1),
@@ -20314,12 +20071,6 @@ const createNotificationsTable = async () => {
         ('visit', 114, 43, '2023-10-27 20:19:04', false, -1),
         ('visit', 114, 410, '2023-10-27 20:19:22', false, -1),
         ('visit', 114, 410, '2023-10-27 20:20:41', false, -1),
-        ('visit', 114, 410, '2023-10-27 20:21:11', false, -1),
-        ('visit', 114, 410, '2023-10-27 20:23:17', false, -1),
-        ('visit', 114, 410, '2023-10-27 20:24:02', false, -1),
-        ('visit', 114, 410, '2023-10-27 20:24:19', false, -1),
-        ('visit', 114, 410, '2023-10-27 20:25:26', false, -1),
-        ('visit', 114, 410, '2023-10-27 20:27:29', false, -1),
         ('visit', 114, 410, '2023-10-27 20:29:01', false, -1),
         ('visit', 114, 410, '2023-10-27 20:29:37', false, -1),
         ('visit', 114, 410, '2023-10-27 20:31:00', false, -1),
@@ -20336,27 +20087,6 @@ const createNotificationsTable = async () => {
         ('visit', 114, 43, '2023-10-27 21:15:48', false, -1),
         ('visit', 114, 43, '2023-10-27 21:17:47', false, -1),
         ('visit', 114, 140, '2023-10-27 21:23:55', false, -1),
-        ('visit', 114, 140, '2023-10-27 21:24:27', false, -1),
-        ('visit', 114, 140, '2023-10-27 21:25:07', false, -1),
-        ('visit', 114, 140, '2023-10-27 21:30:31', false, -1),
-        ('visit', 114, 140, '2023-10-27 21:32:34', false, -1),
-        ('visit', 114, 140, '2023-10-27 21:32:38', false, -1),
-        ('visit', 114, 140, '2023-10-27 21:34:33', false, -1),
-        ('visit', 114, 140, '2023-10-27 21:34:35', false, -1),
-        ('visit', 114, 140, '2023-10-27 21:35:25', false, -1),
-        ('visit', 114, 140, '2023-10-27 21:35:28', false, -1),
-        ('visit', 114, 140, '2023-10-27 21:39:26', false, -1),
-        ('visit', 114, 140, '2023-10-27 21:40:27', false, -1),
-        ('visit', 114, 140, '2023-10-27 21:41:49', false, -1),
-        ('visit', 114, 140, '2023-10-27 21:41:55', false, -1),
-        ('visit', 114, 140, '2023-10-27 21:43:15', false, -1),
-        ('visit', 114, 140, '2023-10-27 21:43:17', false, -1),
-        ('visit', 114, 140, '2023-10-27 21:43:57', false, -1),
-        ('visit', 114, 140, '2023-10-27 21:44:06', false, -1),
-        ('visit', 114, 140, '2023-10-27 21:44:15', false, -1),
-        ('visit', 114, 140, '2023-10-27 21:45:52', false, -1),
-        ('visit', 114, 140, '2023-10-27 21:46:11', false, -1),
-        ('visit', 114, 140, '2023-10-27 21:46:16', false, -1),
         ('visit', 114, 140, '2023-10-27 21:46:43', false, -1),
         ('visit', 114, 140, '2023-10-27 21:49:50', false, -1),
         ('visit', 114, 140, '2023-10-27 21:51:18', false, -1),
@@ -20370,17 +20100,6 @@ const createNotificationsTable = async () => {
         ('visit', 114, 140, '2023-10-27 22:02:39', false, -1),
         ('visit', 114, 140, '2023-10-27 22:03:42', false, -1),
         ('visit', 114, 140, '2023-10-27 22:06:43', false, -1),
-        ('visit', 114, 140, '2023-10-27 22:07:44', false, -1),
-        ('visit', 114, 140, '2023-10-27 22:07:49', false, -1),
-        ('visit', 114, 140, '2023-10-27 22:08:01', false, -1),
-        ('visit', 114, 140, '2023-10-27 22:08:05', false, -1),
-        ('visit', 114, 140, '2023-10-27 22:08:33', false, -1),
-        ('visit', 114, 140, '2023-10-27 22:08:34', false, -1),
-        ('visit', 114, 140, '2023-10-27 22:11:50', false, -1),
-        ('visit', 114, 140, '2023-10-27 22:13:52', false, -1),
-        ('visit', 114, 140, '2023-10-27 22:13:54', false, -1),
-        ('visit', 114, 140, '2023-10-27 22:14:46', false, -1),
-        ('visit', 114, 140, '2023-10-27 22:16:07', false, -1),
         ('visit', 114, 140, '2023-10-27 22:16:21', false, -1),
         ('visit', 114, 186, '2023-10-27 22:16:41', false, -1),
         ('visit', 114, 148, '2023-10-27 22:17:04', false, -1),
@@ -20388,35 +20107,12 @@ const createNotificationsTable = async () => {
         ('visit', 114, 140, '2023-10-27 22:18:47', false, -1),
         ('visit', 114, 4, '2023-10-27 22:56:07', false, -1),
         ('visit', 114, 4, '2023-10-27 22:59:40', false, -1),
-        ('visit', 114, 4, '2023-10-27 23:04:35', false, -1),
-        ('visit', 114, 4, '2023-10-27 23:04:52', false, -1),
-        ('visit', 114, 4, '2023-10-27 23:05:48', false, -1),
-        ('visit', 114, 4, '2023-10-27 23:05:51', false, -1),
-        ('visit', 114, 4, '2023-10-27 23:07:19', false, -1),
-        ('visit', 114, 4, '2023-10-27 23:11:09', false, -1),
-        ('visit', 114, 4, '2023-10-27 23:11:32', false, -1),
-        ('visit', 114, 4, '2023-10-27 23:12:09', false, -1),
-        ('visit', 114, 4, '2023-10-27 23:17:25', false, -1),
-        ('visit', 114, 4, '2023-10-27 23:19:56', false, -1),
-        ('visit', 114, 4, '2023-10-27 23:23:16', false, -1),
-        ('visit', 114, 4, '2023-10-27 23:23:56', false, -1),
-        ('visit', 114, 4, '2023-10-27 23:30:10', false, -1),
-        ('visit', 114, 4, '2023-10-27 23:30:14', false, -1),
-        ('visit', 114, 4, '2023-10-27 23:32:51', false, -1),
-        ('visit', 114, 4, '2023-10-27 23:32:58', false, -1),
-        ('visit', 114, 4, '2023-10-27 23:38:34', false, -1),
-        ('visit', 114, 4, '2023-10-28 00:38:12', false, -1),
         ('visit', 114, 1, '2023-10-28 00:51:54', true, -1),
         ('visit', 114, 1, '2023-10-28 00:52:14', true, -1),
         ('visit', 1, 22, '2023-10-28 02:02:19', false, -1),
         ('visit', 1, 114, '2023-10-28 07:05:45', false, -1),
         ('visit', 1, 114, '2023-10-28 07:05:58', false, -1),
         ('visit', 19, 126, '2023-10-28 08:00:54', false, -1),
-        ('visit', 19, 126, '2023-10-28 08:00:59', false, -1),
-        ('visit', 19, 126, '2023-10-28 08:02:41', false, -1),
-        ('visit', 19, 126, '2023-10-28 08:02:52', false, -1),
-        ('visit', 19, 126, '2023-10-28 08:03:17', false, -1),
-        ('visit', 19, 126, '2023-10-28 08:04:50', false, -1),
         ('visit', 19, 126, '2023-10-28 08:40:17', false, -1);
       `;
       await pool.query(insertTableQuery);
@@ -20426,7 +20122,7 @@ const createNotificationsTable = async () => {
     } else {
       console.log('Notifications table already contains data.');
     }
-    console.log('✅ Notifications table created');
+    console.log('✅ Notifications table created\n');
   } catch (error) {
     console.error('Error creating Notifications table:', error);
   }
@@ -20484,7 +20180,7 @@ const createTagsTable = async () => {
     } else {
       console.log('Tags table already contains data.');
     }
-    console.log('✅ Tags table created');
+    console.log('✅ Tags table created\n');
   } catch (error) {
     console.error('Error creating tags table:', error);
   }
@@ -20496,8 +20192,10 @@ const procedures = async () => {
     
     // Drop existing functions if they exist
     await pool.query('DROP FUNCTION IF EXISTS calc_rating(INTEGER, OUT INTEGER, OUT INTEGER, OUT INTEGER) CASCADE');
+    console.log('Dropped existing calc_rating function if it existed.');
     await pool.query('DROP FUNCTION IF EXISTS get_rating(INTEGER) CASCADE');
-    
+    console.log('Dropped existing get_rating function if it existed.');
+  
     // Create CALC_RATING function (equivalent to the stored procedure)
     const createFunctionQuery1 = `
       CREATE OR REPLACE FUNCTION calc_rating(
@@ -20536,15 +20234,18 @@ const procedures = async () => {
           reports INTEGER;
       BEGIN
           SELECT * INTO visit, likes, reports FROM calc_rating(id_user);
-          RETURN (likes / 20.0 + visit / 100.0 - reports / 250.0);
+          RETURN sqrt(GREATEST(likes / 20.0 + visit / 100.0 - reports / 250.0, 0));
       END;
       $$;
     `;
 
+
     await pool.query(createFunctionQuery1);
+    console.log('Created calc_rating function successfully.');
     await pool.query(createFunctionQuery2);
+    console.log('Created get_rating function successfully.');
     
-    console.log('✅ Functions created successfully!');
+    console.log('✅ Functions created successfully!\n');
   } catch (error) {
     console.error('Error creating functions:', error);
   }

@@ -4,8 +4,21 @@ const { jwtBlacklist } = require('../controllers/auth')
 const userModel = require('../models/userModel')
 
 const auth = async (req, res, next) => {
-	// Accept token from header, body, or query to ease testing and non-browser clients
-	const token = req.header('x-auth-token') || req.body.token || req.query.token;
+	// Accept token from Authorization: Bearer <token>, x-auth-token, body, or query
+	let token = null;
+	// Standard header
+	if (req.headers['authorization']) {
+		const authHeader = req.headers['authorization'];
+		if (authHeader.startsWith('Bearer ')) {
+			token = authHeader.slice(7).trim();
+		} else {
+			token = authHeader.trim();
+		}
+	}
+	// Legacy/custom header
+	if (!token) token = req.header('x-auth-token');
+	if (!token) token = req.body.token;
+	if (!token) token = req.query.token;
 	if (!token)
 		return res.json({ status: 'error', type: 'auth', message: 'No token, authorization denied', data: null });
 	if (jwtBlacklist && jwtBlacklist.has(token)) {

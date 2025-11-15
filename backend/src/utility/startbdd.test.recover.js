@@ -1,3 +1,28 @@
+// Vérifie si une table existe et si toutes les colonnes attendues sont présentes
+const ensureTableStructure = async (tableName, expectedColumns, createTableQuery, insertSampleDataFn, resetSequenceFn) => {
+  // Vérifier si la table existe
+  const tableCheck = await pool.query(`SELECT to_regclass('public.${tableName}') as exists;`);
+  if (tableCheck.rows[0].exists) {
+    // Vérifier les colonnes existantes
+    const columnsRes = await pool.query(`SELECT column_name FROM information_schema.columns WHERE table_name='${tableName}';`);
+    const existingColumns = columnsRes.rows.map(r => r.column_name);
+    const missing = expectedColumns.filter(col => !existingColumns.includes(col));
+    if (missing.length > 0) {
+      console.log(`La table ${tableName} existe mais il manque les colonnes : ${missing.join(', ')}. Suppression...`);
+      await pool.query(`DROP TABLE ${tableName} CASCADE;`);
+    }
+  }
+  // Création de la table si absente ou supprimée
+  await pool.query(createTableQuery);
+  // Remplissage si vide
+  const countQuery = `SELECT COUNT(*) AS count FROM ${tableName}`;
+  const countResult = await pool.query(countQuery);
+  const rowCount = parseInt(countResult.rows[0].count);
+  if (rowCount === 0 && insertSampleDataFn) {
+    await insertSampleDataFn();
+    if (resetSequenceFn) await resetSequenceFn();
+  }
+};
 require('dotenv').config();
 const { Pool } = require('pg')
 
@@ -72,39 +97,41 @@ const createUserTable = async () => {
         reports INTEGER DEFAULT 0
       );
     `;
-
     await pool.query(createTableQuery);
-    console.log('Users table created or already exists');
+    console.log('Users table created successfully!');
 
-    const checkDataQuery = 'SELECT COUNT(*) as count FROM users';
-    const result = await pool.query(checkDataQuery);
-    const rowCount = parseInt(result.rows[0].count);
-    
-    console.log(`Users table currently has ${rowCount} rows`);
-
-    if (rowCount === 0) {
-      console.log('Inserting sample data into users table...');
+    const expectedColumns = [
+      'id','first_name','last_name','username','email','password','created_at','gender','looking','birthdate','biography','tags','address','city','country','postal_code','phone','status','lat','lng','vkey','rkey','verified','google_id','reports'
+    ];
+    const insertSampleData = async () => {
       const insertTableQuery = `
         INSERT INTO users (first_name, last_name, username, email, password, created_at, gender, looking, birthdate, biography, tags, address, city, country, postal_code, phone, status, lat, lng, vkey, rkey, verified, google_id, reports) VALUES
         ('Test', 'Admin', 'AdminTest', '42projetsweb@gmail.com', '$2a$10$LG21UOau1qzQ9nCIWNq7iuAltnSsgoPCWHFl5H33PsBRqs0ghyUZK', '2023-07-07 03:09:20', 'male', 'all', '1990-04-09', 'je suis timide', 'Music, Cinema, Geek, Development, Sports', '5 Passage Bullourde', 'Paris', 'France', '75011', '0605868051', '2023-07-07 03:09:20', '48.841463', '2.3614006', '', '', true, '', 0),
         ('Hamdi', 'ELHADJ', 'TestAdmin', '42bhamdi@gmail.com', '$2a$10$UdgzWKD3wKGQWMGK.UWdK.dM53o1wmq/XZGXD46ihtJRaMBOf5ZIa', '2023-07-07 03:10:08', 'male', 'all', '1985-02-05', 'je n ai rien a dire', 'Sports, Geek, Music, Cinema, Development,', '107 rue de Charenton', 'Paris', 'France', '75012', '0605868051', '2023-07-07 03:10:08', '48.8414475', '2.3614038', '', '', true, '', '0'),
+        ('Jayda', 'Feil', 'Stanley95', 'Stanley95@matcha.com', '$2a$10$PEm2yMBHw0gkCg6t7rdDn.v6qZC.BPPSVaG1mgc9tSzjMCstmJnFi', '2023-07-04 08:59:10', 'male', 'female', '2001-03-03', 'Ici pour vous faire rever, je suis naturel naturelle et je cherche une personne naturelle et simple et qui aime la vie, Perdu mais aimant', 'Front-end, Vegan, Back-end, Development', '56 AVENUE DE SAINT-CLOUD', 'Versailles', 'France', '78000', '0864804386', '2023-07-04 08:59:10', '48.805241', '2.138634', '', '', true, '', '0'),
         ('Ahmad', 'Grady', 'Cleveland1', 'Cleveland1@matcha.com', '$2a$10$PEm2yMBHw0gkCg6t7rdDn.v6qZC.BPPSVaG1mgc9tSzjMCstmJnFi', '2023-04-24 05:21:36', 'male', 'male', '2004-09-23', 'je cherche des amis et des amies pour sortir et plus si affinites, Perdu mais aimant, je cherche l amour', 'RNCP-7, Front-end, Back-end, Sports', '5 RUE CARNOT', 'Versailles', 'France', '78000', '0972723295', '2023-04-24 05:21:36', '48.806523', '2.126378', '', '', true, '', '0'),
         ('Marguerite', 'Will', 'LemuelOConner', 'LemuelOConner@matcha.com', '$2a$10$PEm2yMBHw0gkCg6t7rdDn.v6qZC.BPPSVaG1mgc9tSzjMCstmJnFi', '2023-06-15 17:07:11', 'female', 'male', '1998-01-29', 'je suis calme et casaniere, je vous attends avec impatience, je suis franc', 'Validate-at-125, Front-end, Piercing, Geek', '2 ESPLANADE GRAND SIECLE', 'Versailles', 'France', '78000', '0567050968', '2023-06-15 17:07:11', '48.81245', '2.096023', '', '', true, '', 0);
       `;
       await pool.query(insertTableQuery);
       console.log('Sample data inserted into users table');
-      
-      await resetSequence('users', 'id');
+    };
+    await ensureTableStructure('users', expectedColumns, createTableQuery, insertSampleData, async () => await resetSequence('users', 'id'));
+    const countQuery = 'SELECT COUNT(*) AS count FROM users';
+    const countResult = await pool.query(countQuery);
+    const rowCount = parseInt(countResult.rows[0].count);
+    console.log(`Users table currently has ${rowCount} rows`);
+    if (rowCount === 0) {
+      console.log('Users table was empty and has been filled with sample data.');
     } else {
-      console.log('Users table already contains data, skipping insertion');
+      console.log('Users table already contains data.');
     }
-    console.log('✅ Users table created');
-
+    console.log('✅ Users table created\n');
   } catch (error) {
     console.error('Error creating user table:', error);
     throw error;
   }
 };
+
 
 const createBlockedTable = async () => {
   try {
@@ -114,47 +141,59 @@ const createBlockedTable = async () => {
         id SERIAL PRIMARY KEY,
         blocker INTEGER NOT NULL,
         blocked INTEGER NOT NULL,
-        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        type VARCHAR(16) NOT NULL DEFAULT 'block'
       );
     `;
-    
     await pool.query(createTableQuery);
     console.log('Blocked table created successfully!');
-    
-    const countQuery = 'SELECT COUNT(*) AS count FROM blocked';
-    const countResult = await pool.query(countQuery);
-    const rowCount = parseInt(countResult.rows[0].count);
-    
-        const insertTableQuery = `
-          INSERT INTO history (visitor, visited, created_at, type) VALUES
-          (1, 67, '2023-08-02 01:59:53', 'visit'),
-          (23, 1, '2023-08-03 02:18:46', 'visit'),
-          (1, 61, '2023-08-03 02:25:00', 'visit'),
-          (12, 1, '2023-08-03 04:05:02', 'visit'),
-          (1, 74, '2023-08-03 04:05:33', 'visit'),
-        `;
-    if (rowCount === 0) {
-      console.log('Inserting sample data into blocked table...');
+
+    const expectedColumns = ['id','blocker','blocked','created_at','type'];
+    const insertSampleData = async () => {
       const insertTableQuery = `
-        INSERT INTO blocked (blocker, blocked, created_at) VALUES
-        (1, 214, '2023-05-04 16:56:13'),
-        (2, 65, '2023-05-04 16:56:13'),
-        (1, 55, '2023-05-04 16:56:13'),
-        (3, 41, '2023-05-04 16:56:13'),
-        (384, 6, '2023-05-04 16:56:13'),
-        (36, 5, '2023-05-04 16:56:13'),
-        (77, 275, '2023-05-04 16:56:13'),
-        (395, 8, '2023-05-04 16:56:13'),
-        (298, 5, '2023-05-04 16:56:13');
+        INSERT INTO blocked (blocker, blocked, created_at, type) VALUES
+        (1, 214, '2023-05-04 16:56:13', 'block'),
+        (2, 65, '2023-05-04 16:56:13', 'block'),
+        (1, 55, '2023-05-04 16:56:13', 'block'),
+        (3, 41, '2023-05-04 16:56:13', 'block'),
+        (384, 6, '2023-05-04 16:56:13', 'block'),
+        (36, 5, '2023-05-04 16:56:13', 'block'),
+        (77, 275, '2023-05-04 16:56:13', 'block'),
+        (395, 8, '2023-05-04 16:56:13', 'block'),
+        (1, 55, '2023-05-04 16:56:13', 'block'),
+        (3, 41, '2023-05-04 16:56:13', 'report'),
+        (1, 44, '2023-05-04 16:56:13', 'report'),
+        (304, 1, '2023-05-04 16:56:13', 'report'),
+        (1, 85, '2023-05-04 16:56:13', 'block'),
+        (465, 1, '2023-05-04 16:56:13', 'report'),
+        (1, 56, '2023-05-04 16:56:13', 'report'),
+        (76, 1, '2023-05-04 16:56:13', 'report'),
+        (1, 77, '2023-05-04 16:56:13', 'report'),
+        (97, 1, '2023-05-04 16:56:13', 'report'),
+        (1, 88, '2023-05-04 16:56:13', 'report'),
+        (108, 1, '2023-05-04 16:56:13', 'block'),
+        (2, 30, '2023-05-04 16:56:13', 'block'),
+        (3, 247, '2023-05-04 16:56:13', 'report'),
+        (2, 41, '2023-05-04 16:56:13', 'report'),
+        (4, 2, '2023-05-04 16:56:13', 'report'),
+        (2, 352, '2023-05-04 16:56:13', 'report'),
+        (185, 2, '2023-05-04 16:56:13', 'report'),
+        (298, 5, '2023-05-04 16:56:13', 'block');
       `;
       await pool.query(insertTableQuery);
       console.log('Sample data inserted into blocked table');
-      
-      await resetSequence('blocked', 'id');
+    };
+    await ensureTableStructure('blocked', expectedColumns, createTableQuery, insertSampleData, async () => await resetSequence('blocked', 'id'));
+    const countQuery = 'SELECT COUNT(*) AS count FROM blocked';
+    const countResult = await pool.query(countQuery);
+    const rowCount = parseInt(countResult.rows[0].count);
+    console.log(`Blocked table currently has ${rowCount} rows`);
+    if (rowCount === 0) {
+      console.log('Blocked table was empty and has been filled with sample data.');
     } else {
       console.log('Blocked table already contains data.');
     }
-    console.log('✅ Blocked table created');
+    console.log('✅ Blocked table created\n');
   } catch (error) {
     console.error('Error creating blocked table:', error);
   }
@@ -187,15 +226,48 @@ const createChatTable = async () => {
       console.log('Inserting sample data into chat table...');
       const insertTableQuery = `
         INSERT INTO chat (id_conversation, id_from, message, created_at, is_read) VALUES  
-        (1, 1, 'Salut', '2020-06-15 17:07:11', false),
+        (2, 1, 'Salut', '2020-06-15 17:07:11', false),
         (1, 2, 'Salut', '2020-06-15 17:07:11', false),
-        (1, 1, 'Ca va ?', '2020-06-15 17:07:11', false),
+        (1, 3, 'Ca va ?', '2020-06-15 17:07:11', false),
         (1, 2, 'Ca va et toi ?', '2020-06-15 17:07:11', false),
+        (1, 2, 'Ca va bien merci', '2020-06-15 17:07:11', false),
+        (1, 2, 'Tu fais quoi ?', '2020-06-15 17:07:11', false),
+        (2, 1, 'Je suis en train de coder', '2020-06-15 17:07:11', false),
+        (1, 2, 'Ok', '2020-06-15 17:07:11', false),
+        (2, 1, 'Et toi ?', '2020-06-15 17:07:11', false),
+        (1, 2, 'Je suis en train de coder', '2020-06-15 17:07:11', false),
+        (11, 51, 'Ok', '2020-06-15 17:07:11', false),
+        (1, 11, 'im here', '2023-10-21 02:55:44', true),
+        (151, 1, 'hello', '2023-10-21 02:55:47', true),
+        (1, 2, 'yo', '2023-10-21 02:56:27', true),
+        (1, 2, 'how are you', '2023-10-21 02:56:33', true),
+        (2, 475, 'hjdfgvpbh', '2023-10-21 03:04:37', true),
+        (2, 475, 'comment vas tu', '2023-10-21 03:04:45', true),
+        (4, 475, 'cc', '2023-10-21 05:12:06', true),
+        (4, 475, 'qu est ce que tu deviens', '2023-10-21 05:12:21', true),
+        (5, 323, 'hi man', '2023-10-21 05:14:00', true),
+        (6, 1, 'you are welcome', '2023-10-21 05:20:01', false),
+        (7, 16, 'mar7be bik', '2023-10-21 05:21:27', true),
+        (8, 410, '3aslema', '2023-10-21 05:22:34', true),
+        (9, 140, 'winek', '2023-10-21 05:24:00', true),
+        (11, 23, 'ya rajel chnawa a7welik', '2023-10-21 05:28:17', true),
+        (11, 1, 'walahi matcha habletni', '2023-10-21 05:28:39', false),
+        (12, 8, 'bonjourno amogo', '2023-10-21 05:29:52', true),
+        (12, 8, 'come stai', '2023-10-21 05:30:27', true),
+        (13, 12, 'je t es chercher partout', '2023-10-21 05:32:16', true),
+        (14, 18, 'hey tu es toujours vivant', '2023-10-21 05:37:55', true),
+        (15, 29, 'mon gars tu me soul avec ton projet', '2023-10-21 05:40:11', true),
+        (16, 216, 'prend ton sac a dos et casse toi', '2023-10-21 05:42:07', true),
+        (17, 22, 'vivement la fin du projet', '2023-10-21 05:43:51', true),
+        (18, 426, 'la vie ne s arrête pas pour les problemes d aucun personne', '2023-10-21 05:46:05', true),
+        (19, 1, 'bientot je serai libre in che2 allah', '2023-10-21 05:47:22', false),
+        (20, 19, 'je suis fatigue', '2023-10-21 05:49:40', false),
+        (20, 19, 'ces projets me soul comme jamais', '2023-10-21 05:50:04', true),
         (1, 2, 'bjr', '2023-10-22 00:26:36', false),
         (15, 29, 'salut', '2023-10-22 06:39:04', false),
         (15, 29, 'tu ne repond pas', '2023-10-22 06:53:11', true),
-        (1, 1, 'cc mon gars', '2023-10-22 06:53:59', false),
-        (1, 1, 'ça vas?', '2023-10-22 06:54:05', false),
+        (1, 50, 'cc mon gars', '2023-10-22 06:53:59', false),
+        (54, 1, 'ça vas?', '2023-10-22 06:54:05', false),
         (12, 1, 'OK comme tu veux', '2023-10-24 19:36:33', false);
       `;
       await pool.query(insertTableQuery);
@@ -205,7 +277,7 @@ const createChatTable = async () => {
     } else {
       console.log('Chat table already contains data.');
     }
-    console.log('✅ Chat table created');
+    console.log('✅ Chat table created\n');
   } catch (error) {
     console.error('Error creating chat table:', error);
   }
@@ -240,6 +312,16 @@ const createConversationsTable = async () => {
         (3, 1, '2023-10-21 03:10:41', true, NULL),
         (4, 1, '2023-10-21 05:12:21', true, NULL),
         (5, 1, '2023-10-21 05:14:00', true, NULL),
+        (6, 1, '2023-10-21 05:20:01', true, NULL),
+        (7, 1, '2023-10-21 05:21:27', true, NULL),
+        (8, 1, '2023-10-21 05:22:34', true, NULL),
+        (9, 1, '2023-10-21 05:24:00', true, NULL),
+        (10, 1, '2023-10-21 03:27:48', true, NULL),
+        (11, 23, '2023-10-21 05:28:39', true, NULL),
+        (12, 1, '2023-10-24 19:36:33', true, NULL),
+        (13, 1, '2023-10-21 05:32:16', true, NULL),
+        (14, 1, '2023-10-21 05:37:55', true, NULL),
+        (15, 1, '2023-10-22 06:53:11', true, NULL),
         (16, 1, '2023-10-21 05:42:07', true, NULL),
         (17, 1, '2023-10-21 05:43:51', true, NULL),
         (18, 1, '2023-10-21 05:46:05', true, NULL),
@@ -255,7 +337,7 @@ const createConversationsTable = async () => {
     } else {
       console.log('Conversations table already contains data.');
     }
-    console.log('✅ Conversations table created');
+    console.log('✅ Conversations table created\n');
   } catch (error) {
     console.error('Error creating conversations table:', error);
   }
@@ -269,39 +351,38 @@ const createHistoryTable = async () => {
         id SERIAL PRIMARY KEY,
         visitor INTEGER NOT NULL,
         visited INTEGER NOT NULL,
-        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        type VARCHAR(20) NOT NULL DEFAULT 'visit'
       );
     `;
     await pool.query(createTableQuery);
     console.log('History table created successfully!');
-    // Ensure 'type' column exists for visit actions
-    try {
-      await pool.query("ALTER TABLE history ADD COLUMN IF NOT EXISTS type VARCHAR(20) NOT NULL DEFAULT 'visit';");
-      console.log("Ensured 'type' column exists in history table.");
-    } catch (err) {
-      console.error("Error ensuring 'type' column in history table:", err);
-    }
-    const countQuery = 'SELECT COUNT(*) AS count FROM history';
-    const countResult = await pool.query(countQuery);
-    const rowCount = parseInt(countResult.rows[0].count);
-    console.log(`History table currently has ${rowCount} rows`);
-    if (rowCount === 0) {
-      console.log('Inserting sample data into history table...');
+
+    const expectedColumns = ['id','visitor','visited','created_at','type'];
+    const insertSampleData = async () => {
       const insertTableQuery = `
-        INSERT INTO history (visitor, visited, created_at) VALUES
+        INSERT INTO history (visitor, visited, created_at, type) VALUES
         (1, 67, '2023-08-02 01:59:53'),
         (23, 1, '2023-08-03 02:18:46'),
+        (1, 61, '2023-08-03 02:25:00'),
         (19, 126, '2023-10-28 08:03:17'),
         (19, 126, '2023-10-28 08:04:50'),
         (19, 126, '2023-10-28 08:40:17');
       `;
       await pool.query(insertTableQuery);
       console.log('Sample data inserted into history table');
-      await resetSequence('history', 'id');
+    };
+    await ensureTableStructure('history', expectedColumns, createTableQuery, insertSampleData, async () => await resetSequence('history', 'id'));
+    const countQuery = 'SELECT COUNT(*) AS count FROM history';
+    const countResult = await pool.query(countQuery);
+    const rowCount = parseInt(countResult.rows[0].count);
+    console.log(`History table currently has ${rowCount} rows`);
+    if (rowCount === 0) {
+      console.log('History table was empty and has been filled with sample data.');
     } else {
       console.log('History table already contains data.');
     }
-    console.log('✅ History table created');
+    console.log('✅ History table created\n');
   } catch (error) {
     console.error('Error creating history table:', error);
   }
@@ -321,45 +402,12 @@ const createImagesTable = async () => {
         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
     `;
-
     await pool.query(createTableQuery);
     console.log('Images table created successfully!');
-
-    const countQuery = 'SELECT COUNT(*) AS count FROM images';
-    const countResult = await pool.query(countQuery);
-    const rowCount = parseInt(countResult.rows[0].count);
-
-    console.log(`Images table currently has ${rowCount} rows`);
-
-    if (rowCount === 0) {
-      console.log('Inserting sample data into images table...');
+    const expectedColumns = ['id','user_id','link','data','profile','cover','created_at'];
+    const insertSampleData = async () => {
       const insertTableQuery = `
         INSERT INTO images (user_id, link, data, profile, cover, created_at) VALUES
-        (490, 'https://i.pravatar.cc/1584x396?u=user-2453', false, false, true, '2023-04-18 04:41:25'),
-        (490, 'https://i.pravatar.cc/400?u=user-2454', false, true, false, '2022-12-03 18:09:41'),
-        (490, 'https://i.pravatar.cc/400?u=user-2455', false, false, false, '2022-12-13 20:17:31'),
-        (490, 'https://i.pravatar.cc/400?u=user-2456', false, false, false, '2023-01-22 20:04:59'),
-        (490, 'https://i.pravatar.cc/400?u=user-2457', false, false, false, '2023-05-26 10:07:04'),
-        (491, 'https://i.pravatar.cc/1584x396?u=user-2458', false, false, true, '2023-04-06 09:28:02'),
-        (491, 'https://i.pravatar.cc/400?u=user-2459', false, true, false, '2023-01-09 13:40:23'),
-        (491, 'https://i.pravatar.cc/400?u=user-2460', false, false, false, '2023-03-15 16:10:22'),
-        (491, 'https://i.pravatar.cc/400?u=user-2461', false, false, false, '2023-10-29 10:19:23'),
-        (491, 'https://i.pravatar.cc/400?u=user-2462', false, false, false, '2023-10-19 19:31:20'),
-        (492, 'https://i.pravatar.cc/1584x396?u=user-2463', false, false, true, '2023-02-07 20:57:08'),
-        (492, 'https://i.pravatar.cc/400?u=user-2464', false, true, false, '2023-07-03 16:48:31'),
-        (492, 'https://i.pravatar.cc/400?u=user-2465', false, false, false, '2023-06-22 05:58:46'),
-        (492, 'https://i.pravatar.cc/400?u=user-2466', false, false, false, '2022-12-16 20:58:19'),
-        (492, 'https://i.pravatar.cc/400?u=user-2467', false, false, false, '2023-06-10 22:48:11'),
-        (493, 'https://i.pravatar.cc/1584x396?u=user-2468', false, false, true, '2023-05-09 21:38:17'),
-        (493, 'https://i.pravatar.cc/400?u=user-2469', false, true, false, '2023-09-07 10:17:27'),
-        (493, 'https://i.pravatar.cc/400?u=user-2470', false, false, false, '2023-04-13 09:14:27'),
-        (493, 'https://i.pravatar.cc/400?u=user-2471', false, false, false, '2023-01-05 04:05:37'),
-        (493, 'https://i.pravatar.cc/400?u=user-2472', false, false, false, '2023-02-18 12:44:13'),
-        (494, 'https://i.pravatar.cc/1584x396?u=user-2473', false, false, true, '2023-09-16 23:57:31'),
-        (494, 'https://i.pravatar.cc/400?u=user-2474', false, true, false, '2023-06-06 07:49:05'),
-        (494, 'https://i.pravatar.cc/400?u=user-2475', false, false, false, '2023-04-17 02:24:41'),
-        (494, 'https://i.pravatar.cc/400?u=user-2476', false, false, false, '2023-05-30 20:00:01'),
-        (494, 'https://i.pravatar.cc/400?u=user-2477', false, false, false, '2023-02-26 02:39:56'),
         (495, 'https://i.pravatar.cc/1584x396?u=user-2478', false, false, true, '2023-05-15 06:48:05'),
         (495, 'https://i.pravatar.cc/400?u=user-2479', false, true, false, '2023-04-15 02:35:28'),
         (495, 'https://i.pravatar.cc/400?u=user-2480', false, false, false, '2023-04-29 08:15:04'),
@@ -393,11 +441,18 @@ const createImagesTable = async () => {
       `;
       await pool.query(insertTableQuery);
       console.log('Sample data inserted into images table');
-      await resetSequence('images', 'id');
+    };
+    await ensureTableStructure('images', expectedColumns, createTableQuery, insertSampleData, async () => await resetSequence('images', 'id'));
+    const countQuery = 'SELECT COUNT(*) AS count FROM images';
+    const countResult = await pool.query(countQuery);
+    const rowCount = parseInt(countResult.rows[0].count);
+    console.log(`Images table currently has ${rowCount} rows`);
+    if (rowCount === 0) {
+      console.log('Images table was empty and has been filled with sample data.');
     } else {
-      console.log('Image table already contains data.');
+      console.log('Images table already contains data.');
     }
-    console.log('✅ Images table created');
+    console.log('✅ Images table created\n');
   } catch (error) {
     console.error('Error creating Images table:', error);
   }
@@ -414,27 +469,14 @@ const createMatchesTable = async () => {
         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
     `;
-    
     await pool.query(createTableQuery);
     console.log('Matches table created successfully!');
 
-    const countQuery = 'SELECT COUNT(*) AS count FROM matches';
-    const countResult = await pool.query(countQuery);
-    const rowCount = parseInt(countResult.rows[0].count);
-    
-    console.log(`Matches table currently has ${rowCount} rows`);
-
-    if (rowCount === 0) {
-      console.log('Inserting sample data into matches table...');
+    const expectedColumns = ['id','matcher','matched','created_at'];
+    const insertSampleData = async () => {
       const insertTableQuery = `
         INSERT INTO matches (matcher, matched, created_at) VALUES
         (1, 61, '2023-08-03 15:50:33'),
-        (1, 59, '2023-08-04 01:12:23'),
-        (1, 392, '2023-08-07 05:13:03'),
-        (1, 429, '2023-08-07 05:13:17'),
-        (1, 4, '2023-08-07 05:14:02'),
-        (4, 497, '2023-08-10 06:25:26'),
-        (4, 1, '2023-10-21 04:03:58'),
         (1, 43, '2023-10-22 19:36:14'),
         (126, 1, '2023-10-23 01:59:47'),
         (1, 299, '2023-10-24 23:36:49'),
@@ -442,12 +484,18 @@ const createMatchesTable = async () => {
       `;
       await pool.query(insertTableQuery);
       console.log('Sample data inserted into matches table');
-      
-      await resetSequence('matches', 'id');
+    };
+    await ensureTableStructure('matches', expectedColumns, createTableQuery, insertSampleData, async () => await resetSequence('matches', 'id'));
+    const countQuery = 'SELECT COUNT(*) AS count FROM matches';
+    const countResult = await pool.query(countQuery);
+    const rowCount = parseInt(countResult.rows[0].count);
+    console.log(`Matches table currently has ${rowCount} rows`);
+    if (rowCount === 0) {
+      console.log('Matches table was empty and has been filled with sample data.');
     } else {
       console.log('Matches table already contains data.');
     }
-    console.log('✅ Matches table created');
+    console.log('✅ Matches table created\n');
   } catch (error) {
     console.error('Error creating matches table:', error);
   }
@@ -482,13 +530,18 @@ const createNotificationsTable = async () => {
       const insertTableQuery = `
         INSERT INTO notifications (type, id_from, id_to, created_at, is_read, id_conversation) VALUES
         ('visit', 1, 67, '2023-08-02 01:59:53', false, -1),
-        ('visit', 1, 61, '2023-08-03 02:18:46', false, -1),
-        ('visit', 1, 61, '2023-08-03 02:25:00', false, -1),
-        ('visit', 19, 126, '2023-10-28 08:00:59', false, -1),
-        ('visit', 19, 126, '2023-10-28 08:02:41', false, -1),
-        ('visit', 19, 126, '2023-10-28 08:02:52', false, -1),
-        ('visit', 19, 126, '2023-10-28 08:03:17', false, -1),
-        ('visit', 19, 126, '2023-10-28 08:04:50', false, -1),
+        ('like', 1, 74, '2023-08-03 04:05:36', false, -1),
+        ('unlike', 1, 74, '2023-08-03 04:05:37', false, -1),
+        ('visit', 2, 94, '2023-08-03 15:48:10', false, -1),
+        ('like', 1, 61, '2023-08-03 15:50:33', false, -1),
+        ('visit', 2, 1, '2023-08-03 16:18:52', true, -1),
+        ('like', 2, 1, '2023-08-03 16:18:54', true, -1),
+        ('like_back', 1, 5, '2023-08-03 16:19:40', true, -1),
+        ('visit', 1, 5, '2023-08-03 16:21:46', true, -1),
+        ('unlike', 1, 5, '2023-08-03 16:21:48', true, -1),
+        ('like', 1, 5, '2023-08-03 16:21:48', true, -1),
+        ('like_back', 2, 1, '2023-08-03 16:22:58', true, -1),
+        ('visit', 19, 126, '2023-10-28 08:00:54', false, -1),
         ('visit', 19, 126, '2023-10-28 08:40:17', false, -1);
       `;
       await pool.query(insertTableQuery);
@@ -498,7 +551,7 @@ const createNotificationsTable = async () => {
     } else {
       console.log('Notifications table already contains data.');
     }
-    console.log('✅ Notifications table created');
+    console.log('✅ Notifications table created\n');
   } catch (error) {
     console.error('Error creating Notifications table:', error);
   }
@@ -556,7 +609,7 @@ const createTagsTable = async () => {
     } else {
       console.log('Tags table already contains data.');
     }
-    console.log('✅ Tags table created');
+    console.log('✅ Tags table created\n');
   } catch (error) {
     console.error('Error creating tags table:', error);
   }
@@ -568,8 +621,10 @@ const procedures = async () => {
     
     // Drop existing functions if they exist
     await pool.query('DROP FUNCTION IF EXISTS calc_rating(INTEGER, OUT INTEGER, OUT INTEGER, OUT INTEGER) CASCADE');
+    console.log('Dropped existing calc_rating function if it existed.');
     await pool.query('DROP FUNCTION IF EXISTS get_rating(INTEGER) CASCADE');
-    
+    console.log('Dropped existing get_rating function if it existed.');
+  
     // Create CALC_RATING function (equivalent to the stored procedure)
     const createFunctionQuery1 = `
       CREATE OR REPLACE FUNCTION calc_rating(
@@ -608,15 +663,18 @@ const procedures = async () => {
           reports INTEGER;
       BEGIN
           SELECT * INTO visit, likes, reports FROM calc_rating(id_user);
-          RETURN (likes / 20.0 + visit / 100.0 - reports / 250.0);
+          RETURN sqrt(GREATEST(likes / 20.0 + visit / 100.0 - reports / 250.0, 0));
       END;
       $$;
     `;
 
+
     await pool.query(createFunctionQuery1);
+    console.log('Created calc_rating function successfully.');
     await pool.query(createFunctionQuery2);
+    console.log('Created get_rating function successfully.');
     
-    console.log('✅ Functions created successfully!');
+    console.log('✅ Functions created successfully!\n');
   } catch (error) {
     console.error('Error creating functions:', error);
   }

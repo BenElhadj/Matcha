@@ -1,3 +1,48 @@
+// Get users who have blocked me (paginated)
+const getBlockedBy = async (id, limit = 25, offset = 0) => {
+    const query = `
+        SELECT 
+            blocked.blocker AS blocker_id, 
+            users.username AS username, 
+            users.first_name AS first_name, 
+            users.last_name AS last_name, 
+            users.gender AS gender, 
+            users.birthdate AS birthdate, 
+            images.link AS link, 
+            images.data AS data, 
+            blocked.created_at AS blocked_at, 
+            get_rating(users.id) AS rating 
+        FROM blocked 
+        JOIN users ON blocked.blocker = users.id 
+        LEFT JOIN images ON users.id = images.user_id AND images.profile = TRUE 
+        WHERE blocked.blocked = $1
+        ORDER BY blocked.created_at DESC
+        LIMIT $2 OFFSET $3
+    `;
+    const result = await db.query(query, [id, limit, offset]);
+    const isValid = v => v && v !== 'false' && v !== '' && v !== null && v !== undefined;
+    return result.rows.map(row => {
+        let avatar = '';
+        if (isValid(row.link)) {
+            avatar = row.link;
+        } else if (isValid(row.data)) {
+            avatar = row.data;
+        } else {
+            avatar = '';
+        }
+        return {
+            blocker_id: row.blocker_id,
+            username: row.username,
+            first_name: row.first_name,
+            last_name: row.last_name,
+            gender: row.gender,
+            birthdate: row.birthdate,
+            avatar,
+            blocked_at: row.blocked_at,
+            rating: row.rating
+        };
+    });
+};
 const db = require('../config/database')
 
 // add user
@@ -273,23 +318,91 @@ const isBlocked = async (blocker, blocked) => {
     return result.rowCount > 0;
 }
 
-//  Block user 
+// ...existing code...
+
+// Block user (type = 'block')
 const blockUser = async (user_id, id) => {
-    const query = `INSERT INTO blocked (blocker, blocked) VALUES ($1, $2)`;
+    const query = `INSERT INTO blocked (blocker, blocked, type) VALUES ($1, $2, 'block') ON CONFLICT DO NOTHING`;
     await db.query(query, [user_id, id]);
 }
 
-// Unblock user 
+// Report user (type = 'report')
+const reportUser = async (user_id, id) => {
+    const query = `INSERT INTO blocked (blocker, blocked, type) VALUES ($1, $2, 'report') ON CONFLICT DO NOTHING`;
+    await db.query(query, [user_id, id]);
+}
+
+// Unblock user (type = 'block')
 const unblockUser = async (user_id, id) => {
-    const query = `DELETE FROM blocked WHERE blocker = $1 AND blocked = $2`;
+    const query = `DELETE FROM blocked WHERE blocker = $1 AND blocked = $2 AND type = 'block'`;
     await db.query(query, [user_id, id]);
-}
+};
 
-// Report User 
-const reportUser = async (id) => {
-    const query = `UPDATE users SET reports = reports + 1 WHERE id = $1`;
-    await db.query(query, [id]);
-}
+// Get users I have reported (paginated)
+const getReported = async (id, limit = 25, offset = 0) => {
+    const query = `
+        SELECT 
+            blocked.blocked AS reported_id, 
+            users.username, users.first_name, users.last_name, users.gender, users.birthdate, images.link, images.data, blocked.created_at, get_rating(users.id) AS rating
+        FROM blocked 
+        JOIN users ON blocked.blocked = users.id 
+        LEFT JOIN images ON users.id = images.user_id AND images.profile = TRUE 
+        WHERE blocked.blocker = $1 AND blocked.type = 'report'
+        ORDER BY blocked.created_at DESC
+        LIMIT $2 OFFSET $3
+    `;
+    const result = await db.query(query, [id, limit, offset]);
+    const isValid = v => v && v !== 'false' && v !== '' && v !== null && v !== undefined;
+    return result.rows.map(row => {
+        let avatar = '';
+        if (isValid(row.link)) avatar = row.link;
+        else if (isValid(row.data)) avatar = row.data;
+        return {
+            reported_id: row.reported_id,
+            username: row.username,
+            first_name: row.first_name,
+            last_name: row.last_name,
+            gender: row.gender,
+            birthdate: row.birthdate,
+            avatar,
+            reported_at: row.created_at,
+            rating: row.rating
+        };
+    });
+};
+
+// Get users who have reported me (paginated)
+const getReportedBy = async (id, limit = 25, offset = 0) => {
+    const query = `
+        SELECT 
+            blocked.blocker AS reporter_id, 
+            users.username, users.first_name, users.last_name, users.gender, users.birthdate, images.link, images.data, blocked.created_at, get_rating(users.id) AS rating
+        FROM blocked 
+        JOIN users ON blocked.blocker = users.id 
+        LEFT JOIN images ON users.id = images.user_id AND images.profile = TRUE 
+        WHERE blocked.blocked = $1 AND blocked.type = 'report'
+        ORDER BY blocked.created_at DESC
+        LIMIT $2 OFFSET $3
+    `;
+    const result = await db.query(query, [id, limit, offset]);
+    const isValid = v => v && v !== 'false' && v !== '' && v !== null && v !== undefined;
+    return result.rows.map(row => {
+        let avatar = '';
+        if (isValid(row.link)) avatar = row.link;
+        else if (isValid(row.data)) avatar = row.data;
+        return {
+            reporter_id: row.reporter_id,
+            username: row.username,
+            first_name: row.first_name,
+            last_name: row.last_name,
+            gender: row.gender,
+            birthdate: row.birthdate,
+            avatar,
+            reported_at: row.created_at,
+            rating: row.rating
+        };
+    });
+};
 
 // User update location 
 const updateLocation = async (lat, long, id) => {
@@ -345,5 +458,8 @@ module.exports = {
     reportUser,
     updateLocation,
     updateStatus,
-    blacklist
+    blacklist,
+    getBlockedBy,
+    getReported,
+    getReportedBy
 }

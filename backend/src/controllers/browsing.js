@@ -1,3 +1,53 @@
+// Liste paginée des utilisateurs que j'ai signalés
+const getReported = async (req, res) => {
+	if (!req.user.id)
+		return res.json({ status: 'error', message: 'Not logged in', data: null });
+	const page = parseInt(req.query.page, 10) || 1;
+	const limit = parseInt(req.query.limit, 10) || 25;
+	const offset = (page - 1) * limit;
+	try {
+		const items = await userModel.getReported(req.user.id, limit, offset);
+		const countRes = await db.query("SELECT COUNT(*) FROM blocked WHERE blocker = $1 AND type = 'report'", [req.user.id]);
+		const total = parseInt(countRes.rows[0].count, 10);
+		return res.json({ page, limit, total, items });
+	} catch (err) {
+		return res.json({ status: 'error', message: 'Fatal error', data: String(err && err.message ? err.message : err) });
+	}
+};
+
+// Liste paginée des utilisateurs qui m'ont signalé
+const getReportedBy = async (req, res) => {
+	if (!req.user.id)
+		return res.json({ status: 'error', message: 'Not logged in', data: null });
+	const page = parseInt(req.query.page, 10) || 1;
+	const limit = parseInt(req.query.limit, 10) || 25;
+	const offset = (page - 1) * limit;
+	try {
+		const items = await userModel.getReportedBy(req.user.id, limit, offset);
+		const countRes = await db.query("SELECT COUNT(*) FROM blocked WHERE blocked = $1 AND type = 'report'", [req.user.id]);
+		const total = parseInt(countRes.rows[0].count, 10);
+		return res.json({ page, limit, total, items });
+	} catch (err) {
+		return res.json({ status: 'error', message: 'Fatal error', data: String(err && err.message ? err.message : err) });
+	}
+};
+// Liste paginée des utilisateurs qui m'ont bloqué
+const getBlockedBy = async (req, res) => {
+	if (!req.user.id)
+		return res.json({ status: 'error', message: 'Not logged in', data: null });
+	const page = parseInt(req.query.page, 10) || 1;
+	const limit = parseInt(req.query.limit, 10) || 25;
+	const offset = (page - 1) * limit;
+	try {
+		const items = await userModel.getBlockedBy(req.user.id, limit, offset);
+		// Pour le total, on fait un COUNT
+		const countRes = await db.query('SELECT COUNT(*) FROM blocked WHERE blocked = $1 AND type = \'block\'', [req.user.id]);
+		const total = parseInt(countRes.rows[0].count, 10);
+		return res.json({ page, limit, total, items });
+	} catch (err) {
+		return res.json({ status: 'error', message: 'Fatal error', data: String(err && err.message ? err.message : err) });
+	}
+};
 const userModel = require('../models/userModel')
 const tagsModel = require('../models/tagsModel')
 
@@ -270,6 +320,9 @@ module.exports = {
 	getBlocked,
 	getMatches,
 	getAllHistory,
+	getBlockedBy,
+	getReported,
+	getReportedBy,
 	discover
 }
 
