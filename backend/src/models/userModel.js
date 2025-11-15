@@ -279,6 +279,7 @@ const getBlocked = async (id) => {
             images.link AS link, 
             images.data AS data, 
             blocked.created_at AS blocked_at, 
+            blocked.type AS type, 
             get_rating(users.id) AS rating 
         FROM blocked 
         JOIN users ON blocked.blocked = users.id 
@@ -306,6 +307,7 @@ const getBlocked = async (id) => {
             birthdate: row.birthdate,
             avatar,
             blocked_at: row.blocked_at,
+            type: row.type,
             rating: row.rating
         };
     });
@@ -332,6 +334,11 @@ const reportUser = async (user_id, id) => {
     const query = `INSERT INTO blocked (blocker, blocked, type) VALUES ($1, $2, 'report')`;
     await db.query(query, [user_id, id]);
 }
+// Supprimer un report (type = 'report')
+const unreportUser = async (user_id, id) => {
+    const query = `DELETE FROM blocked WHERE blocker = $1 AND blocked = $2 AND type = 'report'`;
+    await db.query(query, [user_id, id]);
+};
 
 // Unblock user (type = 'block')
 const unblockUser = async (user_id, id) => {
@@ -457,6 +464,7 @@ module.exports = {
     blockUser,
     unblockUser,
     reportUser,
+        unreportUser,
     updateLocation,
     updateStatus,
     blacklist,

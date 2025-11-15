@@ -17,6 +17,9 @@ const location = require('../controllers/location')
 const multer = require('multer')
 const upload = multer({ limits: { fileSize: 4 * 1024 * 1024 } })
 
+// Route pour retirer un report (doit être après l'init de routes)
+routes.post('/unreport', authCheck, block.unreportUser)
+
 // Nouvelle route pour uploader une image de profil
 routes.post('/image/profile', [authCheck, upload.single('image')], userProfile.uploadProfileImage)
 
