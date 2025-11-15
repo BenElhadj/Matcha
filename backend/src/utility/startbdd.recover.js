@@ -641,6 +641,20 @@ const createBlockedTable = async () => {
       );
     `;
     await pool.query(createTableQuery);
+        // Supprime toute contrainte unique existante
+    await pool.query(`DO $$ BEGIN
+      IF EXISTS (SELECT 1 FROM pg_indexes WHERE tablename = 'blocked' AND indexname = 'blocked_blocker_blocked_key') THEN
+        EXECUTE 'DROP INDEX blocked_blocker_blocked_key';
+      END IF;
+      IF EXISTS (SELECT 1 FROM pg_indexes WHERE tablename = 'blocked' AND indexname = 'blocked_blocker_blocked_type_key') THEN
+        EXECUTE 'DROP INDEX blocked_blocker_blocked_type_key';
+      END IF;
+      IF EXISTS (SELECT 1 FROM pg_indexes WHERE tablename = 'blocked' AND indexname = 'idx_block_unique') THEN
+        EXECUTE 'DROP INDEX idx_block_unique';
+      END IF;
+    END $$;`);
+    // Ajoute un index unique partiel pour les blocks uniquement
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_block_unique ON blocked (blocker, blocked) WHERE type = 'block';`);
     console.log('Blocked table created successfully!');
 
     const expectedColumns = ['id','blocker','blocked','created_at','type'];

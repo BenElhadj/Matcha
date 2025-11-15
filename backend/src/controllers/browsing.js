@@ -1,3 +1,22 @@
+// Fusionne les utilisateurs qui m'ont bloqué et ceux qui m'ont signalé (block/report)
+const { getBlockedOrReportedBy } = require('../models/getBlockedOrReportedBy')
+
+const getBlockedOrReportedByCtrl = async (req, res) => {
+	if (!req.user.id)
+		return res.json({ status: 'error', message: 'Not logged in', data: null });
+	const page = parseInt(req.query.page, 10) || 1;
+	const limit = parseInt(req.query.limit, 10) || 25;
+	const offset = (page - 1) * limit;
+	try {
+		const items = await getBlockedOrReportedBy(req.user.id, limit, offset);
+		// Compte total block + report
+		const countRes = await db.query("SELECT COUNT(*) FROM blocked WHERE blocked = $1 AND (type = 'block' OR type = 'report')", [req.user.id]);
+		const total = parseInt(countRes.rows[0].count, 10);
+		return res.json({ page, limit, total, items });
+	} catch (err) {
+		return res.json({ status: 'error', message: 'Fatal error', data: String(err && err.message ? err.message : err) });
+	}
+};
 // Liste paginée des utilisateurs que j'ai signalés
 const getReported = async (req, res) => {
 	if (!req.user.id)
@@ -323,6 +342,7 @@ module.exports = {
 	getBlockedBy,
 	getReported,
 	getReportedBy,
+	getBlockedOrReportedByCtrl,
 	discover
 }
 

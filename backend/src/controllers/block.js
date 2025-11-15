@@ -68,17 +68,34 @@ const unblockUser = async (req, res) => {
 // Report User 
 
 const reportUser = async (req, res) => {
-	if (!req.user.id)
-		return res.json({ status: 'error', type: 'block', message: 'Not logged in', data: null })
-	if (!req.body.id || isNaN(req.body.id))
-		return res.json({ status: 'error', type: 'block', message: 'Invalid request', data: null })
+	console.log('[API] POST /api/users/report', { userId: req.user.id, reportedId: req.body.id });
+	if (!req.user.id) {
+		console.log('[API] reportUser: Not logged in');
+		return res.json({ status: 'error', type: 'report', message: 'Not logged in', data: null });
+	}
+	if (!req.body.id || isNaN(req.body.id)) {
+		console.log('[API] reportUser: Invalid request', req.body);
+		return res.json({ status: 'error', type: 'report', message: 'Invalid request', data: null });
+	}
 	try {
-		await userModel.reportUser(req.body.id)
-		return res.json({ status: 'success', type: 'block', message: 'User reported', data: null })
+		await userModel.reportUser(req.user.id, req.body.id);
+		// Vérification de l'insertion
+		const check = await require('../utility/startbdd').pool.query(
+			'SELECT * FROM blocked WHERE blocker = $1 AND blocked = $2 AND type = $3 ORDER BY created_at DESC LIMIT 1',
+			[req.user.id, req.body.id, 'report']
+		);
+		if (check.rows.length > 0) {
+			console.log('[API] reportUser: Inserted row:', check.rows[0]);
+			return res.json({ status: 'success', type: 'report', message: 'User reported', data: check.rows[0] });
+		} else {
+			console.log('[API] reportUser: Insert failed');
+			return res.json({ status: 'error', type: 'report', message: 'Insert failed', data: null });
+		}
 	} catch (err) {
-		return res.json({ status: 'error', type: 'block', message: 'Fatal error', data: err })
+		console.log('[API] reportUser: Fatal error', err);
+		return res.json({ status: 'error', type: 'report', message: 'Fatal error', data: err });
 	}
-	}
+}
 
 	module.exports = {
 	   blockUser,

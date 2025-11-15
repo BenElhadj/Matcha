@@ -328,7 +328,8 @@ const blockUser = async (user_id, id) => {
 
 // Report user (type = 'report')
 const reportUser = async (user_id, id) => {
-    const query = `INSERT INTO blocked (blocker, blocked, type) VALUES ($1, $2, 'report') ON CONFLICT DO NOTHING`;
+    console.log('[MODEL] reportUser called', { user_id, id });
+    const query = `INSERT INTO blocked (blocker, blocked, type) VALUES ($1, $2, 'report')`;
     await db.query(query, [user_id, id]);
 }
 
