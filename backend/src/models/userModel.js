@@ -76,7 +76,7 @@ const getUserBrow = async () => {
 
 // GET User by id (browsing)
 const getUserbyIdBrow = async (id, user_id) => {
-    const query = `SELECT users.*, get_rating(users.id) AS rating FROM users WHERE id = $1 AND id NOT IN (SELECT blocked FROM blocked WHERE blocker = $2) AND $2 NOT IN (SELECT blocked FROM blocked WHERE blocker = $1)`;
+    const query = `SELECT users.*, get_rating(users.id) AS rating FROM users WHERE id = $1 AND id NOT IN (SELECT blocked FROM blocked WHERE blocker = $2 AND type = 'block') AND $2 NOT IN (SELECT blocked FROM blocked WHERE blocker = $1 AND type = 'block')`;
     const result = await db.query(query, [id, user_id]);
     return result.rows;
 }

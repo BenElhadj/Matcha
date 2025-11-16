@@ -414,13 +414,13 @@ async function discover(req, res) {
 			}
 		})
 
-		// Exclude blocked both ways
-		// me blocks others
-		const blk1 = await db.query('SELECT blocked FROM blocked WHERE blocker = $1', [me.id])
-		const myBlockedSet = new Set(blk1.rows.map((r) => String(r.blocked)))
-		// others block me
-		const blk2 = await db.query('SELECT blocker FROM blocked WHERE blocked = $1', [me.id])
-		const blockedBySet = new Set(blk2.rows.map((r) => String(r.blocker)))
+	// Exclude blocked both ways (type = 'block' ONLY)
+	// me blocks others
+	const blk1 = await db.query("SELECT blocked FROM blocked WHERE blocker = $1 AND type = 'block'", [me.id])
+	const myBlockedSet = new Set(blk1.rows.map((r) => String(r.blocked)))
+	// others block me
+	const blk2 = await db.query("SELECT blocker FROM blocked WHERE blocked = $1 AND type = 'block'", [me.id])
+	const blockedBySet = new Set(blk2.rows.map((r) => String(r.blocker)))
 	rows = rows.filter((u) => !myBlockedSet.has(String(u.user_id)) && !blockedBySet.has(String(u.user_id)))
 	// Exclude self
 	rows = rows.filter((u) => String(u.user_id) !== String(me.id))
