@@ -17,9 +17,14 @@ const getBlockedOrReportedBy = async (id, limit = 25, offset = 0) => {
     const result = await db.query(query, [id, limit, offset]);
     const isValid = v => v && v !== 'false' && v !== '' && v !== null && v !== undefined;
     return result.rows.map(row => {
-        let avatar = '';
-        if (isValid(row.link)) avatar = row.link;
-        else if (isValid(row.data)) avatar = row.data;
+        let avatar = null;
+        if (isValid(row.link)) {
+            avatar = row.link;
+        } else if (isValid(row.data)) {
+            avatar = `data:image/png;base64,${row.data}`;
+        } else {
+            avatar = null;
+        }
         return {
             user_id: row.user_id,
             username: row.username,
