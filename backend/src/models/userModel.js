@@ -319,7 +319,7 @@ const getBlocked = async (id) => {
 
 // Check if a specific user is already blocked by the current user
 const isBlocked = async (blocker, blocked) => {
-    const query = `SELECT 1 FROM blocked WHERE blocker = $1 AND blocked = $2`;
+    const query = `SELECT 1 FROM blocked WHERE blocker = $1 AND blocked = $2 AND type = 'block'`;
     const result = await db.query(query, [blocker, blocked]);
     return result.rowCount > 0;
 }
