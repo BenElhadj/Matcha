@@ -1,4 +1,6 @@
 // Icon and message helpers for block/report distinction
+import blockIcon from '@/assets/Block/block.png'
+import reportIcon from '@/assets/Block/report.png'
 export function getBlockReportIcon(type) {
   // Returns [iconSet, iconName, colorClass]
   switch (type) {
@@ -50,6 +52,10 @@ export function getImageSrc(image, defaultImage = 'default/defaut_profile.txt') 
     if (typeof image === 'string') {
       const key = `${defaultImage}|${image}`
       if (__imageSrcMemoStr.has(key)) return __imageSrcMemoStr.get(key)
+      // Protection: if the string starts with '/' and looks like base64, it's a bug, return defaultImage
+      if (/^\/[A-Za-z0-9+/=]+$/.test(image.trim())) {
+        return defaultImage
+      }
       const resolved = __resolveImageInternal(image, defaultImage)
       // Prevent unbounded growth
       if (__imageSrcMemoStr.size > 1000) __imageSrcMemoStr.clear()
@@ -79,6 +85,10 @@ function __resolveImageInternal(image, defaultImage = 'default/defaut_profile.tx
   if (typeof image === 'string') {
     const s = image.trim();
     if (!s || s === 'false') return defaultImage;
+    // Protection: if the string starts with '/' and looks like base64, it's a bug, return defaultImage
+    if (/^\/[A-Za-z0-9+/=]+$/.test(s)) {
+      return defaultImage;
+    }
     if (s.startsWith('data:image')) {
       // Validate data URI doesn't contain HTML or invalid base64 payload
       const parts = s.split(',')
@@ -95,6 +105,10 @@ function __resolveImageInternal(image, defaultImage = 'default/defaut_profile.tx
     if (/^[A-Za-z0-9+/=_-\s]+$/.test(s)) {
       const compact = s.replace(/\s+/g, '')
       return `data:image/png;base64,${compact}`
+    }
+    // If it looks like a path but doesn't start with http(s) or data:, treat as invalid if it looks like base64
+    if (s.startsWith('/') && /^[A-Za-z0-9+/=]+$/.test(s.slice(1))) {
+      return defaultImage;
     }
     if (isExternal(s)) return s;
     return getFullPath(s);
@@ -720,7 +734,9 @@ export default {
       case 'block':
       case 'you_block':
       case 'he_block':
-        return ['mdi', 'mdi-block-helper', 'text-warning']
+        return ['img', blockIcon]
+      case 'report':
+        return ['img', reportIcon]
       case 'talk':
         return ['mdi', 'mdi-wechat', 'text-grey']
       case 'avatar_img':

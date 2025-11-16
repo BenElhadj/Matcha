@@ -1,8 +1,10 @@
 <template>
   <q-layout>
     <q-page padding>
+      <AlertView v-if="alert.state" :alert="alert" />
       <h1 class="q-pb-md" style="margin-top: -10px; text-align: center">Notifications</h1>
       <div class="notif-list-outer">
+        <!-- Onglets de notifications -->
         <NotifFilterTabs>
           <template #all>
             <q-infinite-scroll @load="onLoadMore" :offset="300">
@@ -33,6 +35,7 @@
               </template>
             </q-infinite-scroll>
           </template>
+
           <template #likes>
             <q-infinite-scroll @load="onLoadMore" :offset="300">
               <div class="notif-list">
@@ -46,6 +49,7 @@
               </div>
             </q-infinite-scroll>
           </template>
+
           <template #views>
             <q-infinite-scroll @load="onLoadMore" :offset="300">
               <div class="notif-list">
@@ -59,17 +63,30 @@
               </div>
             </q-infinite-scroll>
           </template>
+
           <template #block>
-            <q-infinite-scroll @load="onLoadMore" :offset="300">
+            <q-infinite-scroll @load="onLoadMoreBlockedOrReportedBy" :offset="300">
               <div class="notif-list">
-                <template v-for="(entry, i) in notifsBlock" :key="entry.id || i">
+                <template v-for="user in blockedOrReportedBy" :key="user.user_id">
                   <NotifTooltip
-                    :notif="entry"
-                    :avatar-src="getNotifProfileSrc(entry)"
-                    @click="openNotification(entry)"
+                    :notif="user"
+                    :avatar-src="getNotifProfileSrc(user)"
+                    @click="openNotification({ id_from: user.user_id })"
                   />
                 </template>
               </div>
+              <div
+                v-if="!hasMoreBlockedOrReportedBy && blockedOrReportedBy.length === 0"
+                class="end-history"
+              >
+                <q-icon name="mdi-history" size="32px" class="q-mr-sm" />
+                <div class="text-subtitle1">Aucun utilisateur ne vous a bloqué ou signalé.</div>
+              </div>
+              <template #loading>
+                <div class="q-my-md flex items-center justify-center">
+                  <LoaderView />
+                </div>
+              </template>
             </q-infinite-scroll>
           </template>
         </NotifFilterTabs>
@@ -79,6 +96,63 @@
 </template>
 
 <script setup>
+// --- Qui m'a bloqué ou signalé ---
+const blockedOrReportedBy = ref([])
+const loadingBlockedOrReportedBy = ref(false)
+const pageBlockedOrReportedBy = ref(1)
+const limitBlockedOrReportedBy = 25
+const hasMoreBlockedOrReportedBy = ref(true)
+
+async function fetchBlockedOrReportedBy(page = 1) {
+  loadingBlockedOrReportedBy.value = true
+  try {
+    const token = localStorage.getItem('token')
+    if (!token) {
+      blockedOrReportedBy.value = []
+      hasMoreBlockedOrReportedBy.value = false
+      loadingBlockedOrReportedBy.value = false
+      return []
+    }
+    const res = await axios.get(
+      `http://localhost:3000/api/users/blocked-or-reported-by?page=${page}&limit=${limitBlockedOrReportedBy}`,
+      {
+        headers: {
+          Authorization: 'Bearer ' + token,
+          'Content-Type': 'application/json'
+        }
+      }
+    )
+    return res.data.items || []
+  } catch (e) {
+    return []
+  } finally {
+    loadingBlockedOrReportedBy.value = false
+  }
+}
+
+async function onLoadMoreBlockedOrReportedBy(_index, done) {
+  if (!hasMoreBlockedOrReportedBy.value) {
+    done(true)
+    return
+  }
+  const items = await fetchBlockedOrReportedBy(pageBlockedOrReportedBy.value)
+  if (Array.isArray(items) && items.length) {
+    blockedOrReportedBy.value.push(...items)
+    pageBlockedOrReportedBy.value += 1
+    if (items.length < limitBlockedOrReportedBy) hasMoreBlockedOrReportedBy.value = false
+    done(false)
+  } else {
+    hasMoreBlockedOrReportedBy.value = false
+    done(true)
+  }
+}
+
+onMounted(() => {
+  blockedOrReportedBy.value = []
+  pageBlockedOrReportedBy.value = 1
+  hasMoreBlockedOrReportedBy.value = true
+  onLoadMoreBlockedOrReportedBy(0, () => {})
+})
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useStore } from 'vuex'
 import { useRouter } from 'vue-router'
@@ -135,9 +209,20 @@ const getNotifProfileSrc = (entry) => {
   try {
     const id = entry?.id_from
     const cached = id ? store.state?.avatars?.byId?.[id] || '' : ''
-    return cached || resolveImg(entry?.profile_image)
+    let img = null
+    if (entry.avatar) img = entry.avatar
+    else if (entry.profile_image) img = entry.profile_image
+    else if (typeof entry === 'object' && (entry.link || entry.data)) img = entry
+    else img = entry
+
+    // Si c'est une chaîne base64 sans préfixe data:image, on convertit
+    if (typeof img === 'string' && /^[A-Za-z0-9+/=_-\s]+$/.test(img) && !img.startsWith('data:image')) {
+      const compact = img.replace(/\s+/g, '')
+      img = `data:image/png;base64,${compact}`
+    }
+    return cached || resolveImg(img)
   } catch (_) {
-    return resolveImg(entry?.profile_image)
+    return resolveImg(entry)
   }
 }
 
@@ -280,10 +365,27 @@ onUnmounted(() => {
   } catch (_) {}
 })
 
+import AlertView from '@/views/AlertView.vue'
+const alert = ref({ state: false, color: '', text: '' })
+
 const openNotification = async (entry) => {
   try {
     const senderId = entry.id_from ?? entry.from
     if (!senderId) return
+    // Check if this user has blocked me (only for blockedOrReportedBy list)
+    const blocked = blockedOrReportedBy.value.some(
+      (u) =>
+        u.user_id === senderId &&
+        (u.type === 'block' || u.type === 'he_block' || u.type === 'you_block')
+    )
+    if (blocked) {
+      alert.value = {
+        state: true,
+        color: 'red',
+        text: "You can't access this profile. This user has blocked you."
+      }
+      return
+    }
     await store.dispatch('seenNotifFrom', { id_from: senderId, id_to: currentUser.value?.id })
     router.push(`/user/${senderId}`)
   } catch (e) {

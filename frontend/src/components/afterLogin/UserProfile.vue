@@ -748,12 +748,14 @@ onBeforeUnmount(() => {})
   background-size: 20px;
   background-repeat: no-repeat;
   margin-left: -7px;
+  margin-top: 15px;
 }
 .icon-report {
   background-image: url('@/assets/Block/report.png');
   background-size: 20px;
   background-repeat: no-repeat;
   margin-left: -7px;
+  margin-top: 15px;
 }
 .icon-size {
   width: 37px;

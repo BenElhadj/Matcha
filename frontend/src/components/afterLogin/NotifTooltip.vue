@@ -5,14 +5,28 @@
         <AppAvatar :image="avatarSrc" :userId="notif.id_from" :showPresence="true" size="small" />
         <div class="notif-main-info">
           <q-icon small style="font-size: 16px !important">
-            <span :class="getNotifIcon(notif.type)"></span>
+            <template v-if="Array.isArray(getNotifIcon(notif.type)) && getNotifIcon(notif.type)[0] === 'img'">
+              <img :src="getNotifIcon(notif.type)[1]" alt="icon" style="width: 18px; height: 18px; vertical-align: middle;" />
+            </template>
+            <template v-else>
+              <span :class="getNotifIcon(notif.type)"></span>
+            </template>
           </q-icon>
           <span class="notif-username">{{ notif.username }}</span>
         </div>
       </div>
       <div class="notif-details">
         <div class="notif-msg notif-msg-lifted">
-          {{ getDisplayName(notif) }}{{ getNotifMsg(notif) }}
+          {{ getDisplayName(notif) }}
+          <template v-if="notif.type === 'block' || notif.type === 'you_block' || notif.type === 'he_block'">
+            blocked your profile
+          </template>
+          <template v-else-if="notif.type === 'report' || notif.type === 'signal'">
+            reported your profile
+          </template>
+          <template v-else>
+            {{ getNotifMsg(notif) }}
+          </template>
         </div>
         <div class="notif-date">{{ formatDate(notif.date) }}</div>
       </div>
