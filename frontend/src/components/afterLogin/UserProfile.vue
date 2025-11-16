@@ -65,64 +65,69 @@
               <q-tab name="tab-photo" label="Photos"></q-tab>
             </div>
 
-            <div class="row" style="flex: 1; width: 100%; margin-top: 0; margin-bottom: 0;">
-              <q-btn flat @click="onLikeClick" style="margin-top: 0; margin-bottom: 0;">
-              <img class="icon-size" :class="{ 'pop-like': animateLike }" :src="likeIcon" style="margin-top: 0; margin-bottom: 0;" />
+            <div class="row" style="flex: 1; width: 100%; margin-top: 0; margin-bottom: 0">
+              <q-btn flat @click="onLikeClick" style="margin-top: 0; margin-bottom: 0">
+                <img
+                  class="icon-size"
+                  :class="{ 'pop-like': animateLike }"
+                  :src="likeIcon"
+                  style="margin-top: 0; margin-bottom: 0"
+                />
               </q-btn>
 
-              <q-btn flat style="margin-top: 0; margin-bottom: 0;">
-              <img
-                class="icon-size"
-                @click="goToChat"
-                :src="userCanChat ? chatFalse : chatTrue"
-                style="margin-top: 0; margin-bottom: 0;"
-              />
+              <q-btn flat style="margin-top: 0; margin-bottom: 0">
+                <img
+                  class="icon-size"
+                  @click="goToChat"
+                  :src="userCanChat ? chatFalse : chatTrue"
+                  style="margin-top: 0; margin-bottom: 0"
+                />
               </q-btn>
 
-              <div style="margin-top: 0; margin-bottom: 0;">
-              <q-tooltip top class="status_container">
-                <span>You can block or report</span>
-              </q-tooltip>
-              <q-fab
-                vertical-actions-align="right"
-                text-color="black"
-                direction="right"
-                icon="mdi-chevron-double-right"
-                active-icon="mdi-window-close"
-                flat
-                square
-                padding="md sm md lg"
-                label-position="left"
-                label="."
-                bg-color="red"
-                class="icon-banir"
-                style="margin-top: -8px; margin-bottom: 0;"
-              >
-                <q-fab-action
+              <div style="margin-top: 0; margin-bottom: 0">
+                <q-tooltip top class="status_container">
+                  <span>You can block or report</span>
+                </q-tooltip>
+                <q-fab
+                  vertical-actions-align="right"
+                  text-color="black"
+                  direction="right"
+                  icon="mdi-chevron-double-right"
+                  active-icon="mdi-window-close"
                   flat
                   square
-                  external-label
-                  color="warning"
-                  @click="confirmAlert('Report')"
-                  class="icon-report"
+                  padding="md sm md lg"
+                  label-position="left"
+                  label="."
+                  bg-color="red"
+                  class="icon-banir"
+                  style="margin-top: -14px; margin-bottom: 0"
+                >
+                  <q-fab-action
+                    flat
+                    square
+                    external-label
+                    color="warning"
+                    @click="confirmAlert('Report')"
+                    class="icon-report"
                   >
-                  <q-tooltip bottom class="status_container">
-                    <span>Report</span>
-                  </q-tooltip>
-                </q-fab-action>
-                <q-fab-action
-                  flat
-                  square
-                  external-label
-                  color="red"
-                  @click="confirmAlert('Block')"
-                  class="icon-block"
+                    <q-tooltip bottom class="status_container">
+                      <span>Report</span>
+                    </q-tooltip>
+                  </q-fab-action>
+                  <q-fab-action
+                    flat
+                    square
+                    external-label
+                    color="red"
+                    @click="confirmAlert('Block')"
+                    class="icon-block"
                   >
-                  <q-tooltip bottom class="status_container">
-                    <span>Block</span>
-                  </q-tooltip>
-                </q-fab-action>
-              </q-fab>
+                    <q-tooltip bottom class="status_container">
+                      <span>Block</span>
+                    </q-tooltip>
+                  </q-fab-action>
+                </q-fab>
               </div>
             </div>
           </q-tabs>

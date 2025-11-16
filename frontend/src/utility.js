@@ -1,3 +1,28 @@
+// Icon and message helpers for block/report distinction
+export function getBlockReportIcon(type) {
+  // Returns [iconSet, iconName, colorClass]
+  switch (type) {
+    case 'block':
+      return ['mdi', 'mdi-block-helper', 'text-warning'];
+    case 'report':
+      return ['mdi', 'mdi-alert-circle', 'text-red'];
+    default:
+      return ['mdi', 'mdi-help-circle', 'text-grey'];
+  }
+}
+
+export function getBlockReportMessage(type, firstName, lastName) {
+  if (firstName === null) firstName = 'Anonymous';
+  if (lastName === null) lastName = 'User';
+  switch (type) {
+    case 'block':
+      return `You blocked ${firstName} ${lastName}`;
+    case 'report':
+      return `You reported ${firstName} ${lastName}`;
+    default:
+      return `${firstName} ${lastName}`;
+  }
+}
 // Utilitaire global pour l'affichage d'image (gère 'false', base64 et URLs)
 // Memoization to avoid repeatedly validating large base64 payloads during re-renders
 const __imageSrcMemoStr = new Map(); // key: `${default}|${value}` -> resolved src

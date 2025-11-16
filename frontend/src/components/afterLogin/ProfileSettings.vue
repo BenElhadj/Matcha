@@ -260,23 +260,53 @@
         >
           <q-item
             v-for="banned in blacklist"
-            @before-mount="console.log('Avatar reçu pour', banned.username, ':', banned.avatar)"
-            :key="banned.id"
+            :key="banned.block_row_id || banned.id"
             class="blacklist_item mx-2"
+            :class="{
+              'block-bg': banned.type === 'block',
+              'report-bg': banned.type === 'report'
+            }"
             style="width: 340px"
           >
-            <q-expansion-item class="bg-grey-3">
+            <q-expansion-item
+              :class="
+                banned.type === 'block'
+                  ? 'block-bg'
+                  : banned.type === 'report'
+                  ? 'report-bg'
+                  : 'bg-grey-3'
+              "
+            >
               <template v-slot:expand-icon>
-                <q-icon name="mdi-chevron-down" />
+                <q-icon name="mdi-chevron-down" style="margin-top: " />
               </template>
               <template v-slot:header>
                 <q-item-section avatar>
                   <AppAvatar :image="banned.avatar" size="small" />
                 </q-item-section>
                 <q-item-section>
-                  <div class="text-weight-bold">{{ banned.first_name }} {{ banned.last_name }}</div>
-                  <div class="text-caption text-grey">@{{ banned.username }}</div>
-
+                  <div class="row items-center">
+                    <div class="text-weight-bold">
+                      {{ banned.first_name }} {{ banned.last_name }}
+                    </div>
+                  </div>
+                  <div style="display: flex; flex-direction: row; align-items: center; width: 100%">
+                    <div class="text-caption text-grey" style="flex: 1; text-align: left">
+                      @{{ banned.username }}
+                    </div>
+                    <img
+                      v-if="banned.type === 'block'"
+                      src="@/assets/Block/block.png"
+                      alt="block icon"
+                      style="width: 20px; height: 23px; margin-bottom: 0px; margin-left: auto"
+                    />
+                    <img
+                      v-else-if="banned.type === 'report'"
+                      src="@/assets/Block/report.png"
+                      alt="report icon"
+                      style="width: 20px; height: 23px; margin-bottom: 0px; margin-left: auto"
+                    />
+                  </div>
                   <div class="row items-center q-mt-xs">
                     <q-rating
                       :color="
@@ -319,11 +349,33 @@
                   </span>
                   <br />
                   <span>
-                    You blocked him on {{ moment(banned.blocked_at).format('D MMMM, YYYY') }}
+                    <template v-if="banned.type === 'block'">
+                      You blocked them on {{ moment(banned.blocked_at).format('D MMMM, YYYY') }}
+                    </template>
+                    <template v-else-if="banned.type === 'report'">
+                      You reported them on {{ moment(banned.blocked_at).format('D MMMM, YYYY') }}
+                    </template>
+                    <template v-else>
+                      Action on {{ moment(banned.blocked_at).format('D MMMM, YYYY') }}
+                    </template>
                   </span>
                 </q-card-section>
                 <q-card-actions align="right">
-                  <q-btn color="green" flat @click="unBlock(banned)">unblocked</q-btn>
+                  <q-btn v-if="banned.type === 'block'" color="green" flat @click="unBlock(banned)"
+                    >unblocked</q-btn
+                  >
+                  <q-btn v-if="banned.type === 'report'" color="red" flat @click="unReport(banned)"
+                    >remove report</q-btn
+                  >
+                  <q-btn
+                    v-if="banned.can_view_profile && banned.blocked_id"
+                    color="primary"
+                    flat
+                    @click="
+                      $router.push({ name: 'userprofile', params: { id: banned.blocked_id } })
+                    "
+                    >View profile</q-btn
+                  >
                 </q-card-actions>
               </q-card>
             </q-expansion-item>
@@ -341,7 +393,9 @@ import moment from 'moment'
 import { ref, onMounted, computed, nextTick, defineAsyncComponent, watch } from 'vue'
 import { useStore } from 'vuex'
 import axios from 'axios'
-import utility from '@/utility'
+import utility, { getBlockReportIcon, getBlockReportMessage } from '@/utility'
+// Expose helpers for template
+// (If using <script setup>, these are auto-exposed)
 import AlertView from '@/views/AlertView.vue'
 
 import AppAvatar from '@/components/common/AppAvatar.vue'
@@ -390,26 +444,54 @@ const swapLocation = ref({
   lng: location.value.lng
 })
 
-
-
 const fetchBlacklist = async () => {
   try {
     const res = await utility.sync('users/getblocked')
-    // console.log('Réponse brute de fetchBlacklist:', res)
     if (Array.isArray(res)) {
       blacklist.value = res
-      // console.log('Blacklist alimentée:', blacklist.value)
-      if (res.length === 0) {
-        alert.value = { state: true, color: 'green', text: "you haven't blocked anyone" }
-      }
     } else {
       alert.value = { state: true, color: 'red', text: 'Erreur: réponse inattendue du serveur' }
       blacklist.value = []
     }
-  }
-  catch (err) {
-    alert.value = { state: true, color: 'red', text: 'Erreur lors de la récupération de la blacklist.' }
+  } catch (err) {
+    alert.value = {
+      state: true,
+      color: 'red',
+      text: 'Erreur lors de la récupération de la blacklist.'
+    }
     blacklist.value = []
+  }
+}
+// Supprimer un report
+const unReport = async (banned) => {
+  const block_row_id = banned.block_row_id || banned.id
+  const url = `${import.meta.env.VITE_APP_API_URL}/api/users/unreport`
+  const headers = { 'x-auth-token': user.value.token }
+  try {
+    const result = await axios.post(url, { id: block_row_id }, { headers })
+    if (result.data && result.data.status === 'success') {
+      fetchBlacklist()
+      alert.value = {
+        state: true,
+        color: 'green',
+        text: result.data.message || 'Report removed.'
+      }
+    } else {
+      alert.value = {
+        state: true,
+        color: 'red',
+        text:
+          result.data && result.data.message
+            ? result.data.message
+            : 'Erreur lors de la suppression du report.'
+      }
+    }
+  } catch (err) {
+    alert.value = {
+      state: true,
+      color: 'red',
+      text: 'Erreur serveur lors de la suppression du report.'
+    }
   }
 }
 const rules = {
@@ -553,23 +635,17 @@ const changeLoc = async () => {
 }
 
 const unBlock = async (banned) => {
-  const { blocked_id } = banned
+  const blocked_id = banned.blocked_id || banned.id
   const url = `${import.meta.env.VITE_APP_API_URL}/api/users/unblock`
   const headers = { 'x-auth-token': user.value.token }
   try {
     const result = await axios.post(url, { id: blocked_id }, { headers })
-    if (result.data && result.data.status === 'success') {
-      fetchBlacklist()
+    await fetchBlacklist()
+    if (result.data && result.data.message) {
       alert.value = {
         state: true,
-        color: 'green',
-        text: result.data.message || 'Utilisateur débloqué.'
-      }
-    } else {
-      alert.value = {
-        state: true,
-        color: 'red',
-        text: result.data && result.data.message ? result.data.message : 'Erreur lors du déblocage.'
+        color: result.data.status === 'success' ? 'green' : 'red',
+        text: result.data.message
       }
     }
   } catch (err) {
@@ -581,11 +657,31 @@ const unBlock = async (banned) => {
 onMounted(() => {
   fetchBlacklist()
 })
+
+const noBlacklist = () => {
+  alert.value = {
+    state: true,
+    color: 'green',
+    text: "You haven't blocked or reported anyone."
+  }
+}
 </script>
 
 <style>
+body, .q-page-container, .q-page, .q-dialog, .q-card, .q-item, .q-item-section, .q-item-label, .text-caption, .text-grey, .text-weight-bold, .q-btn, .q-input, .q-rating, .q-expansion-item, .blacklist_item {
+  font-size: 1.01em !important;
+  letter-spacing: 0.018em !important;
+}
+
 .map_toolbar {
   z-index: 5;
+}
+
+.block-bg {
+  background: linear-gradient(90deg, #fff0f0 60%, #f8f9fa 100%) !important;
+}
+.report-bg {
+  background: linear-gradient(90deg, #fffbe6 60%, #f8f9fa 100%) !important;
 }
 
 .map-container {

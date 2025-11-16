@@ -47,7 +47,7 @@
                 <q-range
                   v-model="distance"
                   :min="0"
-                    :max="Math.round(maxDis)"
+                  :max="Math.round(maxDis)"
                   :step="step"
                   label-always
                   thumb-label="always"
@@ -71,7 +71,7 @@
                 <q-range
                   v-model="rating"
                   :min="0"
-                    :max="Number(ratingCap).toFixed(2)"
+                  :max="parseFloat(ratingCap)"
                   :step="0.1"
                   label-always
                   thumb-label="always"
