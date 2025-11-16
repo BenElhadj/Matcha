@@ -311,7 +311,8 @@ const getBlocked = async (id) => {
             avatar,
             blocked_at: row.blocked_at,
             type: row.type,
-            rating: row.rating
+            rating: row.rating,
+            can_view_profile: row.type === 'report' ? true : false
         };
     });
 }
