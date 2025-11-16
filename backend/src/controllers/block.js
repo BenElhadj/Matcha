@@ -71,11 +71,8 @@ const unblockUser = async (req, res) => {
 	if (!req.body.id || isNaN(req.body.id)){
 		return res.json({ status: 'error', type: 'block', message: 'Invalid request', data: null })}
 	try {
-		const result = await userModel.unblockUser(req.user.id, req.body.id)
-		// result is undefined, so check if the unblock actually deleted a row
-		// Let's re-query to check if the block still exists
-		const stillBlocked = await userModel.isBlocked(req.user.id, req.body.id);
-		if (stillBlocked) {
+		const deletedCount = await userModel.unblockUser(req.user.id, req.body.id)
+		if (!deletedCount) {
 			return res.json({ status: 'error', type: 'block', message: 'Cannot unblock user', data: null })
 		}
 		try {

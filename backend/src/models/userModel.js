@@ -347,7 +347,8 @@ const unreportUser = async (user_id, block_row_id) => {
 // Unblock user (type = 'block')
 const unblockUser = async (user_id, id) => {
     const query = `DELETE FROM blocked WHERE blocker = $1 AND blocked = $2 AND type = 'block'`;
-    await db.query(query, [user_id, id]);
+    const result = await db.query(query, [user_id, id]);
+    return result.rowCount;
 };
 
 // Get users I have reported (paginated)
