@@ -23,17 +23,12 @@
           align-items: center;
         "
       >
-        <div class="q-px-lg q-py-md" style="width: 100%; max-width: 600px; margin: 0 auto">
-          <q-timeline
-            :layout="layout"
-            color="secondary"
-            style="margin: 0 auto; position: relative; left: 50px"
-          >
+        <div class="q-px-lg q-py-md" style="width: 100%; max-width: 600px">
+          <q-timeline :layout="layout" color="secondary" style="position: relative; left: 55px">
             <q-timeline-entry heading>
               <div style="text-align: center; width: 100%; margin-left: -137px">
                 Here you can see all your history of actions on the website
               </div>
-              <br />
             </q-timeline-entry>
             <q-timeline-entry
               v-for="(entry, i) in history"
@@ -58,15 +53,28 @@
                 >
                   <AppAvatar
                     :image="entry.profile_image"
-                    @click="redirectToUser(entry.his_id)"
+                    @click="redirectToUser(entry.his_id || entry.id)"
                     size="small"
-                    style="cursor: pointer; margin-top: 25px; margin-bottom: -20px;"
+                    style="cursor: pointer; margin-top: 25px; margin-bottom: -20px"
                   />
                   <div
                     class="text-caption text-center q-mt-xs"
-                    style="max-width: 80px; word-break: break-all; margin-top: 30px; margin-bottom: -20px"
+                    style="
+                      max-width: 80px;
+                      word-break: break-all;
+                      margin-top: 30px;
+                      margin-bottom: -20px;
+                    "
                   >
-                    {{ entry.username }}
+                    <span v-if="entry.first_name || entry.last_name">
+                      {{ entry.first_name || '' }} {{ entry.last_name || '' }}
+                    </span>
+                    <span v-else-if="entry.username">
+                      {{ entry.username }}
+                    </span>
+                    <span v-else>
+                      {{ getUserName(entry) }}
+                    </span>
                   </div>
                 </div>
                 <div
@@ -180,39 +188,11 @@ const user = computed(() => store.getters.user)
 const getNotifIcon = utility.getNotifIcon
 const getHistoryAction = utility.getHistoryAction
 
-const history = ref([])
-const page = ref(1)
-const limit = ref(25)
-const hasMore = ref(true)
+// Utilise le getter history du store pour n'afficher que les actions faites PAR l'utilisateur
+const history = computed(() => store.getters.history)
+const hasMore = ref(false) // désactivé car tout est chargé d'un coup
 const isLoading = ref(false)
-
-let total = null
-
-const fetchHistory = async () => {
-  const token = user.value.token || localStorage.getItem('token')
-  const url = `${import.meta.env.VITE_APP_API_URL}/api/browse/allhistory?offset=${
-    (page.value - 1) * limit.value
-  }&limit=${limit.value}`
-  const headers = { 'x-auth-token': token }
-  const result = await axios.get(url, { headers })
-  const items = Array.isArray(result.data.history) ? result.data.history : []
-  if (typeof result.data.total === 'number') total = result.data.total
-  // Ajout sans doublons (par id)
-  const existingIds = new Set(history.value.map((e) => e.id))
-  const filtered = items.filter((e) => !existingIds.has(e.id))
-  history.value.push(...filtered)
-  if (items.length < limit.value || (total !== null && history.value.length >= total))
-    hasMore.value = false
-  page.value += 1
-  return filtered
-}
-
-const onShowMore = async () => {
-  if (isLoading.value || !hasMore.value) return
-  isLoading.value = true
-  await fetchHistory()
-  isLoading.value = false
-}
+const onShowMore = () => {} // désactivé
 
 // Utilitaire pour choisir la bonne date selon l'action
 function getEntryDate(entry) {
@@ -235,12 +215,6 @@ function formatEntryDate(entry, mode = 'relative') {
 }
 
 import { onMounted, watch } from 'vue'
-onMounted(() => {
-  isLoading.value = true
-  fetchHistory().finally(() => {
-    isLoading.value = false
-  })
-})
 
 // Infinite scroll: charge plus d'historique quand on atteint le bas de la page
 function handleScroll() {
@@ -272,11 +246,31 @@ watch(
 )
 
 const redirectToUser = (hisId) => {
-  if (hisId === user.value.id || hisId === user.value._id) {
-    router.push('/')
+  // Redirige seulement si l'id cible est différent de l'utilisateur courant
+  if (!hisId || hisId === user.value.id || hisId === user.value._id) {
     return
   }
   router.push(`/user/${hisId}`)
+}
+
+// Utilitaire pour récupérer le nom complet ou username fallback
+function getUserName(entry) {
+  // Cherche dans les listes du store si possible
+  const lists = [
+    store.state.following,
+    store.state.followers,
+    store.state.visited,
+    store.state.visitor
+  ]
+  for (const list of lists) {
+    if (Array.isArray(list)) {
+      const found = list.find((u) => String(u.id) === String(entry.his_id || entry.id))
+      if (found) {
+        return (found.first_name || '') + ' ' + (found.last_name || '')
+      }
+    }
+  }
+  return entry.id || ''
 }
 </script>
 

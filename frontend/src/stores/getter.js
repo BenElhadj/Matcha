@@ -29,34 +29,44 @@ export const getters = {
   connectedUsers: (state) => state.connectedUsers,
   history: (state) => {
     const actions = [];
-    // Visites faites par l'utilisateur
+    // Visites faites PAR l'utilisateur (vues)
     if (Array.isArray(state.visited)) {
       actions.push(...state.visited.map(cur => ({ ...cur, type: 'you_visit' })));
     }
-    // Likes faits par l'utilisateur
+    // Likes faits PAR l'utilisateur
     if (Array.isArray(state.following)) {
       actions.push(...state.following.map(cur => ({ ...cur, type: 'you_like' })));
     }
-    // Like back faits par l'utilisateur (présent dans following ET followers)
+    // Like back faits PAR l'utilisateur (présent dans following ET followers)
     if (Array.isArray(state.following) && Array.isArray(state.followers)) {
       const followerIds = new Set(state.followers.map(f => String(f.id)));
       actions.push(...state.following.filter(cur => followerIds.has(String(cur.id))).map(cur => ({ ...cur, type: 'you_like_back' })));
     }
-    // Unlikes faits par l'utilisateur (via mapping unlike)
+    // Unlikes faits PAR l'utilisateur (via mapping unlike)
     if (state.user && state.user.relation && state.user.relation.unlike) {
       const unlikeMap = state.user.relation.unlike;
       if (Array.isArray(state.following)) {
         actions.push(...state.following.filter(cur => unlikeMap[String(cur.id)] === 'you_unlike').map(cur => ({ ...cur, type: 'you_unlike' })));
       }
     }
-    // Blocks faits par l'utilisateur
+    // Blocks faits PAR l'utilisateur
     if (Array.isArray(state.blocked)) {
       actions.push(...state.blocked.map(cur => ({ ...cur, type: 'you_block' })));
     }
-    // Reports faits par l'utilisateur (depuis blacklist/banned)
+    // Unblocks faits PAR l'utilisateur (suppression d'un block)
+    if (Array.isArray(state.user?.relation?.unblock)) {
+      actions.push(...state.user.relation.unblock.map(cur => ({ ...cur, type: 'you_unblock' })));
+    }
+    // Reports faits PAR l'utilisateur (depuis blacklist/banned)
     if (Array.isArray(state.blacklist)) {
       actions.push(...state.blacklist.filter(cur => cur.type === 'report').map(cur => ({ ...cur, type: 'report' })));
     }
+    // Unreports faits PAR l'utilisateur (suppression d'un report)
+    if (Array.isArray(state.user?.relation?.unreport)) {
+      actions.push(...state.user.relation.unreport.map(cur => ({ ...cur, type: 'you_unreport' })));
+    }
+    // On retire toutes les actions faites PAR les autres (visitor, follower, he_like, he_like_back, he_unlike, he_block, he_report, etc.)
+    // (En pratique, on ne les ajoute jamais ici, donc rien à retirer)
     // Trie par date décroissante si possible (created_at, match_date, blocked_at, sinon 0)
     actions.sort((a, b) => {
       const da = new Date(a.created_at || a.match_date || a.blocked_at || 0);

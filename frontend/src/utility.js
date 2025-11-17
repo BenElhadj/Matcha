@@ -713,11 +713,15 @@ export default {
       case 'block':
       case 'you_block':
         return `You blocked ${first_name} ${last_name}`
+      case 'you_unblock':
+        return `You unblocked ${first_name} ${last_name}`
       case 'he_block':
         return `${first_name} ${last_name} blocked you`
       case 'report':
       case 'you_report':
         return `You reported ${first_name} ${last_name}`
+      case 'you_unreport':
+        return `You unreported ${first_name} ${last_name}`
       case 'he_report':
         return `${first_name} ${last_name} reported you`
       case 'talk':
