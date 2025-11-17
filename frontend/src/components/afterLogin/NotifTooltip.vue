@@ -2,11 +2,24 @@
   <q-card class="notif_bubble notif_card_effect" clickable @click="onClick">
     <q-card-section>
       <div class="notif-row-main">
-        <AppAvatar :image="avatarSrc" :userId="notif.id_from" :showPresence="true" size="small" />
+        <AppAvatar
+          :image="resolvedAvatarSrc"
+          :userId="notif.id_from"
+          :showPresence="true"
+          size="small"
+        />
         <div class="notif-main-info">
           <q-icon small style="font-size: 16px !important">
-            <template v-if="Array.isArray(getNotifIcon(notif.type)) && getNotifIcon(notif.type)[0] === 'img'">
-              <img :src="getNotifIcon(notif.type)[1]" alt="icon" style="width: 18px; height: 18px; vertical-align: middle;" />
+            <template
+              v-if="
+                Array.isArray(getNotifIcon(notif.type)) && getNotifIcon(notif.type)[0] === 'img'
+              "
+            >
+              <img
+                :src="safeNotifIconSrc(notif.type)"
+                alt="icon"
+                style="width: 18px; height: 18px; vertical-align: middle"
+              />
             </template>
             <template v-else>
               <span :class="getNotifIcon(notif.type)"></span>
@@ -18,7 +31,9 @@
       <div class="notif-details">
         <div class="notif-msg notif-msg-lifted">
           {{ getDisplayName(notif) }}
-          <template v-if="notif.type === 'block' || notif.type === 'you_block' || notif.type === 'he_block'">
+          <template
+            v-if="notif.type === 'block' || notif.type === 'you_block' || notif.type === 'he_block'"
+          >
             blocked your profile
           </template>
           <template v-else-if="notif.type === 'report' || notif.type === 'signal'">
@@ -38,6 +53,8 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
+import { getImageSrc } from '@/utility.js'
 import AppAvatar from '@/components/common/AppAvatar.vue'
 import utility from '@/utility.js'
 import moment from 'moment'
@@ -59,6 +76,26 @@ function getDisplayName(notif) {
   if (notif.username) return notif.username
   return ''
 }
+
+// Renvoie une icône sûre (jamais false, undefined ou vide)
+function safeNotifIconSrc(type) {
+  const icon = getNotifIcon(type)
+  if (
+    Array.isArray(icon) &&
+    icon[0] === 'img' &&
+    typeof icon[1] === 'string' &&
+    icon[1] &&
+    icon[1] !== 'false'
+  ) {
+    return icon[1]
+  }
+  // Fallback image par défaut (à adapter si tu veux une autre image)
+  const base = import.meta.env.BASE_URL || '/'
+  return `${base}default/defaut_profile.txt`
+}
+
+// Utilise getImageSrc pour garantir la compatibilité base64/lien/objet
+const resolvedAvatarSrc = computed(() => getImageSrc(props.avatarSrc))
 
 function onClick() {
   emit('click', props.notif)

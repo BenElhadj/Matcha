@@ -7,10 +7,6 @@
       </h3>
       <q-timeline align="top" label="Loose" center class="q-gutter-md">
         <q-timeline color="secondary">
-          <q-timeline-entry heading style="margin: 10px; text-align: center">
-            Her you can see all your history of actions on the website
-            <br /><br />
-          </q-timeline-entry>
           <q-timeline-entry
             v-for="(entry, i) in history"
             :key="entry.id || i"
@@ -21,7 +17,7 @@
             :class="getNotifIcon(entry.type)[2]"
             :icon="getNotifIcon(entry.type)[1]"
           >
-            <div class="row items-center no-wrap">
+            <div class="row items-center no-wrap q-mt-xs timeline-entry-content" :class="i % 2 === 0 ? 'left-align' : 'right-align'">
               <AppAvatar
                 :image="entry.profile_image"
                 @click="redirectToUser(entry.his_id)"
@@ -29,14 +25,10 @@
               />
               <div class="q-ml-sm">
                 <strong>{{ entry.first_name }} {{ entry.last_name }}</strong>
+                <div class="history-action-text q-mt-xs">{{ getHistoryMessage(entry) }}</div>
+                <div class="text-caption text-grey-7">{{ moment(entry.match_date).fromNow() }}</div>
               </div>
             </div>
-            <q-item-section right>
-              {{ getHistoryAction(entry.type, entry.first_name, entry.last_name) }}
-              <br />
-              <span class="text-caption">{{ moment(entry.match_date).fromNow() }}</span>
-              <!-- {{ entry }} -->
-            </q-item-section>
           </q-timeline-entry>
           <q-timeline-entry
             v-if="!hasMore && history.length"
@@ -68,6 +60,51 @@ import utility from '@/utility.js'
 import moment from 'moment'
 import axios from 'axios'
 import LoaderView from '../../views/LoaderView.vue'
+
+// Génère un message d'action personnalisé en anglais pour chaque type
+function getHistoryMessage(entry) {
+  const first = entry.first_name || 'Anonymous';
+  const last = entry.last_name || 'User';
+  const ago = moment(entry.match_date).fromNow();
+  switch (entry.type) {
+    case 'visited':
+    case 'you_visit':
+      return `You visited the profile of ${first} ${last} ${ago}`;
+    case 'visitor':
+    case 'he_visit':
+      return `${first} ${last} visited your profile ${ago}`;
+    case 'following':
+    case 'you_like':
+      return `You liked the profile of ${first} ${last} ${ago}`;
+    case 'follower':
+    case 'he_like':
+      return `${first} ${last} liked your profile ${ago}`;
+    case 'you_like_back':
+      return `You accepted the friendship of ${first} ${last} ${ago}`;
+    case 'he_like_back':
+      return `${first} ${last} accepted your friendship ${ago}`;
+    case 'you_unlike':
+      return `You removed the profile of ${first} ${last} ${ago}`;
+    case 'he_unlike':
+      return `${first} ${last} removed your profile ${ago}`;
+    case 'you_block':
+      return `You blocked the profile of ${first} ${last} ${ago}`;
+    case 'he_block':
+      return `${first} ${last} blocked your profile ${ago}`;
+    case 'you_report':
+      return `You reported the profile of ${first} ${last} ${ago}`;
+    case 'he_report':
+      return `${first} ${last} reported your profile ${ago}`;
+    case 'talk':
+      return `You talked to ${first} ${last} ${ago}`;
+    case 'avatar_img':
+      return `You changed your avatar ${ago}`;
+    case 'cover_img':
+      return `You changed your cover ${ago}`;
+    default:
+      return `${first} ${last} ${ago}`;
+  }
+}
 
 const store = useStore()
 const route = useRoute()
@@ -142,3 +179,28 @@ const redirectToUser = (hisId) => {
   border: 1px solid rgba(0, 0, 0, 0.25) !important;
 }
 </style>
+
+/* Centrage de la timeline et alignement alterné des entrées */
+.q-timeline {
+  margin-left: auto;
+  margin-right: auto;
+  max-width: 600px;
+}
+.timeline-entry-content.left-align {
+  justify-content: flex-start;
+  margin-left: 24px;
+}
+.timeline-entry-content.right-align {
+  justify-content: flex-end;
+  margin-right: 24px;
+}
+
+/* Met en avant l'action réalisée dans l'historique */
+.history-action-text {
+  font-weight: 600;
+  color: #1976d2;
+  font-size: 1.13em;
+  letter-spacing: 0.01em;
+  margin-bottom: 2px;
+  display: block;
+}

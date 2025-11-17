@@ -205,25 +205,13 @@ const resolveImg = (img) =>
 
 // Use global avatars store (id -> optimized src)
 
+// Nouvelle version : ne filtre ni ne transforme, laisse AppAvatar/utility gérer
 const getNotifProfileSrc = (entry) => {
-  try {
-    const id = entry?.id_from
-    const cached = id ? store.state?.avatars?.byId?.[id] || '' : ''
-    let img = null
-    if (entry.avatar) img = entry.avatar
-    else if (entry.profile_image) img = entry.profile_image
-    else if (typeof entry === 'object' && (entry.link || entry.data)) img = entry
-    else img = entry
-
-    // Si c'est une chaîne base64 sans préfixe data:image, on convertit
-    if (typeof img === 'string' && /^[A-Za-z0-9+/=_-\s]+$/.test(img) && !img.startsWith('data:image')) {
-      const compact = img.replace(/\s+/g, '')
-      img = `data:image/png;base64,${compact}`
-    }
-    return cached || resolveImg(img)
-  } catch (_) {
-    return resolveImg(entry)
-  }
+  const id = entry?.id_from
+  const cached = id ? store.state?.avatars?.byId?.[id] || '' : ''
+  // Prend avatar, profile_image, link, data, ou ''
+  let img = entry.avatar || entry.profile_image || entry.link || entry.data || ''
+  return cached || img
 }
 
 const loadMore = async () => {

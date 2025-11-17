@@ -49,9 +49,22 @@ const sizeClass = computed(() => `size-${props.size}`)
 const src = computed(() => {
   const base = import.meta.env.BASE_URL || '/'
   const fallback = utility.getCachedDefault?.('profile') || `${base}default/defaut_profile.txt`
-  if (utility.getImageSrc) return utility.getImageSrc(props.image, fallback)
-  if (utility.getFullPath) return utility.getFullPath(props.image)
-  return fallback
+  let resolved = utility.getImageSrc
+    ? utility.getImageSrc(props.image, fallback)
+    : utility.getFullPath
+    ? utility.getFullPath(props.image)
+    : fallback
+  // Ajout du préfixe base64 uniquement pour JPEG /9j/
+  if (
+    resolved &&
+    typeof resolved === 'string' &&
+    !resolved.startsWith('data:image') &&
+    !resolved.startsWith('http') &&
+    resolved.startsWith('/9j/')
+  ) {
+    return `data:image/jpeg;base64,${resolved}`
+  }
+  return resolved
 })
 
 // Inline width/height override when pixelSize is provided

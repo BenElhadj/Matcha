@@ -389,16 +389,23 @@
 </template>
 
 <script setup>
+// function logAvatar(avatar) {
+//   // Log la valeur de l'avatar pour debug
+//   // eslint-disable-next-line no-console
+//   // console.log('DEBUG avatar:', avatar)
+//   return ''
+// }
 import moment from 'moment'
 import { ref, onMounted, computed, nextTick, defineAsyncComponent, watch } from 'vue'
 import { useStore } from 'vuex'
 import axios from 'axios'
-import utility, { getBlockReportIcon, getBlockReportMessage } from '@/utility'
+import utility, { getBlockReportIcon, getBlockReportMessage, getImageSrc } from '@/utility'
 // Expose helpers for template
 // (If using <script setup>, these are auto-exposed)
 import AlertView from '@/views/AlertView.vue'
 
 import AppAvatar from '@/components/common/AppAvatar.vue'
+// import { getImageSrc } from '@/utility.js' (inutile ici)
 import MapLocationSelector from '@/components/common/MapLocationSelector.vue'
 
 const googleKey = import.meta.env.VITE_APP_GOOGLE_KEY || ''
@@ -668,7 +675,22 @@ const noBlacklist = () => {
 </script>
 
 <style>
-body, .q-page-container, .q-page, .q-dialog, .q-card, .q-item, .q-item-section, .q-item-label, .text-caption, .text-grey, .text-weight-bold, .q-btn, .q-input, .q-rating, .q-expansion-item, .blacklist_item {
+body,
+.q-page-container,
+.q-page,
+.q-dialog,
+.q-card,
+.q-item,
+.q-item-section,
+.q-item-label,
+.text-caption,
+.text-grey,
+.text-weight-bold,
+.q-btn,
+.q-input,
+.q-rating,
+.q-expansion-item,
+.blacklist_item {
   font-size: 1.01em !important;
   letter-spacing: 0.018em !important;
 }

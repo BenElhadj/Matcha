@@ -46,17 +46,35 @@ function __setMemoForObj(obj, def, val) {
   m.set(def, val)
 }
 
-export function getImageSrc(image, defaultImage = 'default/defaut_profile.txt') {
+export function getImageSrc(image, defaultImage = 'assets/default/defaut_profile.txt') {
   try {
     // Quick memoization for strings (including data URIs and base64) to cut regex/split cost
     if (typeof image === 'string') {
       const key = `${defaultImage}|${image}`
-      if (__imageSrcMemoStr.has(key)) return __imageSrcMemoStr.get(key)
+      if (__imageSrcMemoStr.has(key)) {
+        return __imageSrcMemoStr.get(key)
+      }
+      // Si la chaîne commence par /9j/ (base64 JPEG), forcer le retour JPEG et NE PAS utiliser le fallback
+      if (image.trim().startsWith('/9j/')) {
+        const jpegData = `data:image/jpeg;base64,${image.trim()}`
+        __imageSrcMemoStr.set(key, jpegData)
+        return jpegData
+      }
       // Protection: if the string starts with '/' and looks like base64, it's a bug, return defaultImage
       if (/^\/[A-Za-z0-9+/=]+$/.test(image.trim())) {
         return defaultImage
       }
       const resolved = __resolveImageInternal(image, defaultImage)
+      // Si le resolved est le fallback mais l'image d'origine commence par /9j/, on préfère le JPEG
+      if (
+        resolved === defaultImage &&
+        typeof image === 'string' &&
+        image.trim().startsWith('/9j/')
+      ) {
+        const jpegData = `data:image/jpeg;base64,${image.trim()}`
+        __imageSrcMemoStr.set(key, jpegData)
+        return jpegData
+      }
       // Prevent unbounded growth
       if (__imageSrcMemoStr.size > 1000) __imageSrcMemoStr.clear()
       __imageSrcMemoStr.set(key, resolved)
@@ -71,14 +89,15 @@ export function getImageSrc(image, defaultImage = 'default/defaut_profile.txt') 
       return resolved
     }
     // Fallback to resolver for other types (null/undefined handled inside)
-    return __resolveImageInternal(image, defaultImage)
+    const resolved = __resolveImageInternal(image, defaultImage)
+    return resolved
   } catch (_) {
     return defaultImage
   }
 }
 
 // Internal resolver (original logic), kept separate to allow memoization above
-function __resolveImageInternal(image, defaultImage = 'default/defaut_profile.txt') {
+function __resolveImageInternal(image, defaultImage = 'assets/default/defaut_profile.txt') {
   if (!image) return defaultImage;
 
   // Si c'est une chaîne directe
@@ -100,18 +119,22 @@ function __resolveImageInternal(image, defaultImage = 'default/defaut_profile.tx
       }
       return s
     }
-    // Plain base64 provided as a string (no data: prefix)
+    // Plain base64 provided comme string (no data: prefix)
     // Accept URL-safe base64 and whitespace, then normalize by stripping whitespace
-    if (/^[A-Za-z0-9+/=_-\s]+$/.test(s)) {
-      const compact = s.replace(/\s+/g, '')
-      return `data:image/png;base64,${compact}`
+    if (/^([A-Za-z0-9+/=]+)$/.test(s)) {
+      if (s.startsWith("/9j/")) return `data:image/jpeg;base64,${s}`;
+      if (s.startsWith("iVBOR")) return `data:image/png;base64,${s}`;
+      // Si la chaîne est longue (typiquement >100) et ne commence pas par /9j/ ou iVBOR, on tente jpeg par défaut
+      if (s.length > 100) return `data:image/jpeg;base64,${s}`;
+      // Sinon, ne rien préfixer
+      return defaultImage;
     }
     // If it looks like a path but doesn't start with http(s) or data:, treat as invalid if it looks like base64
     if (s.startsWith('/') && /^[A-Za-z0-9+/=]+$/.test(s.slice(1))) {
       return defaultImage;
     }
-    if (isExternal(s)) return s;
-    return getFullPath(s);
+  if (isExternal(s)) return s;
+  return getFullPath(s);
   }
 
   // Si c'est un objet, appliquer d'abord la convention DB:
@@ -133,7 +156,11 @@ function __resolveImageInternal(image, defaultImage = 'default/defaut_profile.tx
       }
       if (/^[A-Za-z0-9+/=_-\s]+$/.test(val)) {
         const compact = val.replace(/\s+/g, '')
-        return `data:image/png;base64,${compact}`
+        if (compact.startsWith('/9j/')) return `data:image/jpeg;base64,${compact}`
+        if (compact.startsWith('iVBOR')) return `data:image/png;base64,${compact}`
+        if (compact.length > 100) return `data:image/jpeg;base64,${compact}`
+        // Ne rien préfixer sinon
+        return defaultImage;
       }
       // fallback: treat as path or URL
       return isExternal(val) ? val : getFullPath(val)
@@ -182,7 +209,10 @@ function __resolveImageInternal(image, defaultImage = 'default/defaut_profile.tx
       }
       if (/^[A-Za-z0-9+/=_-\s]+$/.test(val)) {
         const compact = val.replace(/\s+/g, '')
-        return `data:image/png;base64,${compact}`
+        if (compact.startsWith('/9j/')) return `data:image/jpeg;base64,${compact}`
+        if (compact.startsWith('iVBOR')) return `data:image/png;base64,${compact}`
+        // Ne rien préfixer par défaut, laisser tomber si inconnu
+        return defaultImage;
       }
     }
   }
@@ -229,6 +259,12 @@ export function getCachedDefault (kind = 'profile') {
   try { val = localStorage.getItem(key) } catch (_) { val = null }
   if (val && typeof val === 'string') {
     const s = val.trim()
+    // Si la valeur du cache est un base64 JPEG pur, retourne un data URI JPEG
+    if (s.startsWith('/9j/')) {
+      const jpegData = `data:image/jpeg;base64,${s}`
+      __defaultTxtCache[kind] = jpegData
+      return jpegData
+    }
     if (s.startsWith('data:image')) {
       const parts = s.split(',')
       const payload = parts.length > 1 ? parts.slice(1).join(',') : ''
@@ -238,12 +274,14 @@ export function getCachedDefault (kind = 'profile') {
         try { localStorage.removeItem(key) } catch (_) {}
         return null
       }
+      __defaultTxtCache[kind] = s
+      return s
     } else if (s.includes('<!DOCTYPE') || s.includes('<html')) {
       try { localStorage.removeItem(key) } catch (_) {}
       return null
     }
-    __defaultTxtCache[kind] = val
-    return val
+    __defaultTxtCache[kind] = s
+    return s
   }
   return null
 }
@@ -268,10 +306,10 @@ export async function getDefaultTxtImage (relativeTxtPath, kind = 'profile') {
       content = fallbackBase64;
     }
 
-    let dataUri = content
-    if (!content.startsWith('data:image')) {
-      const mime = detectMimeFromBase64(content)
-      dataUri = `data:${mime};base64,${content}`
+    let dataUri = content;
+    // Si déjà un data URI, ne rien ajouter
+    if (!/^data:image\//.test(content)) {
+      dataUri = `data:image/png;base64,${content}`;
     }
 
     const key = kind === 'cover' ? 'default_cover_data_uri' : 'default_profile_data_uri'
@@ -280,15 +318,15 @@ export async function getDefaultTxtImage (relativeTxtPath, kind = 'profile') {
     return dataUri
   } catch (err) {
     console.error('err getDefaultTxtImage in utility.js ===> ', err)
-    // Always fallback to valid PNG
+    // Always fallback to valid PNG, sans double préfixe
     return `data:image/png;base64,${fallbackBase64}`;
   }
 }
 
 export async function warmDefaultTxtImages () {
   // Pass relative paths; getDefaultTxtImage will prepend BASE_URL correctly
-  const profilePath = `default/defaut_profile.txt`;
-  const coverPath = `default/defaut_couverture.txt`;
+  const profilePath = `assets/default/defaut_profile.txt`;
+  const coverPath = `assets/default/defaut_couverture.txt`;
   // Fire and forget; cache results for sync access in getters/components
   try { await getDefaultTxtImage(profilePath, 'profile') } catch (_) {}
   try { await getDefaultTxtImage(coverPath, 'cover') } catch (_) {}
@@ -313,7 +351,7 @@ export const isBlocked = (state, id) => {
 // Nom complet vers le fichier uploads côté backend
 export function getFullPath(file) {
   const base = import.meta.env.BASE_URL || '/';
-  const fallback = `${base}default/defaut_profile.txt`
+  const fallback = `${base}assets/default/defaut_profile.txt`
   if (!file || file === 'false') return fallback
   if (typeof file !== 'string') return fallback
   const s = file.trim()
@@ -600,23 +638,6 @@ export default {
     }
   },
   // Lightweight debug helper to inspect auth + counts
-  notifDebug: async (params = {}) => {
-    try {
-      const token = localStorage.getItem('token')
-      const base = `${import.meta.env.VITE_APP_API_URL}/api/notif/debug`
-      const qp = new URLSearchParams()
-      const { mode, includeBlocked } = params || {}
-      if (typeof mode === 'string' && mode) qp.set('mode', mode)
-      if (includeBlocked !== undefined && includeBlocked !== null) qp.set('includeBlocked', String(includeBlocked))
-      const url = qp.toString() ? `${base}?${qp.toString()}` : base
-      const headers = { 'x-auth-token': token }
-      const res = await axios.get(url, { headers })
-      return res.data
-    } catch (e) {
-      console.error('err notifDebug in frontend/utility.js ===> ', e)
-      return null
-    }
-  },
   calculateDistance: (from, to, mile) => {
     if (!from || !to) return 10
     const radianConversion = Math.PI / 180

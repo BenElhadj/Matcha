@@ -56,7 +56,7 @@ export const getters = {
     }),
   profileImage: (state) => {
     const base = import.meta.env.BASE_URL || '/';
-    const imageProfilTxt = `${base}default/defaut_profile.txt`;
+    const imageProfilTxt = `${base}assets/default/defaut_profile.txt`;
     // Try cached data URI for default first (avoids rendering plain .txt)
     const cachedDefault = utility.getCachedDefault ? utility.getCachedDefault('profile') : null
     const fallback = cachedDefault || imageProfilTxt
@@ -68,7 +68,7 @@ export const getters = {
   },
   coverPhoto: (state) => {
     const base = import.meta.env.BASE_URL || '/';
-    const coverTxt = `${base}default/defaut_couverture.txt`;
+    const coverTxt = `${base}assets/default/defaut_couverture.txt`;
     const cachedDefault = utility.getCachedDefault ? utility.getCachedDefault('cover') : null
     const fallback = cachedDefault || coverTxt
     if (!state.user.images) return fallback

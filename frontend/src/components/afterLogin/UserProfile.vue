@@ -312,7 +312,7 @@ const profileImage = computed(() => {
   // Select image where profile is true/1 and cover is not true/1
   const cachedDefault = utility.getCachedDefault ? utility.getCachedDefault('profile') : null
   const base = import.meta.env.BASE_URL || '/'
-  const defaultImage = cachedDefault || `${base}default/defaut_profile.txt`
+  const defaultImage = cachedDefault || `${base}assets/default/defaut_profile.txt`
   if (!user.value || !user.value.images) return defaultImage
   const image = user.value.images.find(
     (cur) => (cur.profile === true || cur.profile === 1) && !(cur.cover === true || cur.cover === 1)
@@ -453,7 +453,7 @@ const distance = computed(() => {
 const coverPhoto = computed(() => {
   const cachedDefault = utility.getCachedDefault ? utility.getCachedDefault('cover') : null
   const base = import.meta.env.BASE_URL || '/'
-  const cover = cachedDefault || `${base}default/defaut_couverture.txt`
+  const cover = cachedDefault || `${base}assets/default/defaut_couverture.txt`
   if (!user.value || !user.value.images) return cover
   // Select image where cover is true/1 and profile is not true/1
   const image = user.value.images.find(
@@ -662,7 +662,7 @@ const fetchUser = async (id) => {
             date: new Date(),
             id_from: store.state.user.id,
             username: store.state.user.username,
-            profile_image: profileImg ? profileImg.name : 'default/defaut_profile.txt',
+            profile_image: profileImg ? profileImg.name : 'assets/default/defaut_profile.txt',
             id_to: id,
             type: 'visit'
           }

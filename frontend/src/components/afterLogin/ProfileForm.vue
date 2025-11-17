@@ -42,9 +42,8 @@
         />
       </div>
 
-      <q-form @submit.prevent="updateUser" class="q-gutter-md" v-if="user">
+      <q-form @submit.prevent="updateUser" class="q-gutter-md form-horizontal-padding" v-if="user">
         <q-input
-          id="username"
           v-model="user.username"
           :readonly="!isEditing"
           label="Username"
@@ -53,7 +52,6 @@
 
         <div class="q-gutter-md row">
           <q-input
-            id="first_name"
             v-model="user.first_name"
             :readonly="!isEditing"
             label="First Name"
@@ -61,7 +59,6 @@
           />
           <q-separator vertical spacing class="separator-margin"></q-separator>
           <q-input
-            id="last_name"
             v-model="user.last_name"
             :readonly="!isEditing"
             label="Last Name"
@@ -70,7 +67,6 @@
         </div>
 
         <q-input
-          id="birthdate"
           v-model="birthdate"
           :readonly="!isEditing"
           label="Birth Date"
@@ -78,7 +74,6 @@
           class="one-input"
         />
         <q-input
-          id="phone"
           v-model="user.phone"
           :readonly="!isEditing"
           label="Phone Number"
@@ -86,46 +81,32 @@
         />
 
         <div class="q-gutter-md row">
-          <q-select
-            v-model="user.gender"
-            label="Gender"
-            id="gender"
-            :readonly="!isEditing"
-            :options="genders"
-            dropdown-icon="mdi-chevron-down"
-            class="tow-input"
-          />
+          <div class="tow-input" style="display: flex; flex-direction: column">
+            <label for="gender">Gender</label>
+            <select id="gender" v-model="user.gender" :disabled="!isEditing" class="custom-select">
+              <option v-for="g in genders" :key="g" :value="g">{{ g }}</option>
+            </select>
+          </div>
           <q-separator vertical spacing class="separator-margin"></q-separator>
-          <q-select
-            v-model="user.looking"
-            id="looking"
-            :readonly="!isEditing"
-            label="Looking For"
-            :options="looking"
-            dropdown-icon="mdi-chevron-down"
-            class="tow-input"
-          />
+          <div class="tow-input" style="display: flex; flex-direction: column">
+            <label for="looking">Looking For</label>
+            <select
+              id="looking"
+              v-model="user.looking"
+              :disabled="!isEditing"
+              class="custom-select"
+            >
+              <option v-for="l in looking" :key="l" :value="l">{{ l }}</option>
+            </select>
+          </div>
         </div>
 
-        <q-input
-          id="address"
-          v-model="user.address"
-          :readonly="!isEditing"
-          label="Address"
-          class="one-input"
-        />
+        <q-input v-model="user.address" :readonly="!isEditing" label="Address" class="one-input" />
 
         <div class="q-gutter-md row">
-          <q-input
-            id="city"
-            v-model="user.city"
-            :readonly="!isEditing"
-            label="City"
-            class="tow-input"
-          />
+          <q-input v-model="user.city" :readonly="!isEditing" label="City" class="tow-input" />
           <q-separator vertical spacing></q-separator>
           <q-input
-            id="postal_code"
             v-model="user.postal_code"
             :readonly="!isEditing"
             label="Postal Code"
@@ -134,13 +115,7 @@
           />
         </div>
 
-        <q-input
-          id="country"
-          v-model="user.country"
-          :readonly="!isEditing"
-          label="Country"
-          class="one-input"
-        />
+        <q-input v-model="user.country" :readonly="!isEditing" label="Country" class="one-input" />
 
         <div class="one-input">
           <span class="text-h8 text-grey-7">Tags</span>
@@ -154,7 +129,6 @@
           />
           <div v-else>
             <q-input
-              id="tags"
               label="Tags"
               :model-value="Array.isArray(user.tags) ? user.tags.join(', ') : user.tags"
               readonly
@@ -162,7 +136,6 @@
           </div>
         </div>
         <q-input
-          id="biography"
           v-model="user.biography"
           :readonly="!isEditing"
           label="Bio"
@@ -313,7 +286,7 @@ onMounted(async () => {
 }
 .edit {
   width: 100px !important;
-  height: 120px !important;
+  height: 200px !important;
   position: absolute !important;
   background-size: 100%;
 }
@@ -325,7 +298,7 @@ onMounted(async () => {
 }
 
 .tow-input {
-  min-width: 330px;
+  min-width: 359px;
   color: 'primary';
 }
 
@@ -371,5 +344,33 @@ onMounted(async () => {
 
 .vue-tags-input .ti-input {
   border: none !important;
+}
+/* Style custom pour les <select> natifs du formulaire */
+.custom-select {
+  height: 48px;
+  font-size: 1.1em;
+  border: none;
+  border-bottom: 1px solid #bbb;
+  border-radius: 0;
+  background: transparent;
+  outline: none;
+  box-shadow: none;
+  padding: 0 8px;
+  margin-bottom: 8px;
+  transition: border-color 0.2s;
+}
+.custom-select:focus {
+  border-bottom: 1.5px solid #888;
+}
+.custom-select:disabled {
+  background: #f5f5f5;
+  color: #aaa;
+  cursor: not-allowed;
+}
+
+/* Add horizontal padding to the form for equal left/right spacing */
+.form-horizontal-padding {
+  padding-left: 45px;
+  /* padding-right: 25px; */
 }
 </style>
