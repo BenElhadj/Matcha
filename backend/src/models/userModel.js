@@ -1,3 +1,32 @@
+// Batch get user info by array of IDs
+const getUsersByIds = async (ids) => {
+    if (!ids || !ids.length) return [];
+    const query = `SELECT * FROM users WHERE id = ANY($1)`;
+    const result = await db.query(query, [ids]);
+    return result.rows;
+};
+
+// Batch get images for multiple user IDs
+const getImagesByUids = async (userIds) => {
+    if (!userIds || !userIds.length) return [];
+    const query = `SELECT *, COALESCE(link, '') AS link, COALESCE(data, '') AS data FROM images WHERE user_id = ANY($1)`;
+    const result = await db.query(query, [userIds]);
+    // Group by user_id
+    const grouped = {};
+    for (const img of result.rows) {
+        if (!grouped[img.user_id]) grouped[img.user_id] = [];
+        // Only valid images
+        const validLink = img.link && img.link !== 'false' && img.link !== '' && img.link !== null && img.link !== undefined;
+        const validData = img.data && img.data !== 'false' && img.data !== '' && img.data !== null && img.data !== undefined;
+        if (validLink || validData) {
+            grouped[img.user_id].push({
+                ...img,
+                image: validLink ? img.link : img.data
+            });
+        }
+    }
+    return grouped;
+};
 // Get users who have blocked me (paginated)
 const getBlockedBy = async (id, limit = 25, offset = 0) => {
     const query = `
@@ -469,11 +498,13 @@ module.exports = {
     blockUser,
     unblockUser,
     reportUser,
-        unreportUser,
+    unreportUser,
     updateLocation,
     updateStatus,
     blacklist,
     getBlockedBy,
     getReported,
-    getReportedBy
+    getReportedBy,
+    getUsersByIds,
+    getImagesByUids
 }

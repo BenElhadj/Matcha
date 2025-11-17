@@ -67,10 +67,9 @@ const getBlockedBy = async (req, res) => {
 		return res.json({ status: 'error', message: 'Fatal error', data: String(err && err.message ? err.message : err) });
 	}
 };
-const userModel = require('../models/userModel')
+
 const tagsModel = require('../models/tagsModel')
 
-const notifModel = require('../models/notificationsModel')
 const historyModel = require('../models/historyModel')
 
 const matchingModel = require('../models/matchingModel')
@@ -259,17 +258,352 @@ const getHistory = async (req, res) => {
 }
 
 
+const userModel = require('../models/userModel');
+const notificationsModel = require('../models/notificationsModel');
+
 const getAllHistory = async (req, res) => {
 	if (!req.user.id)
 		return res.json({ msg: 'not logged in' });
 	try {
-		// Parse offset/limit from query params, default to 0/20
-		const offset = parseInt(req.query.offset, 10) || 0;
+		const userId = req.user.id;
+		const type = req.query.type || 'all';
+		const page = parseInt(req.query.page, 10) || 1;
 		const limit = parseInt(req.query.limit, 10) || 20;
-		const result = await historyModel.getAllHistory(req.user.id, offset, limit);
-		res.json({ history: result.rows, total: result.total });
+		const offset = (page - 1) * limit;
+		let items = [];
+		let total = 0;
+
+		// Helper pour image de profil (link ou data)
+		const getProfileImage = (img) => {
+			if (!img) return null;
+			if (img.link && img.link !== 'false' && img.link !== '') return img.link;
+			if (img.data && img.data !== 'false' && img.data !== '') {
+				if (img.data.startsWith('data:image')) return img.data;
+				return `data:image/png;base64,${img.data}`;
+			}
+			return null;
+		};
+
+		// 1. Création du compte
+		if (type === 'creation') {
+			const user = await userModel.getUserById(userId);
+			if (user && user[0]) {
+				items = [{
+					type: 'creation',
+					date: user[0].created_at,
+					user_id: userId,
+					username: user[0].username,
+					first_name: user[0].first_name,
+					last_name: user[0].last_name
+					// plus de champ profile_image ici
+				}];
+				total = 1;
+			}
+			return res.json({ page, limit: 1, total, history: items });
+		}
+
+		// 2. Images ajoutées (avatar, cover, autres)
+		if (type === 'add_image') {
+			const images = await userModel.getImages(userId);
+			const user = await userModel.getUserById(userId);
+			items = images.map(img => ({
+				type: img.profile ? 'avatar_img' : (img.cover ? 'cover_img' : 'other_img'),
+				date: img.created_at,
+				image: getProfileImage(img),
+				image_id: img.id,
+				user_id: userId,
+				username: user[0]?.username,
+				first_name: user[0]?.first_name,
+				last_name: user[0]?.last_name
+				// plus de champ my_avatar ici
+			}));
+			total = items.length;
+			items = items.sort((a, b) => new Date(b.date) - new Date(a.date)).slice(offset, offset + limit);
+			return res.json({ page, limit, total, history: items });
+		}
+
+		// 3. Visites effectuées (you_visit)
+		if (type === 'visit') {
+			   // Prendre toutes les notifications de type 'visit' où id_from = userId (actions faites par l'utilisateur)
+			   const visitRows = await db.query(`
+				   SELECT n.id, n.id_from, n.id_to, n.created_at as date, n.type, u.username, u.first_name, u.last_name
+				   FROM notifications n
+				   LEFT JOIN users u ON n.id_to = u.id
+				   WHERE n.type = 'visit' AND n.id_from = $1
+				   ORDER BY n.created_at DESC
+				   LIMIT $2 OFFSET $3
+			   `, [userId, limit, offset]);
+			   const userIds = Array.from(new Set(visitRows.rows.map(n => n.id_to)));
+			   const users = await userModel.getUsersByIds(userIds);
+			   const userMap = {};
+			   users.forEach(u => { userMap[u.id] = u; });
+			   const imagesMap = await userModel.getImagesByUids(userIds);
+			   items = visitRows.rows.map(n => {
+				   const userInfo = userMap[n.id_to] || {};
+				   const imgs = imagesMap[n.id_to] || [];
+				   let profileImg = imgs.find(i => i.profile) || imgs[0];
+				   let profile_image = null;
+				   if (profileImg) {
+					   if (profileImg.link && profileImg.link !== 'false' && profileImg.link !== '') {
+						   profile_image = profileImg.link;
+					   } else if (profileImg.data && profileImg.data !== 'false' && profileImg.data !== '') {
+						   profile_image = profileImg.data.startsWith('data:image') ? profileImg.data : `data:image/png;base64,${profileImg.data}`;
+					   }
+				   }
+				   return {
+					   type: 'you_visit',
+					   date: n.date,
+					   user_id: n.id_to,
+					   username: n.username,
+					   first_name: userInfo.first_name || '',
+					   last_name: userInfo.last_name || '',
+					   profile_image
+				   };
+			   });
+			   // Pour le total, on compte toutes les notifications de type visit faites par l'utilisateur
+			   const totalRes = await db.query(`SELECT COUNT(*) FROM notifications WHERE type = 'visit' AND id_from = $1`, [userId]);
+			   total = parseInt(totalRes.rows[0].count, 10);
+			   return res.json({ page, limit, total, history: items });
+		}
+
+		// 4. Likes/dislikes effectués (you_like, you_like_back, you_unlike)
+		if (type === 'like') {
+			   // Prendre toutes les notifications de type like/like_back/unlike où id_from = userId
+			   const likeRows = await db.query(`
+				   SELECT n.id, n.id_from, n.id_to, n.created_at as date, n.type, u.username, u.first_name, u.last_name
+				   FROM notifications n
+				   LEFT JOIN users u ON n.id_to = u.id
+				   WHERE n.id_from = $1 AND n.type IN ('like', 'like_back', 'unlike')
+				   ORDER BY n.created_at DESC
+				   LIMIT $2 OFFSET $3
+			   `, [userId, limit, offset]);
+			   const likeUserIds = Array.from(new Set(likeRows.rows.map(n => n.id_to)));
+			   const users = await userModel.getUsersByIds(likeUserIds);
+			   const userMap = {};
+			   users.forEach(u => { userMap[u.id] = u; });
+			   const imagesMap = await userModel.getImagesByUids(likeUserIds);
+			   items = likeRows.rows.map(n => {
+				   const userInfo = userMap[n.id_to] || {};
+				   const imgs = imagesMap[n.id_to] || [];
+				   let profileImg = imgs.find(i => i.profile) || imgs[0];
+				   let profile_image = null;
+				   if (profileImg) {
+					   if (profileImg.link && profileImg.link !== 'false' && profileImg.link !== '') {
+						   profile_image = profileImg.link;
+					   } else if (profileImg.data && profileImg.data !== 'false' && profileImg.data !== '') {
+						   profile_image = profileImg.data.startsWith('data:image') ? profileImg.data : `data:image/png;base64,${profileImg.data}`;
+					   }
+				   }
+				   return {
+					   type: n.type === 'like' ? 'you_like' : (n.type === 'like_back' ? 'you_like_back' : 'you_unlike'),
+					   date: n.date,
+					   user_id: n.id_to,
+					   username: n.username,
+					   first_name: userInfo.first_name || '',
+					   last_name: userInfo.last_name || '',
+					   profile_image
+				   };
+			   });
+			   // Pour le total, on compte toutes les notifications de type like/like_back/unlike faites par l'utilisateur
+			   const totalRes = await db.query(`SELECT COUNT(*) FROM notifications WHERE id_from = $1 AND type IN ('like', 'like_back', 'unlike')`, [userId]);
+			   total = parseInt(totalRes.rows[0].count, 10);
+			   return res.json({ page, limit, total, history: items });
+		}
+
+		// 5. Block/report/unblock/unreport effectués
+		if (type === 'block') {
+			const blocks = await userModel.getBlocked(userId);
+			const reports = await userModel.getReported(userId, 10000, 0);
+			const blockIds = blocks.map(b => b.blocked_id);
+			const reportIds = reports.map(r => r.reported_id);
+			const allIds = Array.from(new Set([...blockIds, ...reportIds]));
+			const users = await userModel.getUsersByIds(allIds);
+			const userMap = {};
+			users.forEach(u => { userMap[u.id] = u; });
+			items = [
+				...blocks.map(b => {
+					const userInfo = userMap[b.blocked_id] || {};
+					return {
+						type: 'you_block',
+						date: b.blocked_at,
+						user_id: b.blocked_id,
+						username: b.username,
+						first_name: userInfo.first_name || '',
+						last_name: userInfo.last_name || '',
+						profile_image: getProfileImage({ link: b.avatar, data: b.avatar })
+					};
+				}),
+				...reports.map(r => {
+					const userInfo = userMap[r.reported_id] || {};
+					return {
+						type: 'you_report',
+						date: r.reported_at,
+						user_id: r.reported_id,
+						username: r.username,
+						first_name: userInfo.first_name || '',
+						last_name: userInfo.last_name || '',
+						profile_image: getProfileImage({ link: r.avatar, data: r.avatar })
+					};
+				})
+			];
+			total = items.length;
+			items = items.sort((a, b) => new Date(b.date) - new Date(a.date)).slice(offset, offset + limit);
+			return res.json({ page, limit, total, history: items });
+		}
+
+		// 6. Tout mélangé (all)
+		if (type === 'all') {
+			   let allItems = [];
+			   // 1. Création du compte
+			   const user = await userModel.getUserById(userId);
+			   const images = await userModel.getImagesByUid(userId);
+			   if (user && user[0]) {
+				   allItems.push({
+					   type: 'creation',
+					   date: user[0].created_at,
+					   user_id: userId,
+					   username: user[0].username,
+					   first_name: user[0].first_name,
+					   last_name: user[0].last_name
+				   });
+			   }
+			   // 2. Images ajoutées
+			   allItems = allItems.concat(images.map(img => ({
+				   type: img.profile ? 'avatar_img' : (img.cover ? 'cover_img' : 'other_img'),
+				   date: img.created_at,
+				   image: (img.link && img.link !== 'false' && img.link !== '') ? img.link : (img.data && img.data !== 'false' && img.data !== '' ? (img.data.startsWith('data:image') ? img.data : `data:image/png;base64,${img.data}`) : null),
+				   image_id: img.id,
+				   user_id: userId,
+				   username: user[0]?.username,
+				   first_name: user[0]?.first_name,
+				   last_name: user[0]?.last_name
+			   })));
+			   // 3. Visites effectuées
+			   const visitRows = await db.query(`
+				   SELECT n.id, n.id_from, n.id_to, n.created_at as date, n.type, u.username, u.first_name, u.last_name
+				   FROM notifications n
+				   LEFT JOIN users u ON n.id_to = u.id
+				   WHERE n.type = 'visit' AND n.id_from = $1
+				   ORDER BY n.created_at DESC
+				   LIMIT 10000 OFFSET 0
+			   `, [userId]);
+			   const visitUserIds = Array.from(new Set(visitRows.rows.map(n => n.id_to)));
+			   const visitUsers = await userModel.getUsersByIds(visitUserIds);
+			   const visitUserMap = {};
+			   visitUsers.forEach(u => { visitUserMap[u.id] = u; });
+			   const visitImagesMap = await userModel.getImagesByUids(visitUserIds);
+			   allItems = allItems.concat(visitRows.rows.map(n => {
+				   const userInfo = visitUserMap[n.id_to] || {};
+				   const imgs = visitImagesMap[n.id_to] || [];
+				   let profileImg = imgs.find(i => i.profile) || imgs[0];
+				   let profile_image = null;
+				   if (profileImg) {
+					   if (profileImg.link && profileImg.link !== 'false' && profileImg.link !== '') {
+						   profile_image = profileImg.link;
+					   } else if (profileImg.data && profileImg.data !== 'false' && profileImg.data !== '') {
+						   profile_image = profileImg.data.startsWith('data:image') ? profileImg.data : `data:image/png;base64,${profileImg.data}`;
+					   }
+				   }
+				   return {
+					   type: 'you_visit',
+					   date: n.date,
+					   user_id: n.id_to,
+					   username: n.username,
+					   first_name: userInfo.first_name || '',
+					   last_name: userInfo.last_name || '',
+					   profile_image
+				   };
+			   }));
+			   // 4. Likes/dislikes effectués
+			   const likeRows = await db.query(`
+				   SELECT n.id, n.id_from, n.id_to, n.created_at as date, n.type, u.username, u.first_name, u.last_name
+				   FROM notifications n
+				   LEFT JOIN users u ON n.id_to = u.id
+				   WHERE n.id_from = $1 AND n.type IN ('like', 'like_back', 'unlike')
+				   ORDER BY n.created_at DESC
+				   LIMIT 10000 OFFSET 0
+			   `, [userId]);
+			   const likeUserIds = Array.from(new Set(likeRows.rows.map(n => n.id_to)));
+			   const likeUsers = await userModel.getUsersByIds(likeUserIds);
+			   const likeUserMap = {};
+			   likeUsers.forEach(u => { likeUserMap[u.id] = u; });
+			   const likeImagesMap = await userModel.getImagesByUids(likeUserIds);
+			   allItems = allItems.concat(likeRows.rows.map(n => {
+				   const userInfo = likeUserMap[n.id_to] || {};
+				   const imgs = likeImagesMap[n.id_to] || [];
+				   let profileImg = imgs.find(i => i.profile) || imgs[0];
+				   let profile_image = null;
+				   if (profileImg) {
+					   if (profileImg.link && profileImg.link !== 'false' && profileImg.link !== '') {
+						   profile_image = profileImg.link;
+					   } else if (profileImg.data && profileImg.data !== 'false' && profileImg.data !== '') {
+						   profile_image = profileImg.data.startsWith('data:image') ? profileImg.data : `data:image/png;base64,${profileImg.data}`;
+					   }
+				   }
+				   return {
+					   type: n.type === 'like' ? 'you_like' : (n.type === 'like_back' ? 'you_like_back' : 'you_unlike'),
+					   date: n.date,
+					   user_id: n.id_to,
+					   username: n.username,
+					   first_name: userInfo.first_name || '',
+					   last_name: userInfo.last_name || '',
+					   profile_image
+				   };
+			   }));
+			   // 5. Block/report effectués
+			   const blocks = await userModel.getBlocked(userId);
+			   const reports = await userModel.getReported(userId, 10000, 0);
+			   const blockIds = blocks.map(b => b.blocked_id);
+			   const reportIds = reports.map(r => r.reported_id);
+			   const allBlockReportIds = Array.from(new Set([...blockIds, ...reportIds]));
+			   const blockReportUsers = await userModel.getUsersByIds(allBlockReportIds);
+			   const blockReportUserMap = {};
+			   blockReportUsers.forEach(u => { blockReportUserMap[u.id] = u; });
+			   allItems = allItems.concat([
+				   ...blocks.map(b => {
+					   const userInfo = blockReportUserMap[b.blocked_id] || {};
+					   let profile_image = null;
+					   if (b.avatar && b.avatar !== 'false' && b.avatar !== '') {
+						   profile_image = b.avatar;
+					   }
+					   return {
+						   type: 'you_block',
+						   date: b.blocked_at,
+						   user_id: b.blocked_id,
+						   username: b.username,
+						   first_name: userInfo.first_name || '',
+						   last_name: userInfo.last_name || '',
+						   profile_image
+					   };
+				   }),
+				   ...reports.map(r => {
+					   const userInfo = blockReportUserMap[r.reported_id] || {};
+					   let profile_image = null;
+					   if (r.avatar && r.avatar !== 'false' && r.avatar !== '') {
+						   profile_image = r.avatar;
+					   }
+					   return {
+						   type: 'you_report',
+						   date: r.reported_at,
+						   user_id: r.reported_id,
+						   username: r.username,
+						   first_name: userInfo.first_name || '',
+						   last_name: userInfo.last_name || '',
+						   profile_image
+					   };
+				   })
+			   ]);
+			   // Tri et pagination
+			   allItems = allItems.sort((a, b) => new Date(b.date) - new Date(a.date));
+			   total = allItems.length;
+			   items = allItems.slice(offset, offset + limit);
+			   return res.json({ page, limit, total, history: items });
+		}
+
+		// Si type inconnu
+		return res.json({ page, limit, total: 0, history: [] });
 	} catch (err) {
-		return res.json({ msg: 'Fatal error', err });
+		return res.json({ msg: 'Fatal error', err: String(err && err.message ? err.message : err) });
 	}
 };
 

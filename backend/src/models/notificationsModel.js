@@ -2,8 +2,13 @@ const db = require('../config/database')
 
 const insertNotifVis = async (user_id, id) => {
     if (user_id === id) return; // Ne pas notifier soi-même
-    const query = `INSERT INTO notifications (type, id_from, id_to) VALUES ('visit', $1, $2)`
-    await db.query(query, [user_id, id])
+    // Vérifie s'il y a déjà une notif de visite dans la dernière heure
+    const checkQuery = `SELECT 1 FROM notifications WHERE type = 'visit' AND id_from = $1 AND id_to = $2 AND created_at > NOW() - INTERVAL '1 hour' LIMIT 1`;
+    const check = await db.query(checkQuery, [user_id, id]);
+    if (check.rows.length === 0) {
+        const query = `INSERT INTO notifications (type, id_from, id_to) VALUES ('visit', $1, $2)`;
+        await db.query(query, [user_id, id]);
+    }
 }
 
 const insertNotif = async (type, user_id, id) => {

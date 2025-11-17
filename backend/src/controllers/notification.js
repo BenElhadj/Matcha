@@ -38,62 +38,95 @@ const insertChatNotif = async (req, res) => {
 
 // Get All notification 
 
+// Nouvelle version avec filtrage par type (visit, like, block, all)
 const getAllNotif = async (req, res) => {
 	if (!req.user.id)
 		return res.json({ status: 'error', type: 'notification', message: 'Not logged in', data: null })
 	try {
-		// Support pagination via query params: ?limit=20&page=1
-			const limit = Math.min(parseInt(req.query.limit) || 50, 200) // cap to avoid huge responses
-			const page = Math.max(parseInt(req.query.page) || 1, 1)
+		const limit = Math.min(parseInt(req.query.limit) || 50, 200)
+		const page = Math.max(parseInt(req.query.page) || 1, 1)
 		const offset = (page - 1) * limit
+		const type = (req.query.type || '').toLowerCase()
+		const includeBlocked = String(req.query.includeBlocked || '').toLowerCase() === '1' || String(req.query.includeBlocked || '').toLowerCase() === 'true'
 
-			const mode = (req.query.mode || '').toString().toLowerCase()
-			const useAll = mode === 'all'
-			const includeBlocked = String(req.query.includeBlocked || '').toLowerCase() === '1' || String(req.query.includeBlocked || '').toLowerCase() === 'true'
-		// Fetch items
-		let result = useAll
-				? await notifModel.getNotifAll(req.user.id, limit, offset, includeBlocked)
-				: await notifModel.getNotif(req.user.id, limit, offset, includeBlocked)
+		// Récupérer toutes les notifs (all)
+		let notifResult = await notifModel.getNotifAll(req.user.id, 1000, 0, includeBlocked)
 
-		// Lightweight diagnostics to help understand empty sets in prod
-		let rawCount = 0, filteredCount = 0
-		try {
-			rawCount = await notifModel.countAllNotif(req.user.id)
-			filteredCount = await notifModel.countAllNotifFiltered(req.user.id)
-		} catch (e) {
-			// non-fatal
+		// Récupérer tous les blocks/reports faits par les autres sur moi
+		const db = require('../config/database')
+		const blockedRows = await db.query(`
+			SELECT blocked.id AS id, blocked.blocker AS id_from, blocked.type AS type, users.username, users.first_name, users.last_name, blocked.created_at AS date, images.link as profile_image, images.data as profile_data
+			FROM blocked 
+			JOIN users ON blocked.blocker = users.id 
+			LEFT JOIN images ON users.id = images.user_id AND images.profile = TRUE 
+			WHERE blocked.blocked = $1 AND (blocked.type = 'block' OR blocked.type = 'report')
+		`, [req.user.id])
+		let blockResult = blockedRows.rows.map(r => {
+			let profile_image = null;
+			if (r.profile_image && r.profile_image !== 'false' && r.profile_image !== '') {
+				profile_image = r.profile_image;
+			} else if (r.profile_data && r.profile_data !== 'false' && r.profile_data !== '') {
+				profile_image = `data:image/png;base64,${r.profile_data}`;
+			} else {
+				profile_image = null;
+			}
+			return {
+				id: r.id,
+				id_from: r.id_from,
+				from: r.id_from,
+				type: r.type,
+				username: r.username,
+				first_name: r.first_name || '',
+				last_name: r.last_name || '',
+				date: r.date,
+				is_read: true,
+				profile_image,
+				cover: null
+			}
+		})
+
+		// Fusionner les deux sources
+		let result = [...notifResult, ...blockResult]
+
+		// Correction du mapping des types pour le filtrage
+		let filterTypes = [];
+		if (type === 'visit') filterTypes = ['visit', 'he_visit'];
+		else if (type === 'like') filterTypes = ['like', 'he_like', 'he_like_back', 'he_unlike', 'like_back', 'unlike'];
+		else if (type === 'block') filterTypes = ['block', 'report', 'he_report', 'he_unreport', 'he_block', 'he_unblock', 'you_block', 'you_unblock', 'you_report', 'you_unreport'];
+		// Si type = all ou vide, on prend tout
+
+		if (filterTypes.length > 0) {
+			result = result.filter(r => filterTypes.includes(r.type))
 		}
 
-		console.log('[notif:getAllNotif] user:', req.user.id, 'mode:', useAll ? 'all' : 'latest', 'includeBlocked:', includeBlocked, 'page:', page, 'limit:', limit,
-			'rows:', Array.isArray(result) ? result.length : (result == null ? 'null' : typeof result),
-			'rawCount:', rawCount, 'filteredCount:', filteredCount)
+		// Tri chronologique (plus récent d'abord)
+		result = result.sort((a, b) => new Date(b.date) - new Date(a.date))
 
-		// Normalise/clean results before sending
-		if (!Array.isArray(result)) {
-			console.warn('[notif:getAllNotif] unexpected result type, coercing to []')
-			result = []
-		}
-		   result = result.map(r => ({
-			   id: r.id,
-			   id_from: r.id_from, // compat ancien front
-			   from: r.id_from,    // compat éventuelle
-			   type: r.type,
-			   username: r.username,
-			   first_name: r.first_name || '',
-			   last_name: r.last_name || '',
-			   date: r.date,
-			   is_read: r.is_read,
-			   profile_image: r.profile_image || null,
-			   cover: r.cover || null
-		   }))
+		// Pagination manuelle après filtrage
+		const total = result.length
+		result = result.slice(offset, offset + limit)
+
+		result = result.map(r => ({
+			id: r.id,
+			id_from: r.id_from,
+			from: r.id_from,
+			type: r.type,
+			username: r.username,
+			first_name: r.first_name || '',
+			last_name: r.last_name || '',
+			date: r.date,
+			is_read: r.is_read,
+			profile_image: r.profile_image || null,
+			cover: r.cover || null
+		}))
 
 		res.json({ status: 'success', type: 'notification', message: 'Notifications fetched', data: {
 			items: result,
 			page,
 			limit,
-			mode: useAll ? 'all' : 'latest-per-sender',
-			includeBlocked,
-			meta: { total: rawCount, totalAfterFilter: filteredCount }
+			total,
+			type: type || 'all',
+			includeBlocked
 		} })
 	} catch (err) {
 		console.error('[notif:getAllNotif] error:', err && err.stack ? err.stack : err)

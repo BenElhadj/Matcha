@@ -4,8 +4,13 @@ const db = require('../config/database')
 // INSERT Into history [visits]
 
 const insertHistory = async (user_id, id) => {
-    const query = `INSERT INTO history (visitor, visited) VALUES ($1, $2)`;
-    await db.query(query, [user_id, id]);
+	// Vérifie s'il y a déjà une visite dans la dernière heure
+	const checkQuery = `SELECT 1 FROM history WHERE visitor = $1 AND visited = $2 AND created_at > NOW() - INTERVAL '1 hour' LIMIT 1`;
+	const check = await db.query(checkQuery, [user_id, id]);
+	if (check.rows.length === 0) {
+		const query = `INSERT INTO history (visitor, visited) VALUES ($1, $2)`;
+		await db.query(query, [user_id, id]);
+	}
 }
 
 /// Get Visitore History 
