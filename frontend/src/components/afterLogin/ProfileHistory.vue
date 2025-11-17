@@ -35,7 +35,7 @@
               :key="entry.id || i"
               :title="''"
               :subtitle="formatEntryDate(entry, 'absolute')"
-              :side="i % 2 === 0 ? 'left' : 'right'"
+              :side="left"
               :color="getNotifIcon(entry.type)[2]"
               :class="getNotifIcon(entry.type)[2]"
               :icon="getNotifIcon(entry.type)[1]"
