@@ -28,24 +28,42 @@ export const getters = {
   allTags: (state) => state.allTags,
   connectedUsers: (state) => state.connectedUsers,
   history: (state) => {
-    return [
-      ...state.visitor.map(cur => ({
-        ...cur,
-        type: 'visitor'
-      })),
-      ...state.visited.map(cur => ({
-        ...cur,
-        type: 'visited'
-      })),
-      ...state.followers.map(cur => ({
-        ...cur,
-        type: 'follower'
-      })),
-      ...state.following.map(cur => ({
-        ...cur,
-        type: 'following'
-      }))
-    ]
+    const actions = [];
+    // Visites faites par l'utilisateur
+    if (Array.isArray(state.visited)) {
+      actions.push(...state.visited.map(cur => ({ ...cur, type: 'you_visit' })));
+    }
+    // Likes faits par l'utilisateur
+    if (Array.isArray(state.following)) {
+      actions.push(...state.following.map(cur => ({ ...cur, type: 'you_like' })));
+    }
+    // Like back faits par l'utilisateur (présent dans following ET followers)
+    if (Array.isArray(state.following) && Array.isArray(state.followers)) {
+      const followerIds = new Set(state.followers.map(f => String(f.id)));
+      actions.push(...state.following.filter(cur => followerIds.has(String(cur.id))).map(cur => ({ ...cur, type: 'you_like_back' })));
+    }
+    // Unlikes faits par l'utilisateur (via mapping unlike)
+    if (state.user && state.user.relation && state.user.relation.unlike) {
+      const unlikeMap = state.user.relation.unlike;
+      if (Array.isArray(state.following)) {
+        actions.push(...state.following.filter(cur => unlikeMap[String(cur.id)] === 'you_unlike').map(cur => ({ ...cur, type: 'you_unlike' })));
+      }
+    }
+    // Blocks faits par l'utilisateur
+    if (Array.isArray(state.blocked)) {
+      actions.push(...state.blocked.map(cur => ({ ...cur, type: 'you_block' })));
+    }
+    // Reports faits par l'utilisateur (depuis blacklist/banned)
+    if (Array.isArray(state.blacklist)) {
+      actions.push(...state.blacklist.filter(cur => cur.type === 'report').map(cur => ({ ...cur, type: 'report' })));
+    }
+    // Trie par date décroissante si possible (created_at, match_date, blocked_at, sinon 0)
+    actions.sort((a, b) => {
+      const da = new Date(a.created_at || a.match_date || a.blocked_at || 0);
+      const db = new Date(b.created_at || b.match_date || b.blocked_at || 0);
+      return db - da;
+    });
+    return actions;
   },
   matches: (state) =>
     state.following.filter((cur) => {

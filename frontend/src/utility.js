@@ -686,36 +686,48 @@ export default {
     }
   
     switch (type) {
+      case 'visit':
       case 'visited':
       case 'you_visit':
         return `You visited the profile of ${first_name} ${last_name}`
       case 'visitor':
       case 'he_visit':
         return `${first_name} ${last_name} visited your profile`
+      case 'like':
       case 'following':
       case 'you_like':
         return `You liked ${first_name} ${last_name}`
       case 'follower':
       case 'he_like':
-        return `${first_name} ${last_name}  liked you`
+        return `${first_name} ${last_name} liked you`
+      case 'like_back':
       case 'you_like_back':
         return `You accepted the like of ${first_name} ${last_name}`
       case 'he_like_back':
         return `${first_name} ${last_name} accepted your like`
+      case 'unlike':
       case 'you_unlike':
         return `You unliked ${first_name} ${last_name}`
       case 'he_unlike':
         return `${first_name} ${last_name} unliked you`
+      case 'block':
       case 'you_block':
         return `You blocked ${first_name} ${last_name}`
       case 'he_block':
         return `${first_name} ${last_name} blocked you`
+      case 'report':
+      case 'you_report':
+        return `You reported ${first_name} ${last_name}`
+      case 'he_report':
+        return `${first_name} ${last_name} reported you`
       case 'talk':
         return `You talked to ${first_name} ${last_name}`
-      case 'avatar_img' :
+      case 'avatar_img':
         return 'You changed your avatar'
-      case 'cover_img' :
+      case 'cover_img':
         return 'You changed your cover'
+      default:
+        return `${first_name} ${last_name}`
     }
   },
   getNotifMsg (notif) {
