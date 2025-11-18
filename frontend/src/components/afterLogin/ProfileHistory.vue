@@ -1,3 +1,4 @@
+import { API_URL, BASE_URL } from '@/utility.js';
 <template>
   <q-page class="q-pa-lg flex flex-center" style="min-height: 100vh">
     <div

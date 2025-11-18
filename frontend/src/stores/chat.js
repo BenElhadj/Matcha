@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { API_URL } from '@/utility.js';
 
 export const chat = {
   state: {
@@ -73,7 +74,7 @@ export const chat = {
     syncConvoAll: async ({ commit }) => {
       try {
         const token = localStorage.getItem('token')
-        const url = `${import.meta.env.VITE_APP_API_URL}/api/chat/all`
+        const url = `${API_URL}/api/chat/all`
         const headers = { 'x-auth-token': token }
         const result = await axios.get(url, { headers })
         // API renvoie { status, type, message, data: [...] }

@@ -1,9 +1,10 @@
+import { API_URL, BASE_URL } from '@/utility.js';
 import { createRouter, createWebHistory } from 'vue-router'
 import { store } from '@/stores/store'
 import axios from 'axios'
 
 const router = createRouter({
-  history: createWebHistory(import.meta.env.BASE_URL),
+  history: createWebHistory(BASE_URL),
   routes: [
     {
       path: '/forgot',
@@ -55,7 +56,7 @@ const router = createRouter({
         try {
           const token = localStorage.getItem('token')
           const headers = { 'x-auth-token': token }
-          const url = `${import.meta.env.VITE_APP_API_URL}/api/users/show/${id}`
+          const url = `${API_URL}/api/users/show/${id}`
           const res = await axios.get(url, { headers })
           if (res.data && !res.data.msg) {
             to.meta.prefetchedUser = res.data

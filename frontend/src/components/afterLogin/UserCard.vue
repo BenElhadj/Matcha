@@ -1,3 +1,4 @@
+<!-- L'import JS doit être dans <script setup> -->
 <template>
   <q-card class="user-card-root">
     <div class="pt-1 column justify-center align-center">
@@ -87,6 +88,7 @@
 </template>
 
 <script setup>
+import { API_URL, BASE_URL } from '@/utility.js'
 import { ref, computed, onMounted } from 'vue'
 import { useStore } from 'vuex'
 import moment from 'moment'
@@ -148,7 +150,7 @@ async function onLikeIconClick() {
   }
   try {
     const likedBool = nextLikedFromState(relationType.value)
-    const url = `${import.meta.env.VITE_APP_API_URL}/api/match`
+    const url = `${API_URL}/api/match`
     const token = store.state.user?.token || localStorage.getItem('token')
     const headers = { 'x-auth-token': token }
     const body = { id: Number(targetId), liked: !!likedBool }
@@ -201,7 +203,7 @@ const isOnline = computed(() => {
 })
 
 const getProfileImage = computed(() => {
-  const base = import.meta.env.BASE_URL || '/'
+  const base = BASE_URL
   const defaultTxt = `${base}default/defaut_profile.txt`
   const cachedDefault = utility.getCachedDefault ? utility.getCachedDefault('profile') : null
   const fallback = cachedDefault || defaultTxt

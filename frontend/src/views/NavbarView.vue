@@ -215,6 +215,7 @@
 
 <script setup>
 import utility from '@/utility.js'
+import { API_URL, BASE_URL } from '@/utility.js'
 import { ref, onMounted, onUnmounted, onBeforeUnmount, computed, watch } from 'vue'
 import { useStore } from 'vuex'
 import { useRouter } from 'vue-router'
@@ -290,7 +291,7 @@ const connectedUserIds = ref(new Set())
 // Track unread counts per conversation for the messages list and total badge
 const unreadCountsByConv = ref({})
 
-const base = import.meta.env.BASE_URL || '/'
+const base = BASE_URL
 const defaultProfileTxt = `${base}default/defaut_profile.txt`
 const getFullPath = utility.getFullPath
 const resolveImg = (img) =>
@@ -321,7 +322,7 @@ const toUserChat = async (convo) => {
     // Mark conversation as read immediately to update counters
     const token = localStorage.getItem('token')
     const headers = { 'x-auth-token': token }
-    const url = `${import.meta.env.VITE_APP_API_URL}/api/chat/update`
+    const url = `${API_URL}/api/chat/update`
     await axios.post(url, { id: convo?.id_conversation }, { headers })
     // Optimistically zero local unread count for this convo and recompute total
     if (convo?.id_conversation) {
@@ -418,7 +419,7 @@ const fetchUserProfileImage = async (id) => {
   try {
     const token = user.value?.token || localStorage.getItem('token')
     const headers = { 'x-auth-token': token }
-    const url = `${import.meta.env.VITE_APP_API_URL}/api/users/show/${id}`
+    const url = `${API_URL}/api/users/show/${id}`
     const res = await axios.get(url, { headers })
     const images = Array.isArray(res.data?.images) ? res.data.images : []
     // Prefer the image marked as profile
@@ -427,8 +428,7 @@ const fetchUserProfileImage = async (id) => {
     if (!profileImg) return ''
     // Use same resolver as elsewhere so it supports data:, external URLs, or backend filenames
     const fallback =
-      utility.getCachedDefault?.('profile') ||
-      `${import.meta.env.BASE_URL || '/'}default/defaut_profile.txt`
+      utility.getCachedDefault?.('profile') || `${BASE_URL}default/defaut_profile.txt`
     const src = utility.getImageSrc
       ? utility.getImageSrc(profileImg, fallback)
       : getFullPath(profileImg?.name || profileImg?.link || profileImg?.data || '')
@@ -572,7 +572,7 @@ const syncConvo = async (convo) => {
 const logout = async () => {
   try {
     const token = user.value?.token || localStorage.getItem('token')
-    const url = `${import.meta.env.VITE_APP_API_URL}/api/auth/logout`
+    const url = `${API_URL}/api/auth/logout`
     const headers = { 'x-auth-token': token }
     await axios.get(url, { headers })
   } catch (err) {
@@ -604,7 +604,7 @@ menuConvos.value = buildMenuMessages(newMessage.value)
 const getAllConvos = async () => {
   try {
     const token = localStorage.getItem('token')
-    const url = `${import.meta.env.VITE_APP_API_URL}/api/chat/all`
+    const url = `${API_URL}/api/chat/all`
     const headers = { 'x-auth-token': token }
     const result = await axios.get(url, { headers })
     return Array.isArray(result?.data?.data) ? result.data.data : []
@@ -618,7 +618,7 @@ const getAllConvos = async () => {
 const getUnreadConvoCounts = async () => {
   try {
     const token = localStorage.getItem('token')
-    const url = `${import.meta.env.VITE_APP_API_URL}/api/chat/notSeen`
+    const url = `${API_URL}/api/chat/notSeen`
     const headers = { 'x-auth-token': token }
     const result = await axios.get(url, { headers })
     const arr = Array.isArray(result?.data?.data) ? result.data.data : []

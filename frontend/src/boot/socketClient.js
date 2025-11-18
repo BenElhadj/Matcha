@@ -1,13 +1,16 @@
+
 import { io } from 'socket.io-client'
+import { API_URL } from '@/utility.js'
 
 let socket = null
+
 
 export const getSocket = () => socket
 
 export function connectSocket(userId, { on } = {}) {
   if (socket && socket.connected) return socket
   // Use backend API URL as Socket.io endpoint
-  const url = import.meta.env.VITE_APP_API_URL
+  const url = API_URL
   socket = io(url, {
     transports: ['websocket', 'polling'],
     withCredentials: false,
@@ -21,6 +24,7 @@ export function connectSocket(userId, { on } = {}) {
     on && on.disconnect && on.disconnect(reason)
   })
   return socket
+
 }
 
 export function disconnectSocket() {

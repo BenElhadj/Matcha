@@ -1,4 +1,4 @@
-// Utilitaire global pour l'affichage d'image
+import { API_URL, BASE_URL } from '@/utility.js'; // Utilitaire global pour l'affichage d'image
 <template>
   <q-page>
     <q-page-container>
@@ -38,10 +38,10 @@
           <img :src="getImageSrc(image || {})" class="image full-width" loading="lazy" />
         </div>
         <!-- BOUTON + CSS POUR UPLOAD -->
-        <div 
+        <div
           class="col-xs-12 col-sm-6 col-md-4 img_container gallery-plus-container"
           v-if="user.id.toString() === (props.userToto?.id ?? user.id).toString()"
-          >
+        >
           <input
             type="file"
             id="gallery-upload"
@@ -127,7 +127,9 @@ const deleteImg = async (image) => {
     alert.value = {
       state: true,
       color: res.data.status === 'success' ? 'green' : 'red',
-      text: res.data.message || (res.data.status === 'success' ? 'Photo supprimée !' : 'Erreur suppression')
+      text:
+        res.data.message ||
+        (res.data.status === 'success' ? 'Photo supprimée !' : 'Erreur suppression')
     }
   } catch (err) {
     let backendMsg =

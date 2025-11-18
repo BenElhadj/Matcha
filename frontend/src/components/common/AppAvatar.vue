@@ -18,6 +18,7 @@
 </template>
 
 <script setup>
+import { BASE_URL } from '@/utility.js'
 import { computed } from 'vue'
 import { useStore } from 'vuex'
 import utility from '@/utility.js'
@@ -47,7 +48,7 @@ const store = useStore()
 const sizeClass = computed(() => `size-${props.size}`)
 
 const src = computed(() => {
-  const base = import.meta.env.BASE_URL || '/'
+  const base = BASE_URL
   const fallback = utility.getCachedDefault?.('profile') || `${base}default/defaut_profile.txt`
   let resolved = utility.getImageSrc
     ? utility.getImageSrc(props.image, fallback)

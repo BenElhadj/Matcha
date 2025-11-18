@@ -1,3 +1,4 @@
+import { API_URL, BASE_URL } from '@/utility.js';
 <template>
   <q-card class="notif_bubble notif_card_effect" clickable @click="onClick">
     <q-card-section>

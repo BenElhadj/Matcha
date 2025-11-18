@@ -1,3 +1,4 @@
+import { BASE_URL } from '@/utility.js';
 import utility from '@/utility'
 
 export const getters = {
@@ -83,7 +84,7 @@ export const getters = {
       return false
     }),
   profileImage: (state) => {
-    const base = import.meta.env.BASE_URL || '/';
+  const base = BASE_URL;
     const imageProfilTxt = `${base}assets/default/defaut_profile.txt`;
     // Try cached data URI for default first (avoids rendering plain .txt)
     const cachedDefault = utility.getCachedDefault ? utility.getCachedDefault('profile') : null
@@ -95,7 +96,7 @@ export const getters = {
     return utility.getImageSrc(image, fallback)
   },
   coverPhoto: (state) => {
-    const base = import.meta.env.BASE_URL || '/';
+  const base = BASE_URL;
     const coverTxt = `${base}assets/default/defaut_couverture.txt`;
     const cachedDefault = utility.getCachedDefault ? utility.getCachedDefault('cover') : null
     const fallback = cachedDefault || coverTxt

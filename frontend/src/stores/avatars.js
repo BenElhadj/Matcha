@@ -1,3 +1,4 @@
+import { API_URL, BASE_URL } from '@/utility.js';
 // Centralized avatar caching and optimization
 // Provides reactive id->src map, fast seeding from provided image hints, and async fetch fallback
 
@@ -55,7 +56,7 @@ export const avatars = {
       // Seed from hint synchronously if possible
       try {
         if (imageHint && typeof imageHint !== 'undefined' && imageHint !== null) {
-          const base = import.meta.env.BASE_URL || '/'
+          const base = BASE_URL
           const fallback = utility.getCachedDefault?.('profile') || `${base}default/defaut_profile.txt`
           const seeded = utility.getImageSrc
             ? utility.getImageSrc(imageHint, fallback)
@@ -76,20 +77,20 @@ export const avatars = {
       if (bag.pending && bag.pending[key]) return null
       commit('setPending', key)
       try {
-        const token = localStorage.getItem('token')
-        const headers = token ? { 'x-auth-token': token } : {}
-        const url = `${import.meta.env.VITE_APP_API_URL}/api/users/show/${id}`
-        const res = await axios.get(url, { headers })
+    const token = localStorage.getItem('token')
+    const headers = token ? { 'x-auth-token': token } : {}
+    const url = `${API_URL}/api/users/show/${id}`
+    const res = await axios.get(url, { headers })
         const images = Array.isArray(res.data?.images) ? res.data.images : []
         const profileImg = images.find((img) => img && (img.profile === 1 || img.profile === true)) || images[0]
         if (!profileImg) {
-          const base = import.meta.env.BASE_URL || '/'
+          const base = BASE_URL
           const fallback = utility.getCachedDefault?.('profile') || `${base}default/defaut_profile.txt`
           commit('setAvatar', { id: key, src: fallback })
           return fallback
         }
-        const base = import.meta.env.BASE_URL || '/'
-        const fallback = utility.getCachedDefault?.('profile') || `${base}default/defaut_profile.txt`
+  const base = BASE_URL
+  const fallback = utility.getCachedDefault?.('profile') || `${base}default/defaut_profile.txt`
         let resolved = utility.getImageSrc
           ? utility.getImageSrc(profileImg, fallback)
           : (utility.getFullPath ? utility.getFullPath(profileImg?.name || profileImg?.link || profileImg?.data || '') : fallback)

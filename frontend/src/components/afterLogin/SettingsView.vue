@@ -1,3 +1,4 @@
+import { API_URL } from '@/utility.js';
 <template>
   <q-page class="page-container">
     <q-page-container v-if="user && user.username">
@@ -116,7 +117,9 @@ import ProfileForm from '@/components/afterLogin/ProfileForm.vue'
 import ProfileGallery from '@/components/afterLogin/ProfileGallery.vue'
 import ProfileHistory from '@/components/afterLogin/ProfileHistory.vue'
 import { defineAsyncComponent } from 'vue'
-const ProfileSettings = defineAsyncComponent(() => import('@/components/afterLogin/ProfileSettings.vue'))
+const ProfileSettings = defineAsyncComponent(() =>
+  import('@/components/afterLogin/ProfileSettings.vue')
+)
 import AlertView from '@/views/AlertView.vue'
 import LoaderView from '@/views/LoaderView.vue'
 import utility from '@/utility.js'
@@ -161,7 +164,7 @@ const urlCover = ref('')
 const openImageUploadDialog = (type) => {
   if (type === 'cover') {
     fileInputCover.value.click()
-    urlCover.value = `${import.meta.env.VITE_APP_API_URL}/api/users/image/cover`
+    urlCover.value = `${API_URL}/api/users/image/cover`
   } else if (type === 'profile') {
     fileInputProfile.value.click()
     urlProfile.value = `${import.meta.env.VITE_APP_API_URL}/api/users/image`

@@ -2,6 +2,9 @@
 
 // URL d'API centralisée avec fallback pour la prod (évite undefined)
 export const API_URL = import.meta.env.VITE_APP_API_URL || 'https://matcha-backend-t6dr.onrender.com';
+export const BASE_URL = (typeof import.meta.env.BASE_URL === 'string' && import.meta.env.BASE_URL.length > 0)
+  ? import.meta.env.BASE_URL
+  : '/';
 import blockIcon from '@/assets/Block/block.png'
 import reportIcon from '@/assets/Block/report.png'
 export function getBlockReportIcon(type) {
@@ -297,7 +300,7 @@ export async function getDefaultTxtImage (relativeTxtPath, kind = 'profile') {
     const existing = getCachedDefault(kind)
     if (existing) return existing
 
-    const base = import.meta.env.BASE_URL || '/';
+  const base = BASE_URL;
     const url = relativeTxtPath.startsWith('http')
       ? relativeTxtPath
       : `${base}${relativeTxtPath.replace(/^\//, '')}`
@@ -353,7 +356,7 @@ export const isBlocked = (state, id) => {
 
 // Nom complet vers le fichier uploads côté backend
 export function getFullPath(file) {
-  const base = import.meta.env.BASE_URL || '/';
+  const base = BASE_URL;
   const fallback = `${base}assets/default/defaut_profile.txt`
   if (!file || file === 'false') return fallback
   if (typeof file !== 'string') return fallback
@@ -526,7 +529,7 @@ export function deriveRelationState({ selfId, targetId, followers = [], followin
 export async function uploadProfileImage(file) {
   try {
     const token = localStorage.getItem('token')
-    const url = `${import.meta.env.VITE_APP_API_URL}/api/users/image/profile`
+  const url = `${API_URL}/api/users/image/profile`
     const formData = new FormData()
     formData.append('image', file)
     const headers = { 'x-auth-token': token }
@@ -541,7 +544,7 @@ export async function uploadProfileImage(file) {
 export async function uploadGalleryImage(file) {
   try {
     const token = localStorage.getItem('token')
-    const url = `${import.meta.env.VITE_APP_API_URL}/api/users/image`
+  const url = `${API_URL}/api/users/image`
     const formData = new FormData()
     formData.append('image', file)
     const headers = { 'x-auth-token': token }
@@ -556,7 +559,7 @@ export async function uploadGalleryImage(file) {
 export async function deleteUserImage(imageId, isProfile = false) {
   try {
     const token = localStorage.getItem('token')
-    const url = `${import.meta.env.VITE_APP_API_URL}/api/users/image/del`
+  const url = `${API_URL}/api/users/image/del`
     const body = { id: imageId, profile: isProfile }
     const headers = { 'x-auth-token': token }
     const res = await axios.post(url, body, { headers })

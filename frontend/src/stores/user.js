@@ -1,5 +1,6 @@
 import utility from '@/utility'
 import axios from 'axios'
+import { API_URL } from '@/utility.js';
 
 export const user = {
   state: {
@@ -199,7 +200,7 @@ export const user = {
       // Toujours rafraîchir les images depuis le backend (route /api/users/image)
       try {
         const token = state.user.token || localStorage.getItem('token')
-        const url = `${import.meta.env.VITE_APP_API_URL}/api/users/image`
+        const url = `${API_URL}/api/users/image`
         const headers = { 'x-auth-token': token }
         const res = await axios.get(url, { headers })
         const images = res.data?.data?.images || []
@@ -376,7 +377,7 @@ export const user = {
     },
     seenNotif: async ({ commit, state }) => {
       try {
-        const url = `${import.meta.env.VITE_APP_API_URL}/api/notif/update`
+        const url = `${API_URL}/api/notif/update`
         const headers = { 'x-auth-token': state.user.token }
         const data = {
           id: state.user.id
@@ -407,7 +408,7 @@ export const user = {
       try {
         if (!Array.isArray(ids) || !ids.length) return
         const token = state.user.token || localStorage.getItem('token')
-        const url = `${import.meta.env.VITE_APP_API_URL}/api/notif/updateByIds`
+        const url = `${API_URL}/api/notif/updateByIds`
         const headers = { 'x-auth-token': token }
         const body = { ids }
         const res = await axios.put(url, body, { headers })
@@ -424,7 +425,7 @@ export const user = {
     syncBlacklist: async ({ commit }, blocked) => {
       if (!blocked || !blocked.length) return commit('syncBlacklist', [])
       const token = localStorage.getItem('token')
-      const url = `${import.meta.env.VITE_APP_API_URL}/api/users/blacklisted`
+      const url = `${API_URL}/api/users/blacklisted`
       const headers = { 'x-auth-token': token }
       const data = { ids: JSON.stringify(blocked) }
       try {

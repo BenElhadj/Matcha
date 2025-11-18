@@ -1,3 +1,4 @@
+import { API_URL, BASE_URL } from '@/utility.js';
 <template>
   <q-page class="page-container">
     <q-page-container v-if="!loading">
@@ -196,7 +197,7 @@ const onProfileChange = async (e) => {
   formData.append('image', file)
   try {
     const token = localStorage.getItem('token')
-    const url = `${import.meta.env.VITE_APP_API_URL}/api/users/image`
+    const url = `${API_URL}/api/users/image`
     await axios.post(url, formData, {
       headers: {
         'x-auth-token': token,
@@ -222,7 +223,7 @@ const onCoverChange = async (e) => {
   formData.append('image', file)
   try {
     const token = localStorage.getItem('token')
-    const url = `${import.meta.env.VITE_APP_API_URL}/api/users/image/cover`
+    const url = `${API_URL}/api/users/image/cover`
     await axios.post(url, formData, {
       headers: {
         'x-auth-token': token,
@@ -311,7 +312,7 @@ const matchesSynced = ref(false)
 const profileImage = computed(() => {
   // Select image where profile is true/1 and cover is not true/1
   const cachedDefault = utility.getCachedDefault ? utility.getCachedDefault('profile') : null
-  const base = import.meta.env.BASE_URL || '/'
+  const base = BASE_URL
   const defaultImage = cachedDefault || `${base}assets/default/defaut_profile.txt`
   if (!user.value || !user.value.images) return defaultImage
   const image = user.value.images.find(
@@ -362,7 +363,7 @@ const confirmAlert = (action) => {
 const getHistory = async () => {
   try {
     const token = user.value.token || localStorage.getItem('token')
-    const url = `${import.meta.env.VITE_APP_API_URL}/api/browse/allhistory`
+    const url = `${API_URL}/api/browse/allhistory`
     const headers = { 'x-auth-token': token }
     const userId = String(route.params.id)
     const typesToFilter = [
@@ -424,7 +425,7 @@ watch(
     const token = newUser.token || localStorage.getItem('token')
     if (token) {
       try {
-        const url = `${import.meta.env.VITE_APP_API_URL}/api/auth/isloggedin`
+        const url = `${API_URL}/api/auth/isloggedin`
         const headers = { 'x-auth-token': token }
         const res = await axios.get(url, { headers })
         data.value = res.data
@@ -452,7 +453,7 @@ const distance = computed(() => {
 
 const coverPhoto = computed(() => {
   const cachedDefault = utility.getCachedDefault ? utility.getCachedDefault('cover') : null
-  const base = import.meta.env.BASE_URL || '/'
+  const base = BASE_URL
   const cover = cachedDefault || `${base}assets/default/defaut_couverture.txt`
   if (!user.value || !user.value.images) return cover
   // Select image where cover is true/1 and profile is not true/1
@@ -475,7 +476,7 @@ const userTags = computed(() => {
 
 // const getProfileImage = () => {
 //   const cachedDefault = utility.getCachedDefault ? utility.getCachedDefault('profile') : null
-//   const base = import.meta.env.BASE_URL || '/'
+//   const base = BASE_URL
 //   const defaultImage = cachedDefault || `${base}default/defaut_profile.txt`
 //   if (!user.value || !user.value.images) return defaultImage
 //   const image = user.value.images.find((cur) => cur.profile === 1) || user.value.images[0]
@@ -506,7 +507,7 @@ async function fetchRelationFromDB() {
   try {
     const token = store.getters?.user?.token || localStorage.getItem('token')
     const headers = { 'x-auth-token': token }
-    const base = import.meta.env.VITE_APP_API_URL
+    const base = API_URL
     const [m, c] = await Promise.all([
       axios.get(`${base}/api/getmatches`, { headers }).catch(() => ({ data: [] })),
       axios.get(`${base}/api/chat/all`, { headers }).catch(() => ({ data: [] }))
@@ -545,7 +546,7 @@ const onLikeClick = async () => {
   } catch (_) {}
   try {
     const likedBool = actionForType(relationType.value)
-    const url = `${import.meta.env.VITE_APP_API_URL}/api/match`
+    const url = `${API_URL}/api/match`
     const token = store.state.user?.token || localStorage.getItem('token')
     const headers = { 'x-auth-token': token }
     const body = { id: Number(route.params.id), liked: !!likedBool }
@@ -571,7 +572,7 @@ const onLikeClick = async () => {
 }
 
 const block = async () => {
-  const url = `${import.meta.env.VITE_APP_API_URL}/api/users/block`
+  const url = `${API_URL}/api/users/block`
   let data = { id: route.params.id }
   const token = user.value.token || localStorage.getItem('token')
   const headers = { 'x-auth-token': token }
@@ -598,7 +599,7 @@ const block = async () => {
 }
 
 const reportUser = async () => {
-  const url = `${import.meta.env.VITE_APP_API_URL}/api/users/report`
+  const url = `${API_URL}/api/users/report`
   const data = { id: route.params.id }
   const token = user.value.token || localStorage.getItem('token')
   const headers = { 'x-auth-token': token }
@@ -647,7 +648,7 @@ const fetchUser = async (id) => {
       try {
         const token = user.token || localStorage.getItem('token')
         const headers = { 'x-auth-token': token }
-        const url = `${import.meta.env.VITE_APP_API_URL}/api/users/show/${id}`
+        const url = `${API_URL}/api/users/show/${id}`
         const res = await axios.get(url, { headers })
         if (res.data.msg) {
           router.push('/404')

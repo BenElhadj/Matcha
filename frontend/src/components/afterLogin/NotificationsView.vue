@@ -1,3 +1,4 @@
+import { API_URL, BASE_URL } from '@/utility.js';
 <template>
   <q-layout>
     <q-page padding>

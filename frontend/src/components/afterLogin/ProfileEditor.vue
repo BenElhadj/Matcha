@@ -1,3 +1,4 @@
+import { API_URL, BASE_URL } from '@/utility.js';
 <template>
   <div>
     <q-dialog v-model="dialog" maximized persistent>
@@ -11,12 +12,7 @@
             @file_success="error = false"
             class="q-mb-md"
           ></q-avatar>
-          <q-avatar
-            :width="250"
-            :min="1"
-            :max="3"
-            :step="0.02"
-          ></q-avatar>
+          <q-avatar :width="250" :min="1" :max="3" :step="0.02"></q-avatar>
         </q-card-section>
         <q-card-actions>
           <q-btn text color="primary" @click="closeEditor">Annuler</q-btn>
@@ -29,45 +25,48 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
-import { mapGetters } from 'vuex';
-import axios from 'axios';
+import { ref } from 'vue'
+import { mapGetters } from 'vuex'
+import axios from 'axios'
 import AlertView from '@/views/AlertView.vue'
 
-const error = ref(null);
-const dialog = ref(false);
+const error = ref(null)
+const dialog = ref(false)
 const alert = ref({
   state: false,
   color: '',
-  text: '',
-});
-const { user } = useStore();
+  text: ''
+})
+const { user } = useStore()
 
 const closeEditor = () => {
-  dialog.value = false;
-  $refs.vueavatar.init();
-};
+  dialog.value = false
+  $refs.vueavatar.init()
+}
 
 const pickFile = () => {
   if (user.images.length < 5) {
-    dialog.value = true;
+    dialog.value = true
   } else {
-    alert.value = { state: true, color: 'red', text: 'The maximum number of photos is five, you must delete one to be able to add another' }
+    alert.value = {
+      state: true,
+      color: 'red',
+      text: 'The maximum number of photos is five, you must delete one to be able to add another'
+    }
   }
-};
+}
 
 const onChangeScale = (scale) => {
-  $refs.vueavatar.changeScale(scale);
-};
+  $refs.vueavatar.changeScale(scale)
+}
 
 const saveClicked = () => {
-  $emit('update-image', $refs.vueavatar.getImageScaled().toDataURL());
-  $refs.vueavatarscale.reset();
-  dialog.value = false;
-};
+  $emit('update-image', $refs.vueavatar.getImageScaled().toDataURL())
+  $refs.vueavatarscale.reset()
+  dialog.value = false
+}
 
 const onImageReady = (scale) => {
-  $refs.vueavatarscale.setScale(scale);
-};
-
+  $refs.vueavatarscale.setScale(scale)
+}
 </script>

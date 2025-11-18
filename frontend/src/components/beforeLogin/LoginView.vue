@@ -1,3 +1,4 @@
+import { API_URL } from '@/utility.js';
 <template>
   <q-layout class="mt-4">
     <div class="login mt-5">
@@ -108,7 +109,7 @@ const log = async () => {
 const checkLogin = async () => {
   try {
     const token = localStorage.getItem('token')
-    const url = `${import.meta.env.VITE_APP_API_URL}/api/auth/isloggedin`
+    const url = `${API_URL}/api/auth/isloggedin`
     const headers = { 'x-auth-token': token }
     const res = await axios.get(url, { headers })
     if (!res.data.msg) router.push('/')
