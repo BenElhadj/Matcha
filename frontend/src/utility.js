@@ -1,4 +1,7 @@
 // Icon and message helpers for block/report distinction
+
+// URL d'API centralisée avec fallback pour la prod (évite undefined)
+export const API_URL = import.meta.env.VITE_APP_API_URL || 'https://matcha-backend-t6dr.onrender.com';
 import blockIcon from '@/assets/Block/block.png'
 import reportIcon from '@/assets/Block/report.png'
 export function getBlockReportIcon(type) {
@@ -370,7 +373,7 @@ export function getFullPath(file) {
   // For any value containing obvious HTML markers, fallback
   if (s.includes('<!DOCTYPE') || s.includes('<html')) return fallback
   // Otherwise, treat as backend upload filename
-  return `${import.meta.env.VITE_APP_API_URL}/uploads/${s}`
+  return `${API_URL}/uploads/${s}`
 }
 
 const getDate = item => {
@@ -417,7 +420,7 @@ const getLocationFromIp = async f => {
 const syncLocation = async location => {
   try {
     const token = localStorage.getItem('token')
-    const url = `${import.meta.env.VITE_APP_API_URL}/api/users/location`
+  const url = `${API_URL}/api/users/location`
     const headers = { 'x-auth-token': token }
     await axios.post(url, location, { headers })
   } catch (error) {
@@ -429,7 +432,7 @@ const syncLocation = async location => {
 const updateOneNotif = async (id_from, id_to) => {
   try {
     const token = localStorage.getItem('token');
-    const url = `${import.meta.env.VITE_APP_API_URL}/api/notif/updateOneNotif`;
+  const url = `${API_URL}/api/notif/updateOneNotif`;
     const headers = { 'x-auth-token': token };
     const response = await axios.put(url, { id_from, id_to }, { headers });
       if (response.status === 200) {
@@ -446,7 +449,7 @@ const updateOneNotif = async (id_from, id_to) => {
 
 const getAllTags = async () => {
   try {
-    const url = `${import.meta.env.VITE_APP_API_URL}/allTags`
+  const url = `${API_URL}/allTags`
     const response = await axios.get(url, {
       headers: { 'X-Requested-With': 'XMLHttpRequest' }
     });
@@ -458,7 +461,7 @@ const getAllTags = async () => {
 }
 
 const getConnectedUsers = async () => {
-  const url = `${import.meta.env.VITE_APP_API_URL}/connectedUsers`
+  const url = `${API_URL}/connectedUsers`
   const headers = { 'X-Requested-With': 'XMLHttpRequest' }
   try {
     const response = await axios.get(url, { headers });
@@ -475,7 +478,7 @@ async function pingServer(timeoutMs = 4000) {
   const source = axios.CancelToken.source()
   const timeout = setTimeout(() => source.cancel('ping timeout'), timeoutMs)
   try {
-    const url = `${import.meta.env.VITE_APP_API_URL}/connectedUsers`
+  const url = `${API_URL}/connectedUsers`
     const headers = { 'X-Requested-With': 'XMLHttpRequest' }
     const res = await axios.get(url, { headers, cancelToken: source.token })
     return !!res && (res.status >= 200 && res.status < 300)
@@ -596,7 +599,7 @@ export default {
   sync: async type => {
     try {
       const token = localStorage.getItem('token')
-      const url = `${import.meta.env.VITE_APP_API_URL}/api/${type}`
+      const url = `${API_URL}/api/${type}`
       const headers = { 'x-auth-token': token }
       const res = await axios.get(url, { headers })
       return res.data && res.data.msg ? [] : (res.data || []);
@@ -608,7 +611,7 @@ export default {
   syncNotif: async (params = {}) => {
     try {
       const token = localStorage.getItem('token')
-      const base = `${import.meta.env.VITE_APP_API_URL}/api/notif/all`
+      const base = `${API_URL}/api/notif/all`
       const qp = new URLSearchParams()
       // Accept optional params; keep legacy behaviour if none provided
       const { limit, page, mode, includeBlocked } = params || {}
@@ -634,7 +637,7 @@ export default {
       return []
     } catch (error) {
       console.error('err syncNotif in frontend/utility.js ===> ', error)
-      return [];
+      return []
     }
   },
   // Lightweight debug helper to inspect auth + counts
