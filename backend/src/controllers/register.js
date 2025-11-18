@@ -14,7 +14,7 @@ const { send } = require('process')
 const readFileAsync = promisify(readFile)
 const writeFileAsync = promisify(writeFile)
 const unlinkAsync = promisify(unlink)
-const upload = multer({ limits: { fileSize: 4 * 1024 * 1024 } })
+const upload = multer({ limits: { fileSize: 4 * 1024 * 1024 } }) // v2 compatible
 const htmlspecialchars = require('htmlspecialchars')
 
 const randomHex = () => randomBytes(10).toString('hex')

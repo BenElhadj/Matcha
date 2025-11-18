@@ -49,7 +49,13 @@ const uploadProfileImage = async (req, res) => {
 		let mime = 'image/png';
 		if (req.file) {
 			mime = req.file.mimetype || 'image/png';
-			   data = req.file.buffer.toString('base64');
+			   // multer v2 : req.file.stream (Readable) au lieu de buffer
+			   const stream = req.file.stream;
+			   const chunks = [];
+			   for await (const chunk of stream) {
+				   chunks.push(chunk);
+			   }
+			   data = Buffer.concat(chunks).toString('base64');
 		} else if (req.body.data) {
 			let incoming = req.body.data;
 			if (typeof incoming === 'string') incoming = incoming.trim();

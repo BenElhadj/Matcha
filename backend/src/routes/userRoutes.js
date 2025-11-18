@@ -15,7 +15,7 @@ const browsing = require('../controllers/browsing')
 const block = require('../controllers/block')
 const location = require('../controllers/location')
 const multer = require('multer')
-const upload = multer({ limits: { fileSize: 4 * 1024 * 1024 } })
+const upload = multer({ limits: { fileSize: 4 * 1024 * 1024 } }) // v2 compatible
 
 // Route pour retirer un report (doit être après l'init de routes)
 routes.post('/unreport', authCheck, block.unreportUser)
