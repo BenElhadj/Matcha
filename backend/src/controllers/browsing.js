@@ -258,8 +258,28 @@ const getHistory = async (req, res) => {
 }
 
 
+
 const userModel = require('../models/userModel');
 const notificationsModel = require('../models/notificationsModel');
+
+// Helper pour image de profil (link ou data), harmonisé avec allhistory
+function getProfileImageCompat(img) {
+	if (!img) return null;
+	let val = null;
+	if (img.link && img.link !== 'false' && img.link !== '') {
+		val = img.link;
+	} else if (img.data && img.data !== 'false' && img.data !== '') {
+		val = img.data;
+	}
+	if (!val || val === 'false') return null;
+	if (typeof val !== 'string') return null;
+	const s = val.trim();
+	if (s.startsWith('http') || s.startsWith('data:image')) return s;
+	if (s.startsWith('/9j/')) return `data:image/jpeg;base64,${s}`;
+	if (s.startsWith('iVBOR')) return `data:image/png;base64,${s}`;
+	if (s.length > 100) return `data:image/jpeg;base64,${s}`;
+	return null;
+}
 
 const getAllHistory = async (req, res) => {
 	if (!req.user.id)
@@ -645,6 +665,51 @@ const getMatches = async (req, res) => {
 // const connectedUsers = {
 // 	return  (connectedUsers)
 // }
+
+
+// Patch la route notifications pour harmoniser le mapping image
+// Si notificationsModel expose une méthode getNotifAll, on la monkey-patch ici
+if (notificationsModel && typeof notificationsModel.getNotifAll === 'function') {
+	const origGetNotifAll = notificationsModel.getNotifAll;
+	notificationsModel.getNotifAll = async function(...args) {
+		const result = await origGetNotifAll.apply(this, args);
+		let notifs = Array.isArray(result) ? result : (result.notifications || []);
+		for (let notif of notifs) {
+			// Recherche dans tous les champs possibles (avatar, profile_image, cover)
+			let val = null;
+			const tryFields = [notif.avatar, notif.profile_image, notif.cover];
+			for (let field of tryFields) {
+				if (field && field !== 'false' && field !== '') {
+					if (typeof field === 'string') {
+						const s = field.trim();
+						if (s.startsWith('http') || s.startsWith('data:image')) {
+							val = s;
+							break;
+						}
+						if (s.startsWith('/9j/')) {
+							val = `data:image/jpeg;base64,${s}`;
+							break;
+						}
+						if (s.startsWith('iVBOR')) {
+							val = `data:image/png;base64,${s}`;
+							break;
+						}
+						if (s.length > 100) {
+							val = `data:image/jpeg;base64,${s}`;
+							break;
+						}
+					}
+				}
+			}
+			notif.profile_image = val;
+		}
+		if (!Array.isArray(result) && result.notifications) {
+			result.notifications = notifs;
+			return result;
+		}
+		return notifs;
+	};
+}
 
 module.exports = {
 	showUsers,
