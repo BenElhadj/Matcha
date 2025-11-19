@@ -63,10 +63,23 @@ const getAllNotif = async (req, res) => {
 		`, [req.user.id])
 		let blockResult = blockedRows.rows.map(r => {
 			let profile_image = null;
+			// Si c'est un lien ou déjà un data:image, laisse passer
 			if (r.profile_image && r.profile_image !== 'false' && r.profile_image !== '') {
 				profile_image = r.profile_image;
 			} else if (r.profile_data && r.profile_data !== 'false' && r.profile_data !== '') {
-				profile_image = `data:image/png;base64,${r.profile_data}`;
+				const s = r.profile_data.trim();
+				if (s.startsWith('data:image')) {
+					profile_image = s;
+				} else if (s.startsWith('/9j/')) {
+					profile_image = `data:image/jpeg;base64,${s}`;
+				} else if (s.startsWith('iVBOR')) {
+					profile_image = `data:image/png;base64,${s}`;
+				} else if (s.length > 100) {
+					// Par défaut, jpeg si base64 long
+					profile_image = `data:image/jpeg;base64,${s}`;
+				} else {
+					profile_image = null;
+				}
 			} else {
 				profile_image = null;
 			}
@@ -106,19 +119,33 @@ const getAllNotif = async (req, res) => {
 		const total = result.length
 		result = result.slice(offset, offset + limit)
 
-		result = result.map(r => ({
-			id: r.id,
-			id_from: r.id_from,
-			from: r.id_from,
-			type: r.type,
-			username: r.username,
-			first_name: r.first_name || '',
-			last_name: r.last_name || '',
-			date: r.date,
-			is_read: r.is_read,
-			profile_image: r.profile_image || null,
-			cover: r.cover || null
-		}))
+		result = result.map(r => {
+			let profile_image = r.profile_image;
+			// Correction aussi pour les notifs classiques (pas que block)
+			if (profile_image && typeof profile_image === 'string' && !profile_image.startsWith('http') && !profile_image.startsWith('data:image')) {
+				const s = profile_image.trim();
+				if (s.startsWith('/9j/')) {
+					profile_image = `data:image/jpeg;base64,${s}`;
+				} else if (s.startsWith('iVBOR')) {
+					profile_image = `data:image/png;base64,${s}`;
+				} else if (s.length > 100) {
+					profile_image = `data:image/jpeg;base64,${s}`;
+				}
+			}
+			return {
+				id: r.id,
+				id_from: r.id_from,
+				from: r.id_from,
+				type: r.type,
+				username: r.username,
+				first_name: r.first_name || '',
+				last_name: r.last_name || '',
+				date: r.date,
+				is_read: r.is_read,
+				profile_image: profile_image || null,
+				cover: r.cover || null
+			}
+		})
 
 		res.json({ status: 'success', type: 'notification', message: 'Notifications fetched', data: {
 			items: result,
