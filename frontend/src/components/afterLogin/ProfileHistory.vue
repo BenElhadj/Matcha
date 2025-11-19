@@ -106,9 +106,9 @@ import { API_URL, BASE_URL } from '@/utility.js';
               Wait for more history...
             </div>
           </div>
-          <div v-if="hasMore && !isLoading" class="q-mt-md flex flex-center">
+          <!-- <div v-if="hasMore && !isLoading" class="q-mt-md flex flex-center">
             <q-btn color="primary" @click="onShowMore" label="Charger plus d'historique" />
-          </div>
+          </div> -->
           <div v-else-if="!hasMore && !isLoading" class="q-mt-md flex flex-center text-grey-7">
             <q-icon name="mdi-history" size="32px" class="q-mr-sm" />
             <span>Vous avez atteint la fin de votre historique.</span>

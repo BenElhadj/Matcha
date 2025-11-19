@@ -23,12 +23,12 @@
               </div>
             </div>
             <div v-if="!notifTabs.all.hasMore" class="end-history">
-              <q-icon name="mdi-history" size="32px" class="q-mb-sm" />
               <div class="text-subtitle1 q-mb-sm" style="text-align: center">
+                <q-icon name="mdi-history" size="32px" class="q-mb-sm" />
                 <span v-if="notifTabs.all.items.length === 0">No notifications yet.</span>
                 <span v-else>No more events to show.</span>
               </div>
-              <div class="text-caption text-grey-7 q-mt-md" style="text-align: center">
+              <div class="text-caption text-grey-7" style="text-align: center">
                 You created your account on
                 {{ formatAccountCreationDate(store.getters.user?.created_at) }}
               </div>
@@ -52,12 +52,12 @@
               </div>
             </div>
             <div v-if="!notifTabs.like.hasMore" class="end-history">
-              <q-icon name="mdi-history" size="32px" class="q-mb-sm" />
               <div class="text-subtitle1 q-mb-sm" style="text-align: center">
+                <q-icon name="mdi-history" size="32px" class="q-mb-sm" />
                 <span v-if="notifTabs.like.items.length === 0">Aucune notification de like.</span>
                 <span v-else>No more likes to show.</span>
               </div>
-              <div class="text-caption text-grey-7 q-mt-md" style="text-align: center">
+              <div class="text-caption text-grey-7" style="text-align: center">
                 You created your account on
                 {{ formatAccountCreationDate(store.getters.user?.created_at) }}
               </div>
@@ -81,14 +81,14 @@
               </div>
             </div>
             <div v-if="!notifTabs.visit.hasMore" class="end-history">
-              <q-icon name="mdi-history" size="32px" class="q-mb-sm" />
               <div class="text-subtitle1 q-mb-sm" style="text-align: center">
+                <q-icon name="mdi-history" size="32px" class="q-mb-sm" />
                 <span v-if="notifTabs.visit.items.length === 0"
                   >Aucune notification de visite.</span
                 >
                 <span v-else>No more views to show.</span>
               </div>
-              <div class="text-caption text-grey-7 q-mt-md" style="text-align: center">
+              <div class="text-caption text-grey-7" style="text-align: center">
                 You created your account on
                 {{ formatAccountCreationDate(store.getters.user?.created_at) }}
               </div>
@@ -117,7 +117,7 @@
                 <span v-if="notifTabs.block.items.length === 0">Aucun blocage ou signalement.</span>
                 <span v-else>No more block or report to show.</span>
               </div>
-              <div class="text-caption text-grey-7 q-mt-md" style="text-align: center">
+              <div class="text-caption text-grey-7" style="text-align: center">
                 You created your account on
                 {{ formatAccountCreationDate(store.getters.user?.created_at) }}
               </div>
