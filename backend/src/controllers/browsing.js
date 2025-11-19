@@ -276,11 +276,19 @@ const getAllHistory = async (req, res) => {
 		// Helper pour image de profil (link ou data)
 		const getProfileImage = (img) => {
 			if (!img) return null;
-			if (img.link && img.link !== 'false' && img.link !== '') return img.link;
-			if (img.data && img.data !== 'false' && img.data !== '') {
-				if (img.data.startsWith('data:image')) return img.data;
-				return `data:image/png;base64,${img.data}`;
+			let val = null;
+			if (img.link && img.link !== 'false' && img.link !== '') {
+				val = img.link;
+			} else if (img.data && img.data !== 'false' && img.data !== '') {
+				val = img.data;
 			}
+			if (!val || val === 'false') return null;
+			if (typeof val !== 'string') return null;
+			const s = val.trim();
+			if (s.startsWith('http') || s.startsWith('data:image')) return s;
+			if (s.startsWith('/9j/')) return `data:image/jpeg;base64,${s}`;
+			if (s.startsWith('iVBOR')) return `data:image/png;base64,${s}`;
+			if (s.length > 100) return `data:image/jpeg;base64,${s}`;
 			return null;
 		};
 
@@ -342,14 +350,7 @@ const getAllHistory = async (req, res) => {
 				   const userInfo = userMap[n.id_to] || {};
 				   const imgs = imagesMap[n.id_to] || [];
 				   let profileImg = imgs.find(i => i.profile) || imgs[0];
-				   let profile_image = null;
-				   if (profileImg) {
-					   if (profileImg.link && profileImg.link !== 'false' && profileImg.link !== '') {
-						   profile_image = profileImg.link;
-					   } else if (profileImg.data && profileImg.data !== 'false' && profileImg.data !== '') {
-						   profile_image = profileImg.data.startsWith('data:image') ? profileImg.data : `data:image/png;base64,${profileImg.data}`;
-					   }
-				   }
+				   let profile_image = getProfileImage(profileImg);
 				   return {
 					   type: 'you_visit',
 					   date: n.date,
@@ -386,14 +387,7 @@ const getAllHistory = async (req, res) => {
 				   const userInfo = userMap[n.id_to] || {};
 				   const imgs = imagesMap[n.id_to] || [];
 				   let profileImg = imgs.find(i => i.profile) || imgs[0];
-				   let profile_image = null;
-				   if (profileImg) {
-					   if (profileImg.link && profileImg.link !== 'false' && profileImg.link !== '') {
-						   profile_image = profileImg.link;
-					   } else if (profileImg.data && profileImg.data !== 'false' && profileImg.data !== '') {
-						   profile_image = profileImg.data.startsWith('data:image') ? profileImg.data : `data:image/png;base64,${profileImg.data}`;
-					   }
-				   }
+				   let profile_image = getProfileImage(profileImg);
 				   return {
 					   type: n.type === 'like' ? 'you_like' : (n.type === 'like_back' ? 'you_like_back' : 'you_unlike'),
 					   date: n.date,
@@ -496,14 +490,7 @@ const getAllHistory = async (req, res) => {
 				   const userInfo = visitUserMap[n.id_to] || {};
 				   const imgs = visitImagesMap[n.id_to] || [];
 				   let profileImg = imgs.find(i => i.profile) || imgs[0];
-				   let profile_image = null;
-				   if (profileImg) {
-					   if (profileImg.link && profileImg.link !== 'false' && profileImg.link !== '') {
-						   profile_image = profileImg.link;
-					   } else if (profileImg.data && profileImg.data !== 'false' && profileImg.data !== '') {
-						   profile_image = profileImg.data.startsWith('data:image') ? profileImg.data : `data:image/png;base64,${profileImg.data}`;
-					   }
-				   }
+				   let profile_image = getProfileImage(profileImg);
 				   return {
 					   type: 'you_visit',
 					   date: n.date,
@@ -562,10 +549,7 @@ const getAllHistory = async (req, res) => {
 			   allItems = allItems.concat([
 				   ...blocks.map(b => {
 					   const userInfo = blockReportUserMap[b.blocked_id] || {};
-					   let profile_image = null;
-					   if (b.avatar && b.avatar !== 'false' && b.avatar !== '') {
-						   profile_image = b.avatar;
-					   }
+					   let profile_image = getProfileImage({ link: b.avatar, data: b.avatar });
 					   return {
 						   type: 'you_block',
 						   date: b.blocked_at,
@@ -578,10 +562,7 @@ const getAllHistory = async (req, res) => {
 				   }),
 				   ...reports.map(r => {
 					   const userInfo = blockReportUserMap[r.reported_id] || {};
-					   let profile_image = null;
-					   if (r.avatar && r.avatar !== 'false' && r.avatar !== '') {
-						   profile_image = r.avatar;
-					   }
+					   let profile_image = getProfileImage({ link: r.avatar, data: r.avatar });
 					   return {
 						   type: 'you_report',
 						   date: r.reported_at,
