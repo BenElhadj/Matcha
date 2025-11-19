@@ -1,4 +1,3 @@
-import { API_URL, BASE_URL } from '@/utility.js';
 <template>
   <q-page class="q-pa-lg flex flex-center" style="min-height: 100vh">
     <div
@@ -25,9 +24,9 @@ import { API_URL, BASE_URL } from '@/utility.js';
         "
       >
         <div class="q-px-lg q-py-md" style="width: 100%; max-width: 600px">
-          <q-timeline :layout="layout" color="secondary" style="position: relative; left: 55px">
+          <q-timeline :layout="layout" color="secondary" style="position: center">
             <q-timeline-entry heading>
-              <div style="text-align: center; width: 100%; margin-left: -137px">
+              <div style="text-align: center; width: 100%; margin: auto">
                 Here you can see all your history of actions on the website
               </div>
             </q-timeline-entry>
@@ -36,7 +35,6 @@ import { API_URL, BASE_URL } from '@/utility.js';
               :key="entry.id || i"
               :title="''"
               :subtitle="formatEntryDate(entry, 'absolute')"
-              :side="left"
               :color="getNotifIcon(entry.type)[2]"
               :class="getNotifIcon(entry.type)[2]"
               :icon="getNotifIcon(entry.type)[1]"
@@ -44,11 +42,12 @@ import { API_URL, BASE_URL } from '@/utility.js';
               <div class="row items-center no-wrap timeline-entry-content">
                 <div
                   style="
+                    flex: 0;
                     display: flex;
                     flex-direction: column;
                     align-items: center;
-                    margin-left: -130px;
-                    margin-right: 60px;
+                    margin-right: 55px;
+                    margin-left: -110px;
                   "
                   class="timeline-entry-content left-align"
                 >
@@ -70,11 +69,10 @@ import { API_URL, BASE_URL } from '@/utility.js';
                     <span v-if="entry.first_name || entry.last_name">
                       {{ entry.first_name || '' }} {{ entry.last_name || '' }}
                     </span>
-                    <span v-else-if="entry.username">
-                      {{ entry.username }}
-                    </span>
+                    <span v-else-if="entry.username"> </span>
                     <span v-else>
-                      {{ getUserName(entry) }}
+                      <!-- {{ entry.username }} -->
+                      <!-- {{ getUserName(entry) }} -->
                     </span>
                   </div>
                 </div>
@@ -121,6 +119,8 @@ import { API_URL, BASE_URL } from '@/utility.js';
 
 <script setup>
 // Fix: define 'left' for timeline side binding
+import { API_URL, BASE_URL } from '@/utility.js'
+const right = 'right'
 const left = 'left'
 import AppAvatar from '@/components/common/AppAvatar.vue'
 import { ref, computed } from 'vue'
