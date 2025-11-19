@@ -1,7 +1,7 @@
 import { API_URL, BASE_URL } from '@/utility.js';
 <template>
   <q-tabs
-    v-model="tab"
+    v-model="tabProxy"
     class="notif-tabs"
     dense
     align="justify"
@@ -9,22 +9,33 @@ import { API_URL, BASE_URL } from '@/utility.js';
     indicator-color="primary"
   >
     <q-tab name="all" label="Tout" />
-    <q-tab name="likes" label="Likes" />
-    <q-tab name="views" label="Vues" />
+    <q-tab name="like" label="Likes" />
+    <q-tab name="visit" label="Vues" />
     <q-tab name="block" label="Block/Report" />
   </q-tabs>
   <q-separator class="full-width-separator" spacing></q-separator>
   <div>
-    <slot name="all" v-if="tab === 'all'"></slot>
-    <slot name="likes" v-else-if="tab === 'likes'"></slot>
-    <slot name="views" v-else-if="tab === 'views'"></slot>
-    <slot name="block" v-else-if="tab === 'block'"></slot>
+    <slot name="all" v-if="tabProxy === 'all'"></slot>
+    <slot name="like" v-else-if="tabProxy === 'like'"></slot>
+    <slot name="visit" v-else-if="tabProxy === 'visit'"></slot>
+    <slot name="block" v-else-if="tabProxy === 'block'"></slot>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
-const tab = ref('all')
+import { ref, watch } from 'vue'
+const props = defineProps({
+  modelValue: { type: String, default: 'all' }
+})
+const emit = defineEmits(['update:modelValue'])
+const tabProxy = ref(props.modelValue)
+watch(tabProxy, (v) => emit('update:modelValue', v))
+watch(
+  () => props.modelValue,
+  (v) => {
+    if (v !== tabProxy.value) tabProxy.value = v
+  }
+)
 </script>
 
 <style scoped>

@@ -291,22 +291,17 @@ export const user = {
           commit('syncHistory', parsed);
           return;
         }
+        // Nouvelle route moderne
+        const items = await utility.syncAllHistory({ limit: 100, page: 1 });
         const merge = cur => ({
           id: cur[cur.visitor_id ? 'visitor_id' : 'visited_id'],
           visit_date: cur.visit_date,
           username: cur.username,
           profile_image: cur.profile_image
         });
-        const res = await utility.sync('browse/history');
-        let responseBody = res.data;
-        if (!responseBody) {
-          responseBody = [];
-        } else if (!Array.isArray(responseBody)) {
-          responseBody = [responseBody];
-        }
-        const history = responseBody.map(cur => ({ ...cur, id: cur.visitor_id || cur.visited_id }));
-        const visitor = responseBody.filter(cur => cur.visitor_id).map(merge);
-        const visited = responseBody.filter(cur => cur.visited_id).map(merge);
+        const history = Array.isArray(items) ? items.map(cur => ({ ...cur, id: cur.visitor_id || cur.visited_id })) : [];
+        const visitor = Array.isArray(items) ? items.filter(cur => cur.visitor_id).map(merge) : [];
+        const visited = Array.isArray(items) ? items.filter(cur => cur.visited_id).map(merge) : [];
         const toSave = { history, visitor, visited };
         commit('syncHistory', toSave);
         localStorage.setItem('user_history', JSON.stringify(toSave));
@@ -441,20 +436,17 @@ export const user = {
     },
     syncHistory: async ({ commit }) => {
       try {
-        let visitor = []
-        let visited = []
+        // Nouvelle route moderne
+        const items = await utility.syncAllHistory({ limit: 100, page: 1 });
         const merge = cur => ({
           id: cur[cur.visitor_id ? 'visitor_id' : 'visited_id'],
           visit_date: cur.visit_date,
           username: cur.username,
           profile_image: cur.profile_image
-        })
-        const res = await utility.sync('browse/history')
-        if (Array.isArray(res.body)) {
-          visitor = res.body.filter(cur => cur.visitor_id).map(merge)
-          visited = res.body.filter(cur => cur.visited_id).map(merge)
-        }
-        commit('syncHistory', { visitor, visited })
+        });
+        const visitor = Array.isArray(items) ? items.filter(cur => cur.visitor_id).map(merge) : [];
+        const visited = Array.isArray(items) ? items.filter(cur => cur.visited_id).map(merge) : [];
+        commit('syncHistory', { visitor, visited });
       } catch (err) {
         console.error('Got error here --> ', err)
       }

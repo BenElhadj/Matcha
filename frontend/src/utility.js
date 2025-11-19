@@ -599,6 +599,7 @@ export default {
     }
     return when.format(fmt)
   },
+  // Appel générique (legacy) pour les autres routes, mais allhistory a sa propre fonction moderne
   sync: async type => {
     try {
       const token = localStorage.getItem('token')
@@ -611,25 +612,53 @@ export default {
       return [];
     }
   },
+
+  // Nouvelle fonction pour /api/browse/allhistory avec pagination et structure moderne
+  syncAllHistory: async (params = {}) => {
+    try {
+      const token = localStorage.getItem('token')
+      const base = `${API_URL}/api/browse/allhistory`
+      const qp = new URLSearchParams()
+      const { limit, page } = params || {}
+      if (Number.isFinite(limit)) qp.set('limit', String(limit))
+      if (Number.isFinite(page)) qp.set('page', String(page))
+      const url = qp.toString() ? `${base}?${qp.toString()}` : base
+      const headers = { 'x-auth-token': token }
+      const result = await axios.get(url, { headers })
+      const payload = result && result.data ? result.data : null
+      if (!payload) return []
+      // Structure backend: { history: [...] }
+      if (Array.isArray(payload.history)) return payload.history
+      // Legacy: { data: { items: [...] } }
+      if (payload.data && Array.isArray(payload.data.items)) return payload.data.items
+      // Fallbacks legacy
+      if (Array.isArray(payload)) return payload
+      if (payload.data && Array.isArray(payload.data)) return payload.data
+      return []
+    } catch (error) {
+      console.error('err syncAllHistory in frontend/utility.js ===> ', error)
+      return []
+    }
+  },
   syncNotif: async (params = {}) => {
     try {
       const token = localStorage.getItem('token')
       const base = `${API_URL}/api/notif/all`
       const qp = new URLSearchParams()
       // Accept optional params; keep legacy behaviour if none provided
-      const { limit, page, mode, includeBlocked } = params || {}
+      const { limit, page, type, includeBlocked } = params || {}
       if (Number.isFinite(limit)) qp.set('limit', String(limit))
       if (Number.isFinite(page)) qp.set('page', String(page))
-      if (typeof mode === 'string' && mode) qp.set('mode', mode)
+      if (typeof type === 'string' && type) qp.set('type', type)
       if (includeBlocked !== undefined && includeBlocked !== null) qp.set('includeBlocked', String(includeBlocked))
       const url = qp.toString() ? `${base}?${qp.toString()}` : base
       const headers = { 'x-auth-token': token }
       const result = await axios.get(url, { headers })
       const payload = result && result.data ? result.data : null
-        // remove verbose debug logs in production
-      // Support both old and new response shapes
+      // Uncomment for debug:
+      // console.log('syncNotif debug', { url, payload })
+      // Always return an array, even if empty or malformed
       if (!payload) return []
-      // Old backends sometimes returned a message key 'msg'
       if (payload.msg) return []
       // New shape: { status, type, message, data: { items, page, limit } }
       if (payload.data && Array.isArray(payload.data.items)) return payload.data.items
@@ -637,6 +666,10 @@ export default {
       if (Array.isArray(payload)) return payload
       // Or nested array
       if (payload.data && Array.isArray(payload.data)) return payload.data
+      // If data is an object with items (but not array), fallback to []
+      if (payload.data && typeof payload.data === 'object' && !Array.isArray(payload.data)) return []
+      // If payload is an object but not recognized, fallback to []
+      if (typeof payload === 'object') return []
       return []
     } catch (error) {
       console.error('err syncNotif in frontend/utility.js ===> ', error)

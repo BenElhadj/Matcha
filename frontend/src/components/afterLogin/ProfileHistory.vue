@@ -99,22 +99,19 @@ import { API_URL, BASE_URL } from '@/utility.js';
                 </div>
               </div>
             </q-timeline-entry>
-            <q-timeline-entry
-              :subtitle="!hasMore ? 'you can\'t see more history' : null"
-              :title="
-                hasMore
-                  ? 'You can show more history'
-                  : 'you created your profile on ' +
-                    moment(user.created_at).format('D MMMM, YYYY, h:mm A')
-              "
-              side="left"
-            />
           </q-timeline>
           <div v-if="isLoading" class="q-my-md flex items-center justify-center">
             <LoaderView />
             <div class="text-grey-7 q-mt-md" style="font-size: 1.1em; text-align: center">
               Wait for more history...
             </div>
+          </div>
+          <div v-if="hasMore && !isLoading" class="q-mt-md flex flex-center">
+            <q-btn color="primary" @click="onShowMore" label="Charger plus d'historique" />
+          </div>
+          <div v-else-if="!hasMore && !isLoading" class="q-mt-md flex flex-center text-grey-7">
+            <q-icon name="mdi-history" size="32px" class="q-mr-sm" />
+            <span>Vous avez atteint la fin de votre historique.</span>
           </div>
         </div>
       </div>
@@ -123,6 +120,8 @@ import { API_URL, BASE_URL } from '@/utility.js';
 </template>
 
 <script setup>
+// Fix: define 'left' for timeline side binding
+const left = 'left'
 import AppAvatar from '@/components/common/AppAvatar.vue'
 import { ref, computed } from 'vue'
 import { useQuasar } from 'quasar'
@@ -189,11 +188,44 @@ const user = computed(() => store.getters.user)
 const getNotifIcon = utility.getNotifIcon
 const getHistoryAction = utility.getHistoryAction
 
-// Utilise le getter history du store pour n'afficher que les actions faites PAR l'utilisateur
-const history = computed(() => store.getters.history)
-const hasMore = ref(false) // désactivé car tout est chargé d'un coup
+// Nouvelle logique : historique paginé via utility.syncAllHistory
+const history = ref([])
+const page = ref(1)
+const limit = ref(20)
+const hasMore = ref(true)
 const isLoading = ref(false)
-const onShowMore = () => {} // désactivé
+
+async function loadHistory() {
+  if (isLoading.value || !hasMore.value) return
+  isLoading.value = true
+  try {
+    const curPage = page.value
+    const curIds = new Set(history.value.map((e) => e.id))
+    const items = await utility.syncAllHistory({ limit: limit.value, page: curPage })
+    if (Array.isArray(items) && items.length) {
+      // Protection anti-doublon : si tous les IDs sont déjà présents, stop
+      const newItems = items.filter((e) => !curIds.has(e.id))
+      if (!newItems.length) {
+        hasMore.value = false
+        isLoading.value = false
+        return
+      }
+      history.value.push(...newItems)
+      page.value += 1
+      if (items.length < limit.value) {
+        hasMore.value = false
+      }
+    } else {
+      hasMore.value = false
+    }
+  } catch (e) {
+    hasMore.value = false
+  } finally {
+    isLoading.value = false
+  }
+}
+
+const onShowMore = () => loadHistory()
 
 // Utilitaire pour choisir la bonne date selon l'action
 function getEntryDate(entry) {
@@ -230,6 +262,8 @@ function handleScroll() {
 
 onMounted(() => {
   window.addEventListener('scroll', handleScroll)
+  // Charge la première page d'historique au montage
+  loadHistory()
 })
 
 import { onBeforeUnmount } from 'vue'
@@ -238,13 +272,14 @@ onBeforeUnmount(() => {
 })
 
 // Log history object whenever it changes
-watch(
-  history,
-  (val) => {
-    console.log('History object:', val)
-  },
-  { deep: true }
-)
+// Log history object whenever it changes
+// watch(
+//   history,
+//   (val) => {
+//     console.log('History object:', val)
+//   },
+//   { deep: true }
+// )
 
 const redirectToUser = (hisId) => {
   // Redirige seulement si l'id cible est différent de l'utilisateur courant
