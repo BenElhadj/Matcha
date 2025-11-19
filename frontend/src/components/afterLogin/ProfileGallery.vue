@@ -65,7 +65,7 @@ import { API_URL, BASE_URL } from '@/utility.js'; // Utilitaire global pour l'af
 import { useStore } from 'vuex'
 import { ref, computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { getImageSrc } from '../../utility.js'
+import { getImageSrc, API_URL } from '../../utility.js'
 import axios from 'axios'
 import AlertView from '../../views/AlertView.vue'
 
@@ -94,7 +94,7 @@ const onPhotoChange = async (e) => {
   formData.append('image', file)
   const token = user.value.token || localStorage.getItem('token')
   // Utiliser la bonne route backend pour galerie
-  const url = `${import.meta.env.VITE_APP_API_URL}/api/users/image`
+  const url = `${API_URL}/api/users/image`
   try {
     await axios.post(url, formData, {
       headers: {
@@ -115,7 +115,7 @@ const onUploadClick = () => {
 
 const deleteImg = async (image) => {
   try {
-    const url = `${import.meta.env.VITE_APP_API_URL}/api/users/image`
+    const url = `${API_URL}/api/users/image`
     const headers = { 'x-auth-token': user.value.token }
     const data = { id: image.id }
     // axios.delete accepte le body via l'option 'data'
@@ -155,7 +155,7 @@ const onGalleryPhotoChange = async (e) => {
   const formData = new FormData()
   formData.append('image', file) // champ attendu par le backend
   const token = user.value.token || localStorage.getItem('token')
-  const url = `${import.meta.env.VITE_APP_API_URL}/api/users/image`
+  const url = `${API_URL}/api/users/image`
   try {
     const res = await axios.post(url, formData, {
       headers: {

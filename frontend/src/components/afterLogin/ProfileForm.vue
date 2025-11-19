@@ -227,7 +227,7 @@ const resetForm = () => {
 const updateUser = async () => {
   try {
     const token = localStorage.getItem('token')
-    const url = `${import.meta.env.VITE_APP_API_URL}/api/users/updateprofile`
+    const url = `${API_URL}/api/users/updateprofile`
     const headers = { 'x-auth-token': token }
 
     const res = await axios.post(url, user, { headers })

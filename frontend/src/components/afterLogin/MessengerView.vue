@@ -26,6 +26,7 @@
 <script setup>
 import { onBeforeUnmount, ref, computed, watch } from 'vue'
 import { useStore } from 'vuex'
+import { API_URL } from '@/utility.js'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 import LoaderView from '@/views/LoaderView.vue'
@@ -64,7 +65,7 @@ watch(
     if (token && isConnected) {
       loaded.value = true
       try {
-        const url = `${import.meta.env.VITE_APP_API_URL}/api/auth/isloggedin`
+        const url = `${API_URL}/api/auth/isloggedin`
         const headers = { 'x-auth-token': token }
         const res = await axios.get(url, { headers })
         data.value = res.data

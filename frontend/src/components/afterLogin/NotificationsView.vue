@@ -259,7 +259,7 @@ const moreToLoad = computed(() => hasMore.value)
 const logout = async (userId) => {
   try {
     const token = localStorage.getItem('token')
-    const url = `${import.meta.env.VITE_APP_API_URL}/api/auth/logout`
+    const url = `${API_URL}/api/auth/logout`
     const headers = { 'x-auth-token': token }
     await axios.get(url, { headers })
   } catch (err) {
@@ -275,7 +275,7 @@ watch(
     const token = newUser?.token || localStorage.getItem('token')
     if (token) {
       try {
-        const url = `${import.meta.env.VITE_APP_API_URL}/api/auth/isloggedin`
+        const url = `${API_URL}/api/auth/isloggedin`
         const headers = { 'x-auth-token': token }
         const res = await axios.get(url, { headers })
         if (!res.data.msg) return

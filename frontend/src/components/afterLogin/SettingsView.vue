@@ -1,4 +1,3 @@
-import { API_URL } from '@/utility.js';
 <template>
   <q-page class="page-container">
     <q-page-container v-if="user && user.username">
@@ -113,6 +112,7 @@ import { API_URL } from '@/utility.js';
 </template>
 
 <script setup>
+import { API_URL } from '@/utility.js'
 import ProfileForm from '@/components/afterLogin/ProfileForm.vue'
 import ProfileGallery from '@/components/afterLogin/ProfileGallery.vue'
 import ProfileHistory from '@/components/afterLogin/ProfileHistory.vue'
@@ -167,7 +167,7 @@ const openImageUploadDialog = (type) => {
     urlCover.value = `${API_URL}/api/users/image/cover`
   } else if (type === 'profile') {
     fileInputProfile.value.click()
-    urlProfile.value = `${import.meta.env.VITE_APP_API_URL}/api/users/image`
+    urlProfile.value = `${API_URL}/api/users/image`
   }
 }
 
@@ -265,7 +265,7 @@ const changeTab = (tab) => {
 
 const updateUser = async () => {
   try {
-    const url = `${import.meta.env.VITE_APP_API_URL}/api/users/updateprofile`
+    const url = `${API_URL}/api/users/updateprofile`
     const headers = { 'x-auth-token': user.token }
     const res = await axios.post(url, user.value, { headers })
 
@@ -297,7 +297,7 @@ const fetchUser = async () => {
   try {
     const token = user.value.token || localStorage.getItem('token')
     const headers = { 'x-auth-token': token }
-    const url = `${import.meta.env.VITE_APP_API_URL || ''}/api/users/show`
+    const url = `${API_URL}/api/users/show`
     const { data } = await axios.post(url, {}, { headers })
     if (data && data.user) {
       user.value = data.user
@@ -313,9 +313,7 @@ const fetchHistory = async (reset = false) => {
     const token = user.value.token || localStorage.getItem('token')
     const headers = { 'x-auth-token': token }
     const offset = reset ? 0 : historyOffset.value
-    const url = `${
-      import.meta.env.VITE_APP_API_URL || ''
-    }/api/browse/allhistory?offset=${offset}&limit=${historyLimit}`
+    const url = `${API_URL}/api/browse/allhistory?offset=${offset}&limit=${historyLimit}`
     const { data } = await axios.get(url, { headers })
     if (data && data.history) {
       if (reset) {

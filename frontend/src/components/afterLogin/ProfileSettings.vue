@@ -399,7 +399,7 @@ import moment from 'moment'
 import { ref, onMounted, computed, nextTick, defineAsyncComponent, watch } from 'vue'
 import { useStore } from 'vuex'
 import axios from 'axios'
-import utility, { getBlockReportIcon, getBlockReportMessage, getImageSrc } from '@/utility'
+import utility, { getBlockReportIcon, getBlockReportMessage, getImageSrc, API_URL } from '@/utility'
 // Expose helpers for template
 // (If using <script setup>, these are auto-exposed)
 import AlertView from '@/views/AlertView.vue'
@@ -472,7 +472,7 @@ const fetchBlacklist = async () => {
 // Supprimer un report
 const unReport = async (banned) => {
   const block_row_id = banned.block_row_id || banned.id
-  const url = `${import.meta.env.VITE_APP_API_URL}/api/users/unreport`
+  const url = `${API_URL}/api/users/unreport`
   const headers = { 'x-auth-token': user.value.token }
   try {
     const result = await axios.post(url, { id: block_row_id }, { headers })
@@ -534,7 +534,7 @@ const savePass = async () => {
     return
   }
   try {
-    const url = `${import.meta.env.VITE_APP_API_URL}/api/users/changepassword`
+    const url = `${API_URL}/api/users/changepassword`
     const headers = { 'x-auth-token': user.value.token }
     const data = {
       password: oldPwd.value,
@@ -582,7 +582,7 @@ const saveEmail = async () => {
     return
   }
   try {
-    const url = `${import.meta.env.VITE_APP_API_URL}/api/users/changeemail`
+    const url = `${API_URL}/api/users/changeemail`
     const headers = { 'x-auth-token': user.value.token }
     const data = {
       email: newEmail.value,
@@ -621,7 +621,7 @@ const locationUpdated = (newLocation) => {
 
 const changeLoc = async () => {
   locDialog.value = false
-  const url = `${import.meta.env.VITE_APP_API_URL}/api/users/location`
+  const url = `${API_URL}/api/users/location`
   const headers = { 'x-auth-token': user.value.token }
   // Only send a plain object, not a ref
   const payload = { lat: swapLocation.value.lat, lng: swapLocation.value.lng }
@@ -643,7 +643,7 @@ const changeLoc = async () => {
 
 const unBlock = async (banned) => {
   const blocked_id = banned.blocked_id || banned.id
-  const url = `${import.meta.env.VITE_APP_API_URL}/api/users/unblock`
+  const url = `${API_URL}/api/users/unblock`
   const headers = { 'x-auth-token': user.value.token }
   try {
     const result = await axios.post(url, { id: blocked_id }, { headers })

@@ -36,6 +36,7 @@ import { useStore } from 'vuex'
 import { useQuasar } from 'quasar'
 import axios from 'axios'
 import { getSocket, connectSocket } from '@/boot/socketClient'
+import { API_URL } from '@/utility.js'
 
 const props = defineProps({
   toId: {
@@ -56,10 +57,6 @@ const msg = ref(null)
 const user = store.getters['user']
 const selectedConvo = store.getters['selectedConvo']
 // let socket = null
-
-// onMounted(() => {
-//   socket = io(`${import.meta.env.VITE_APP_API_URL}`)
-// })
 
 watch(msg, () => {
   if (msg.value && msg.value.length) {
@@ -82,7 +79,7 @@ const sendMsg = async (e) => {
           msg.value = ''
           return
         }
-        const url = `${import.meta.env.VITE_APP_API_URL}/api/chat/send`
+        const url = `${API_URL}/api/chat/send`
         const headers = { 'x-auth-token': user.token }
         const data = {
           id_conversation: store.state.selectedConvo,

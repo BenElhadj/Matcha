@@ -81,6 +81,7 @@
 <script setup>
 import moment from 'moment'
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { API_URL, BASE_URL } from '@/utility.js'
 import utility from '@/utility.js'
 import { useStore } from 'vuex'
 import axios from 'axios'
@@ -106,8 +107,7 @@ const loadGif = 'https://i.giphy.com/media/uyCJt0OOhJBiE/giphy.webp'
 const convo = ref(selectedConvo.value)
 
 // Avatar resolution aligned with the previous version (fallbacks + profile fetch for other user)
-const base = import.meta.env.BASE_URL || '/'
-const defaultProfileTxt = `${base}default/defaut_profile.txt`
+const defaultProfileTxt = `${BASE_URL}default/defaut_profile.txt`
 const myAvatarSrc = computed(() =>
   utility.getImageSrc
     ? utility.getImageSrc(image.value, utility.getCachedDefault?.('profile') || defaultProfileTxt)
@@ -122,7 +122,7 @@ const otherAvatarSrc = computed(() => {
 })
 
 const fallbackOtherAvatar = () => {
-  const base = import.meta.env.BASE_URL || '/'
+  const base = BASE_URL
   const defaultProfileTxt = `${base}default/defaut_profile.txt`
   return utility.getImageSrc
     ? utility.getImageSrc(
@@ -169,7 +169,7 @@ const scroll = () => {
 
 const getChat = async () => {
   try {
-    const url = `${import.meta.env.VITE_APP_API_URL}/api/chat/messages`
+    const url = `${API_URL}/api/chat/messages`
     const headers = { 'x-auth-token': user.value.token }
     const data = {
       id: selectedConvo.value,
