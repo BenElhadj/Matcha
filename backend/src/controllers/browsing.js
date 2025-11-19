@@ -674,8 +674,11 @@ if (notificationsModel && typeof notificationsModel.getNotifAll === 'function') 
 	notificationsModel.getNotifAll = async function(...args) {
 		const result = await origGetNotifAll.apply(this, args);
 		let notifs = Array.isArray(result) ? result : (result.notifications || []);
+		// Collecter tous les id_from pour batch fetch des images
+		const idFroms = Array.from(new Set(notifs.map(n => n.id_from || n.from).filter(Boolean)));
+		const imagesMap = await userModel.getImagesByUids(idFroms);
 		for (let notif of notifs) {
-			// Recherche dans tous les champs possibles (avatar, profile_image, cover)
+			// 1. Essayer d'abord les champs existants (avatar, profile_image, cover)
 			let val = null;
 			const tryFields = [notif.avatar, notif.profile_image, notif.cover];
 			for (let field of tryFields) {
@@ -701,7 +704,24 @@ if (notificationsModel && typeof notificationsModel.getNotifAll === 'function') 
 					}
 				}
 			}
-			notif.profile_image = val;
+			// 2. Si rien trouvé, aller chercher dans la table images
+			if (!val) {
+				const uid = notif.id_from || notif.from;
+				const imgs = imagesMap[uid] || [];
+				let profileImg = imgs.find(i => i.profile) || imgs[0];
+				if (profileImg) {
+					if (profileImg.link && profileImg.link !== 'false' && profileImg.link !== '') {
+						val = profileImg.link;
+					} else if (profileImg.data && profileImg.data !== 'false' && profileImg.data !== '') {
+						const s = profileImg.data.trim();
+						if (s.startsWith('data:image')) val = s;
+						else if (s.startsWith('/9j/')) val = `data:image/jpeg;base64,${s}`;
+						else if (s.startsWith('iVBOR')) val = `data:image/png;base64,${s}`;
+						else if (s.length > 100) val = `data:image/jpeg;base64,${s}`;
+					}
+				}
+			}
+			notif.profile_image = val || null;
 		}
 		if (!Array.isArray(result) && result.notifications) {
 			result.notifications = notifs;
