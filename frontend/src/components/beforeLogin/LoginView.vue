@@ -1,4 +1,3 @@
-import { API_URL } from '@/utility.js';
 <template>
   <q-layout class="mt-4">
     <div class="login mt-5">
@@ -41,6 +40,7 @@ import { API_URL } from '@/utility.js';
 </template>
 
 <script setup>
+import { API_URL } from '@/utility.js'
 import { ref } from 'vue'
 import { useStore } from 'vuex'
 import { useRouter } from 'vue-router'

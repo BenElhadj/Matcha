@@ -206,7 +206,7 @@ import axios from 'axios'
 import UserCard from '@/components/afterLogin/UserCard.vue'
 import LoaderView from '@/views/LoaderView.vue'
 import countries from '@/nats.json'
-import utility from '@/utility'
+import { API_URL } from '@/utility.js'
 import { matMenu } from '@quasar/extras/material-icons'
 import { mdiAbTesting } from '@quasar/extras/mdi-v5'
 import { useRouter } from 'vue-router'
@@ -434,7 +434,7 @@ async function fetchDiscover({ resetPage = false } = {}) {
     lng: userLocation?.lng,
     tags: interests.value && interests.value.length ? interests.value.join(',') : undefined
   }
-  const url = `${import.meta.env.VITE_APP_API_URL}/api/users/discover`
+  const url = `${API_URL}/api/users/discover`
   isFetching.value = true
   // Show a unified overlay via isFetching; no separate isRefreshing flag
   try {
