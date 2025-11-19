@@ -18,24 +18,21 @@
             </div>
             <div v-if="isLoadingAll" class="q-my-md flex items-center justify-center">
               <LoaderView />
-            </div>
-            <div v-if="!notifTabs.all.hasMore && notifTabs.all.items.length" class="end-history">
-              <q-icon name="mdi-history" size="32px" class="q-mr-sm" />
-              <div class="text-subtitle1">
-                <span v-if="notifTabs.all.items.length === 1"
-                  >First notification — no previous history.</span
-                >
-                <span v-else>You've reached the start of your notification history.</span>
+              <div class="text-grey-7 q-mt-md" style="font-size: 1.1em; text-align: center">
+                Wait for more events...
               </div>
             </div>
-            <div
-              v-else-if="!notifTabs.all.hasMore && !notifTabs.all.items.length"
-              class="end-history"
-            >
-              <q-icon name="mdi-history" size="32px" class="q-mr-sm" />
-              <div class="text-subtitle1">No notifications yet.</div>
+            <div v-if="!notifTabs.all.hasMore" class="end-history">
+              <q-icon name="mdi-history" size="32px" class="q-mb-sm" />
+              <div class="text-subtitle1 q-mb-sm" style="text-align: center">
+                <span v-if="notifTabs.all.items.length === 0">No notifications yet.</span>
+                <span v-else>No more events to show.</span>
+              </div>
+              <div class="text-caption text-grey-7 q-mt-md" style="text-align: center">
+                You created your account on
+                {{ formatAccountCreationDate(store.getters.user?.created_at) }}
+              </div>
             </div>
-
           </template>
 
           <template #like>
@@ -50,13 +47,20 @@
             </div>
             <div v-if="isLoadingLike" class="q-my-md flex items-center justify-center">
               <LoaderView />
+              <div class="text-grey-7 q-mt-md" style="font-size: 1.1em; text-align: center">
+                Wait for more likes...
+              </div>
             </div>
-            <div
-              v-if="!notifTabs.like.hasMore && !notifTabs.like.items.length"
-              class="end-history"
-            >
-              <q-icon name="mdi-history" size="32px" class="q-mr-sm" />
-              <div class="text-subtitle1">Aucune notification de like.</div>
+            <div v-if="!notifTabs.like.hasMore" class="end-history">
+              <q-icon name="mdi-history" size="32px" class="q-mb-sm" />
+              <div class="text-subtitle1 q-mb-sm" style="text-align: center">
+                <span v-if="notifTabs.like.items.length === 0">Aucune notification de like.</span>
+                <span v-else>No more likes to show.</span>
+              </div>
+              <div class="text-caption text-grey-7 q-mt-md" style="text-align: center">
+                You created your account on
+                {{ formatAccountCreationDate(store.getters.user?.created_at) }}
+              </div>
             </div>
           </template>
 
@@ -72,13 +76,22 @@
             </div>
             <div v-if="isLoadingVisit" class="q-my-md flex items-center justify-center">
               <LoaderView />
+              <div class="text-grey-7 q-mt-md" style="font-size: 1.1em; text-align: center">
+                Wait for more views...
+              </div>
             </div>
-            <div
-              v-if="!notifTabs.visit.hasMore && !notifTabs.visit.items.length"
-              class="end-history"
-            >
-              <q-icon name="mdi-history" size="32px" class="q-mr-sm" />
-              <div class="text-subtitle1">Aucune notification de visite.</div>
+            <div v-if="!notifTabs.visit.hasMore" class="end-history">
+              <q-icon name="mdi-history" size="32px" class="q-mb-sm" />
+              <div class="text-subtitle1 q-mb-sm" style="text-align: center">
+                <span v-if="notifTabs.visit.items.length === 0"
+                  >Aucune notification de visite.</span
+                >
+                <span v-else>No more views to show.</span>
+              </div>
+              <div class="text-caption text-grey-7 q-mt-md" style="text-align: center">
+                You created your account on
+                {{ formatAccountCreationDate(store.getters.user?.created_at) }}
+              </div>
             </div>
           </template>
 
@@ -94,13 +107,20 @@
             </div>
             <div v-if="isLoadingBlock" class="q-my-md flex items-center justify-center">
               <LoaderView />
+              <div class="text-grey-7 q-mt-md" style="font-size: 1.1em; text-align: center">
+                Wait for more block or report...
+              </div>
             </div>
-            <div
-              v-if="!notifTabs.block.hasMore && !notifTabs.block.items.length"
-              class="end-history"
-            >
-              <q-icon name="mdi-history" size="32px" class="q-mr-sm" />
-              <div class="text-subtitle1">Aucun blocage ou signalement.</div>
+            <div v-if="!notifTabs.block.hasMore" class="end-history">
+              <div class="text-subtitle1 q-mb-sm" style="text-align: center">
+                <q-icon name="mdi-history" size="32px" class="q-mb-sm" />
+                <span v-if="notifTabs.block.items.length === 0">Aucun blocage ou signalement.</span>
+                <span v-else>No more block or report to show.</span>
+              </div>
+              <div class="text-caption text-grey-7 q-mt-md" style="text-align: center">
+                You created your account on
+                {{ formatAccountCreationDate(store.getters.user?.created_at) }}
+              </div>
             </div>
           </template>
         </NotifFilterTabs>
@@ -112,6 +132,7 @@
 <script setup>
 import { API_URL, BASE_URL } from '@/utility.js'
 import { ref, computed, watch, onMounted, onUnmounted, reactive } from 'vue'
+import { useStore } from 'vuex'
 import { useRouter } from 'vue-router'
 import utility from '@/utility.js'
 import NotifFilterTabs from './NotifFilterTabs.vue'
@@ -119,6 +140,13 @@ import NotifTooltip from './NotifTooltip.vue'
 import LoaderView from '@/views/LoaderView.vue'
 
 const router = useRouter()
+const store = useStore()
+
+function formatAccountCreationDate(dateStr) {
+  if (!dateStr) return ''
+  const date = new Date(dateStr)
+  return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+}
 // --- Qui m'a bloqué ou signalé ---
 const blockedOrReportedBy = ref([])
 const loadingBlockedOrReportedBy = ref(false)
@@ -165,7 +193,6 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('scroll', globalScrollHandler)
 })
-
 
 async function fetchBlockedOrReportedBy(page = 1) {
   loadingBlockedOrReportedBy.value = true
@@ -248,7 +275,7 @@ function onLoadMoreTab(tab, done) {
     })
     .then((items) => {
       // Debug avancé : log IDs récupérés et page courante
-      const fetchedIds = Array.isArray(items) ? items.map(e => e.id) : [];
+      const fetchedIds = Array.isArray(items) ? items.map((e) => e.id) : []
       // window.console.log(`[onLoadMoreTab] tab=${tab} page=${currentPage}`);
       // window.console.log('Fetched notification IDs:', fetchedIds);
       if (Array.isArray(items) && items.length) {
@@ -265,7 +292,7 @@ function onLoadMoreTab(tab, done) {
     })
     .catch((err) => {
       // Ne jamais bloquer le loader sur erreur
-      window.console.error(`[onLoadMoreTab] error tab=${tab} page=${currentPage}`, err);
+      window.console.error(`[onLoadMoreTab] error tab=${tab} page=${currentPage}`, err)
       state.hasMore = false
       safeDone(true)
     })
@@ -387,9 +414,10 @@ const openNotification = async (entry) => {
 }
 .end-history {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 18px 12px 34px;
+  padding: 57px 17px 17px;
   opacity: 0.9;
   font-family: 'Elliane';
   color: black;

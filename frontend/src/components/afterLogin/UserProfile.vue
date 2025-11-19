@@ -1,4 +1,3 @@
-import { API_URL, BASE_URL } from '@/utility.js';
 <template>
   <q-page class="page-container">
     <q-page-container v-if="!loading">
