@@ -162,7 +162,9 @@ const getAllHistory = async (user_id, offset = 0, limit = 20, type = 'all') => {
 	if (type === 'add_image' || type === 'all') {
 		const imgQ = `
 			SELECT i.id, i.user_id, i.created_at as created_at, i.link, i.data, i.profile, i.cover,
-			       u.username, u.first_name, u.last_name
+			       u.username, u.first_name, u.last_name,
+			       (SELECT link FROM images WHERE user_id = i.user_id AND profile = TRUE ORDER BY id DESC LIMIT 1) as img_link,
+			       (SELECT data FROM images WHERE user_id = i.user_id AND profile = TRUE ORDER BY id DESC LIMIT 1) as img_data
 			FROM images i
 			LEFT JOIN users u ON u.id = i.user_id
 			WHERE i.user_id = $1
@@ -172,7 +174,23 @@ const getAllHistory = async (user_id, offset = 0, limit = 20, type = 'all') => {
 		const imgRes = await db.query(imgQ, [user_id, pageWindow]);
 		const imgCountRes = await db.query('SELECT COUNT(*) FROM images WHERE user_id = $1', [user_id]);
 		totalCount += parseInt(imgCountRes.rows[0].count, 10);
-		for (const r of imgRes.rows) allRows.push({ id: r.id, visitor_id: user_id, his_id: user_id, created_at: r.created_at, type: 'add_image', username: r.username, first_name: r.first_name, last_name: r.last_name, profile_image: normalizeImg(r.link, r.data) });
+		for (const r of imgRes.rows) {
+			const imageNormalized = normalizeImg(r.link, r.data)
+			let imageType = 'gallery'
+			if (r.profile === true || r.profile === 't' || r.profile === '1') imageType = 'profile'
+			else if (r.cover === true || r.cover === 't' || r.cover === '1') imageType = 'cover'
+			allRows.push({
+				id: r.id,
+				visitor_id: user_id,
+				his_id: user_id,
+				created_at: r.created_at,
+				type: 'add_image',
+				username: r.username,
+				added_type: imageType,
+				added_image: imageNormalized,
+				profile_image: normalizeImg(r.img_link, r.img_data)
+			})
+		}
 	}
 
 	// 4) block/report -> blocked table (actions I performed)
