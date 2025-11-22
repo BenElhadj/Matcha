@@ -44,7 +44,7 @@ const getBlockedBy = async (id, limit = 25, offset = 0) => {
         FROM blocked 
         JOIN users ON blocked.blocker = users.id 
         LEFT JOIN images ON users.id = images.user_id AND images.profile = TRUE 
-        WHERE blocked.blocked = $1
+        WHERE blocked.blocked = $1 AND blocked.type = 'block'
         ORDER BY blocked.created_at DESC
         LIMIT $2 OFFSET $3
     `;
@@ -304,6 +304,7 @@ const setImages = async (user_id) => {
 
 // get Blocked  users 
 const getBlocked = async (id) => {
+    // Only return rows where the relation is an actual 'block' (not 'report')
     const query = `
         SELECT 
             blocked.id AS block_row_id,
@@ -321,7 +322,7 @@ const getBlocked = async (id) => {
         FROM blocked 
         JOIN users ON blocked.blocked = users.id 
         LEFT JOIN images ON users.id = images.user_id AND images.profile = TRUE 
-        WHERE blocked.blocker = $1
+        WHERE blocked.blocker = $1 AND blocked.type = 'block'
         ORDER BY blocked.created_at DESC
     `;
     const result = await db.query(query, [id]);
@@ -348,7 +349,8 @@ const getBlocked = async (id) => {
             blocked_at: row.blocked_at,
             type: row.type,
             rating: row.rating,
-            can_view_profile: row.type === 'report' ? true : false
+            // can_view_profile is false when it's a real block; report-only entries are not returned here
+            can_view_profile: false
         };
     });
 }
