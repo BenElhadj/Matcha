@@ -86,8 +86,37 @@ const showUsers = async (req, res) => {
 const showUserById = async (req, res) => {
 	try {
 		const id = req.params.id;
-		const user = await userModel.getUserById ? await userModel.getUserById(id) : null;
-		res.json(user);
+		const me = req.user && req.user.id ? Number(req.user.id) : null;
+		const targetId = Number(id);
+		// If requester is missing, deny
+		if (!me) return res.json({ msg: 'not logged in' });
+		// If either side blocked the other (type = 'block'), do not reveal the profile
+		try {
+			const iBlocked = await userModel.isBlocked(me, targetId);
+			const blockedMe = await userModel.isBlocked(targetId, me);
+			if (iBlocked || blockedMe) {
+				// Keep the same frontend contract: presence of msg triggers redirect to /404
+				return res.json({ msg: 'not found' });
+			}
+		} catch (e) {
+			console.error('[showUserById] error checking block status', e && e.message ? e.message : e);
+			// On DB error, be conservative and deny
+			return res.json({ msg: 'not found' });
+		}
+
+		// getUserById returns rows; we need a single object and include images
+		const rows = await userModel.getUserById ? await userModel.getUserById(id) : [];
+		if (!rows || !rows.length) return res.json({ msg: 'not found' });
+		const u = rows[0];
+		try {
+			// Attach all valid images (profile/cover/gallery) so frontend can pick profile & cover
+			const images = await userModel.getImages ? await userModel.getImages(targetId) : [];
+			u.images = images;
+		} catch (e) {
+			u.images = [];
+			console.error('[showUserById] failed to load images for user', id, e && e.message ? e.message : e);
+		}
+		return res.json(u);
 	} catch (err) {
 		res.json({ msg: 'Fatal error', err });
 	}
