@@ -195,11 +195,17 @@ const getBlocked = async (req, res) => {
 		console.log('[getBlocked] Pas connecté');
 		return res.json({ msg: 'not logged in' });
 	}
+	const page = parseInt(req.query.page, 10) || 1;
+	const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 25, 1), 100);
+	const offset = (page - 1) * limit;
 	try {
-		console.log('[getBlocked] req.user.id =', req.user.id);
-		const blacklist = await userModel.getBlocked(req.user.id);
-		console.log('[getBlocked] Résultat SQL =', blacklist);
-		res.json(blacklist);
+		console.log('[getBlocked] req.user.id =', req.user.id, 'page=', page, 'limit=', limit);
+		// Use the new paginated model helper to fetch both block+report entries I created
+		const items = await userModel.getBlockedOrReported(req.user.id, limit, offset).catch(() => []);
+		// Count total combined
+		const countRes = await db.query("SELECT COUNT(*) FROM blocked WHERE blocker = $1 AND (type = 'block' OR type = 'report')", [req.user.id]);
+		const total = parseInt(countRes.rows[0].count, 10);
+		return res.json({ page, limit, total, items });
 	} catch (err) {
 		console.error('[getBlocked] Erreur fatale :', err);
 		return res.json({ msg: 'Fatal error', err });

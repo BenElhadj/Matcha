@@ -489,6 +489,45 @@ const getBlocked = async (id) => {
     });
 }
 
+// Get both blocked and reported users that I created (paginated)
+const getBlockedOrReported = async (id, limit = 25, offset = 0) => {
+    const query = `
+        SELECT
+            blocked.id AS block_row_id,
+            blocked.blocked AS blocked_id,
+            users.username, users.first_name, users.last_name, users.gender, users.birthdate,
+            images.link, images.data, blocked.created_at, blocked.type AS type, get_rating(users.id) AS rating
+        FROM blocked
+        JOIN users ON blocked.blocked = users.id
+        LEFT JOIN images ON users.id = images.user_id AND images.profile = TRUE
+        WHERE blocked.blocker = $1 AND (blocked.type = 'block' OR blocked.type = 'report')
+        ORDER BY blocked.created_at DESC
+        LIMIT $2 OFFSET $3
+    `;
+    const result = await db.query(query, [id, limit, offset]);
+    const isValid = v => v && v !== 'false' && v !== '' && v !== null && v !== undefined;
+    return result.rows.map(row => {
+        let avatar = '';
+        if (isValid(row.link)) avatar = row.link;
+        else if (isValid(row.data)) avatar = row.data;
+        return {
+            block_row_id: row.block_row_id,
+            id: row.block_row_id,
+            blocked_id: row.blocked_id,
+            username: row.username,
+            first_name: row.first_name,
+            last_name: row.last_name,
+            gender: row.gender,
+            birthdate: row.birthdate,
+            avatar,
+            blocked_at: row.created_at,
+            type: row.type,
+            can_view_profile: row.type === 'report',
+            rating: row.rating
+        };
+    });
+};
+
 // Check if a specific user is already blocked by the current user
 const isBlocked = async (blocker, blocked) => {
     const query = `SELECT 1 FROM blocked WHERE blocker = $1 AND blocked = $2 AND type = 'block'`;
@@ -525,8 +564,11 @@ const unblockUser = async (user_id, id) => {
 
 // Get users I have reported (paginated)
 const getReported = async (id, limit = 25, offset = 0) => {
+    // Return the rows representing reports *I* created.
+    // Include the blocked table primary key as block_row_id so the frontend can unreport by id.
     const query = `
         SELECT 
+            blocked.id AS block_row_id,
             blocked.blocked AS reported_id, 
             users.username, users.first_name, users.last_name, users.gender, users.birthdate, images.link, images.data, blocked.created_at, get_rating(users.id) AS rating
         FROM blocked 
@@ -543,7 +585,10 @@ const getReported = async (id, limit = 25, offset = 0) => {
         if (isValid(row.link)) avatar = row.link;
         else if (isValid(row.data)) avatar = row.data;
         return {
-            reported_id: row.reported_id,
+            // align shape with blocked mapping used by frontend: provide blocked_id and a row id
+            block_row_id: row.block_row_id,
+            id: row.block_row_id,
+            blocked_id: row.reported_id,
             username: row.username,
             first_name: row.first_name,
             last_name: row.last_name,
@@ -551,6 +596,8 @@ const getReported = async (id, limit = 25, offset = 0) => {
             birthdate: row.birthdate,
             avatar,
             reported_at: row.created_at,
+            type: 'report',
+            can_view_profile: true,
             rating: row.rating
         };
     });
@@ -648,6 +695,7 @@ module.exports = {
     getBlockedBy,
     getReported,
     getReportedBy,
+    getBlockedOrReported,
     getUsersByIds,
     getImagesByUids
     ,getUsersForDiscover

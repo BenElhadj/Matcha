@@ -71,9 +71,13 @@ const router = createRouter({
 
           // Vérification blocage côté serveur avant de précharger le profil
           try {
-            const blkUrl = `${API_URL}/api/users/getblocked`
-            const blkRes = await axios.get(blkUrl, { headers })
-            const rows = Array.isArray(blkRes.data) ? blkRes.data : (blkRes.data && Array.isArray(blkRes.data.data) ? blkRes.data.data : [])
+              const blkUrl = `${API_URL}/api/users/getblocked`
+              const blkRes = await axios.get(blkUrl, { headers })
+              // Accept legacy array or paginated { items } / { data } shapes
+              const blkPayload = blkRes && blkRes.data ? blkRes.data : null
+              const rows = Array.isArray(blkPayload)
+                ? blkPayload
+                : (blkPayload && Array.isArray(blkPayload.items) ? blkPayload.items : (blkPayload && Array.isArray(blkPayload.data) ? blkPayload.data : []))
             const blocked = []
             const blockedBy = []
             if (Array.isArray(rows)) {

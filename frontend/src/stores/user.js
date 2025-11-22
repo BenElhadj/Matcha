@@ -269,10 +269,21 @@ export const user = {
       try {
         let blocked = []
         let blockedBy = []
-        const res = await utility.sync('users/getblocked')
-        if (Array.isArray(res.data)) {
-          blocked = res.data.filter(cur => cur.blocker === state.user.id).map(cur => cur.blocked)
-          blockedBy = res.data.filter(cur => cur.blocked === state.user.id).map(cur => cur.blocker)
+        // Call API and accept both legacy array or new paginated shape
+        const token = localStorage.getItem('token')
+        const headers = { 'x-auth-token': token }
+        const url = `${API_URL}/api/users/getblocked`
+        const apiRes = await axios.get(url, { headers })
+        const payload = apiRes && apiRes.data ? apiRes.data : null
+        let rows = []
+        if (!payload) rows = []
+        else if (Array.isArray(payload)) rows = payload
+        else if (Array.isArray(payload.items)) rows = payload.items
+        else if (Array.isArray(payload.data)) rows = payload.data
+
+        if (Array.isArray(rows)) {
+          blocked = rows.filter(cur => cur.blocker === state.user.id).map(cur => cur.blocked)
+          blockedBy = rows.filter(cur => cur.blocked === state.user.id).map(cur => cur.blocker)
         }
         commit('syncBlocked', { blocked, blockedBy })
         if (blocked.length) dispatch('syncBlacklist', blocked)

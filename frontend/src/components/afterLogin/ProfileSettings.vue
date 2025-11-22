@@ -383,6 +383,15 @@
               </q-card>
             </q-expansion-item>
           </q-item>
+
+          <div class="row items-center justify-between q-mt-md">
+            <q-btn flat label="Prev" :disable="blacklistPage <= 1" @click="fetchBlacklist(blacklistPage - 1)" />
+            <div class="text-caption">
+              Page {{ blacklistPage }} / {{ Math.max(1, Math.ceil(blacklistTotal / blacklistLimit)) }}
+            </div>
+            <q-btn flat label="Next" :disable="blacklistPage >= Math.ceil(blacklistTotal / blacklistLimit)" @click="fetchBlacklist(blacklistPage + 1)" />
+          </div>
+
         </div>
       </q-dialog>
 
@@ -430,6 +439,9 @@ const oldEmail = ref('')
 const newEmail = ref('')
 const blacklist = ref([])
 const blackListDialog = ref(false)
+const blacklistPage = ref(1)
+const blacklistLimit = ref(25)
+const blacklistTotal = ref(0)
 const latitude = computed(() => (location.value ? Number(location.value.lat) : 0))
 const longitude = computed(() => (location.value ? Number(location.value.lng) : 0))
 const location = computed(() => store.getters.location)
@@ -454,15 +466,38 @@ const swapLocation = ref({
   lng: location.value.lng
 })
 
-const fetchBlacklist = async () => {
+const fetchBlacklist = async (page = 1) => {
   try {
-    const res = await utility.sync('users/getblocked')
-    if (Array.isArray(res)) {
-      blacklist.value = res
-    } else {
+    const token = user.value.token
+    const headers = { 'x-auth-token': token }
+    const url = `${API_URL}/api/users/getblocked?page=${page}&limit=${blacklistLimit.value}`
+    const res = await axios.get(url, { headers })
+    const payload = res && res.data ? res.data : null
+    if (!payload) {
       alert.value = { state: true, color: 'red', text: 'Erreur: réponse inattendue du serveur' }
       blacklist.value = []
+      blacklistTotal.value = 0
+      return
     }
+    // Support legacy array response or new paginated shape
+    if (Array.isArray(payload)) {
+      blacklist.value = payload
+      blacklistTotal.value = payload.length
+      blacklistPage.value = 1
+      return
+    }
+    // New shape: { page, limit, total, items }
+    if (Array.isArray(payload.items)) {
+      blacklist.value = payload.items
+      blacklistTotal.value = Number(payload.total) || 0
+      blacklistPage.value = Number(payload.page) || page
+      blacklistLimit.value = Number(payload.limit) || blacklistLimit.value
+      return
+    }
+    // Fallback
+    alert.value = { state: true, color: 'red', text: 'Erreur: réponse inattendue du serveur' }
+    blacklist.value = []
+    blacklistTotal.value = 0
   } catch (err) {
     alert.value = {
       state: true,
@@ -470,6 +505,7 @@ const fetchBlacklist = async () => {
       text: 'Erreur lors de la récupération de la blacklist.'
     }
     blacklist.value = []
+    blacklistTotal.value = 0
   }
 }
 // Supprimer un report
@@ -480,7 +516,7 @@ const unReport = async (banned) => {
   try {
     const result = await axios.post(url, { id: block_row_id }, { headers })
     if (result.data && result.data.status === 'success') {
-      fetchBlacklist()
+      fetchBlacklist(blacklistPage.value)
       alert.value = {
         state: true,
         color: 'green',
@@ -650,7 +686,7 @@ const unBlock = async (banned) => {
   const headers = { 'x-auth-token': user.value.token }
   try {
     const result = await axios.post(url, { id: blocked_id }, { headers })
-    await fetchBlacklist()
+    await fetchBlacklist(blacklistPage.value)
     if (result.data && result.data.message) {
       alert.value = {
         state: true,
@@ -665,7 +701,7 @@ const unBlock = async (banned) => {
 
 // Récupère la blacklist dès l'ouverture de la page
 onMounted(() => {
-  fetchBlacklist()
+  fetchBlacklist(blacklistPage.value)
 })
 
 const noBlacklist = () => {
