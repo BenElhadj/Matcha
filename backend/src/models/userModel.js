@@ -176,17 +176,21 @@ const getUsersForDiscover = async (opts = {}) => {
     const lngIdx = params.length;
 
     // distance expression (km)
+    // Cast stored lat/lng (possibly saved as varchar) to double precision and
+    // guard against empty strings. This prevents Postgres from calling radians()
+    // on character varying values which causes "function radians(character varying) does not exist".
     const distExpr = `(
         6371 * acos(
-            cos(radians($${latIdx})) * cos(radians(users.lat)) * cos(radians(users.lng) - radians($${lngIdx})) +
-            sin(radians($${latIdx})) * sin(radians(users.lat))
+            cos(radians($${latIdx})) * cos(radians(CAST(NULLIF(users.lat, '') AS double precision))) * cos(radians(CAST(NULLIF(users.lng, '') AS double precision)) - radians($${lngIdx})) +
+            sin(radians($${latIdx})) * sin(radians(CAST(NULLIF(users.lat, '') AS double precision)))
         )
     )`;
 
     // Exclude users without coords when distance filtering
     if (isFinite(distanceMax) && Number(distanceMax) < 100000) {
         params.push(distanceMax);
-        where += ` AND users.lat IS NOT NULL AND users.lng IS NOT NULL AND ${distExpr} <= $${params.length}`;
+        // Ensure lat/lng are present and non-empty before attempting numeric casts
+        where += ` AND users.lat IS NOT NULL AND users.lng IS NOT NULL AND users.lat <> '' AND users.lng <> '' AND ${distExpr} <= $${params.length}`;
     }
 
     // Build ORDER BY
