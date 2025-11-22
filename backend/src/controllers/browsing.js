@@ -108,6 +108,16 @@ const showUserById = async (req, res) => {
 		const rows = await userModel.getUserById ? await userModel.getUserById(id) : [];
 		if (!rows || !rows.length) return res.json({ msg: 'not found' });
 		const u = rows[0];
+		// Compute rating using DB function get_rating(id)
+		try {
+			const db = require('../config/database')
+			const rres = await db.query('SELECT get_rating($1) AS rating', [targetId])
+			u.rating = rres && rres.rows && rres.rows[0] && typeof rres.rows[0].rating !== 'undefined' ? Number(rres.rows[0].rating) : 0
+		} catch (e) {
+			// If rating lookup fails, default to 0 but continue
+			try { u.rating = Number(u.rating) || 0 } catch (_) { u.rating = 0 }
+			console.error('[showUserById] failed to compute rating for user', id, e && e.message ? e.message : e)
+		}
 		try {
 			// Attach all valid images (profile/cover/gallery) so frontend can pick profile & cover
 			const images = await userModel.getImages ? await userModel.getImages(targetId) : [];
