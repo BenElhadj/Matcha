@@ -49,7 +49,8 @@ const sizeClass = computed(() => `size-${props.size}`)
 
 const src = computed(() => {
   const base = BASE_URL
-  const fallback = utility.getCachedDefault?.('profile') || `${base}default/defaut_profile.txt`
+  // Keep the same default txt path used by utility.warmDefaultTxtImages()
+  const fallback = utility.getCachedDefault?.('profile') || `${base}assets/default/defaut_profile.txt`
   let resolved = utility.getImageSrc
     ? utility.getImageSrc(props.image, fallback)
     : utility.getFullPath

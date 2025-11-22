@@ -1,7 +1,11 @@
 // Icon and message helpers for block/report distinction
 
 // URL d'API centralisée avec fallback pour la prod (évite undefined)
-export const API_URL = import.meta.env.VITE_APP_API_URL || 'https://matcha-backend-t6dr.onrender.com';
+// Prefer an explicit VITE_APP_API_URL. When running in dev mode and no VITE var is set,
+// default to the local backend (commonly used during development).
+export const API_URL =
+  import.meta.env.VITE_APP_API_URL ||
+  (import.meta.env.DEV ? 'http://127.0.0.1:4000' : 'https://matcha-backend-t6dr.onrender.com');
 export const BASE_URL = (typeof import.meta.env.BASE_URL === 'string' && import.meta.env.BASE_URL.length > 0)
   ? import.meta.env.BASE_URL
   : '/';
