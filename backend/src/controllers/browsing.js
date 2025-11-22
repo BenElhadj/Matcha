@@ -324,6 +324,8 @@ async function discover(req, res) {
 		const q = req.query || {}
 		const page = Math.max(parseInt(q.page || '1', 10), 1)
 		const limit = Math.min(Math.max(parseInt(q.limit || '50', 10), 1), 100)
+		// compute offset for SQL pagination
+		const offset = (page - 1) * limit
 		const onlineFirst = String(q.onlineFirst || '1') === '1'
 		const gender = q.gender && q.gender !== 'all' ? String(q.gender) : null
 		const search = q.search ? String(q.search).toLowerCase() : ''
