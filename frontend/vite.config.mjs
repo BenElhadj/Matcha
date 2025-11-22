@@ -5,6 +5,8 @@ import { quasar, transformAssetUrls } from '@quasar/vite-plugin';
 
 export default defineConfig({
   base: '/Matcha/',
+  // fix cache dir and ignore build output from watcher to avoid repeated re-optimizations
+  cacheDir: 'node_modules/.vite',
   test: {
     environment: 'node',
     coverage: {
@@ -29,6 +31,10 @@ export default defineConfig({
     emptyOutDir: true
   },
   server: {
+    // Ignore the built `dist` folder and other generated files which some tools may touch
+    watch: {
+      ignored: ['**/dist/**', '**/.git/**']
+    },
     proxy: {
       '/api': {
         target: 'http://localhost:3000',
