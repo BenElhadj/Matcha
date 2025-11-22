@@ -1,9 +1,18 @@
 import { API_URL, BASE_URL } from '@/utility.js';
 <template>
-  <q-page>
-    <q-page-container>
-      <h1 class="q-pb-md" style="text-align: center">Profile</h1>
-      <h3 style="margin-bottom: 100px; text-align: center">
+  <q-page class="q-pa-lg">
+    <div
+      style="
+        width: 100%;
+        max-width: 800px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      "
+    >
+      <h1 style="text-align: center">Profile</h1>
+      <h3 style="margin-bottom: 50px; text-align: center">
         {{ user.username }}
       </h3>
 
@@ -153,7 +162,7 @@ import { API_URL, BASE_URL } from '@/utility.js';
         </div>
       </q-form>
       <AlertView :alert="alert"></AlertView>
-    </q-page-container>
+    </div>
   </q-page>
 </template>
 
@@ -286,20 +295,23 @@ onMounted(async () => {
   background-repeat: no-repeat;
 }
 .edit {
-  width: 100px !important;
-  height: 200px !important;
+  /* width: 100px !important; */
+  height: 66px !important;
   position: absolute !important;
+  top: 50px;
+  right: 150px;
+  transform: translateY(0%);
   background-size: 100%;
 }
 .one-input {
-  min-width: 40px;
+  /* min-width: 10px; */
   margin-left: 30px;
-  margin-right: 55px;
+  margin-right: 5px;
   color: 'primary';
 }
 
 .tow-input {
-  min-width: 359px;
+  min-width: 333px;
   color: 'primary';
 }
 

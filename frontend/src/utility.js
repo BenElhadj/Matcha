@@ -5,15 +5,14 @@ export const API_URL = import.meta.env.VITE_APP_API_URL || 'https://matcha-backe
 export const BASE_URL = (typeof import.meta.env.BASE_URL === 'string' && import.meta.env.BASE_URL.length > 0)
   ? import.meta.env.BASE_URL
   : '/';
-import blockIcon from '@/assets/Block/block.png'
-import reportIcon from '@/assets/Block/report.png'
+// block/report icons previously used image assets; we now prefer mdi icons for UI consistency
 export function getBlockReportIcon(type) {
   // Returns [iconSet, iconName, colorClass]
   switch (type) {
     case 'block':
-      return ['mdi', 'mdi-block-helper', 'text-warning'];
+      return ['img', blockImg, 'text-warning'];
     case 'report':
-      return ['mdi', 'mdi-alert-circle', 'text-red'];
+      return ['img', reportImg, 'text-red'];
     default:
       return ['mdi', 'mdi-help-circle', 'text-grey'];
   }
@@ -499,6 +498,8 @@ import dislike from '@/assets/match/dislike.png'
 import defaultIcon from '@/assets/match/heart-default.png'
 import chatAvailable from '@/assets/chat/chat.png'
 import chatUnavailable from '@/assets/chat/chatUnavailable.png'
+import blockImg from '@/assets/Block/block.png'
+import reportImg from '@/assets/Block/report.png'
 
 // Derive relation state strictly from DB-backed arrays (no notifications)
 // Inputs: followers, following, convos (allowed)
@@ -616,16 +617,23 @@ export default {
   // Nouvelle fonction pour /api/browse/allhistory avec pagination et structure moderne
   syncAllHistory: async (params = {}) => {
     try {
+      // console.log('syncAllHistory called with params:', params)
       const token = localStorage.getItem('token')
       const base = `${API_URL}/api/browse/allhistory`
       const qp = new URLSearchParams()
-      const { limit, page } = params || {}
-      if (Number.isFinite(limit)) qp.set('limit', String(limit))
+      const { type, page, limit } = params || {}
+      if (typeof type === 'string' && type) qp.set('type', type)
       if (Number.isFinite(page)) qp.set('page', String(page))
-      const url = qp.toString() ? `${base}?${qp.toString()}` : base
+      if (Number.isFinite(limit)) qp.set('limit', String(limit))
+      const url = base + (qp.toString() ? (base.includes('?') ? '&' : '?') + qp.toString() : '')
+      // console.log('syncAllHistory final URL:', url)
       const headers = { 'x-auth-token': token }
+      // Debug: log the constructed URL so we can verify which `type` is requested from the UI
+      try { console.debug('[utility.syncAllHistory] GET', url) } catch (_) {}
       const result = await axios.get(url, { headers })
+      // console.log('[utility.syncAllHistory] GET result:', result)
       const payload = result && result.data ? result.data : null
+      // console.log('syncAllHistory payload received:', payload)
       if (!payload) return []
       // Structure backend: { history: [...] }
       if (Array.isArray(payload.history)) return payload.history
@@ -634,6 +642,7 @@ export default {
       // Fallbacks legacy
       if (Array.isArray(payload)) return payload
       if (payload.data && Array.isArray(payload.data)) return payload.data
+      console.log('Unrecognized payload structure in syncAllHistory:', payload)
       return []
     } catch (error) {
       console.error('err syncAllHistory in frontend/utility.js ===> ', error)
@@ -810,15 +819,21 @@ export default {
       case 'block':
       case 'you_block':
       case 'he_block':
-        return ['img', blockIcon]
+        // Use image asset so block icons match site-wide imagery
+        return ['img', blockImg, 'text-red']
       case 'report':
-        return ['img', reportIcon]
+        // Use image asset so report icons match site-wide imagery
+        return ['img', reportImg, 'text-yellow']
       case 'talk':
         return ['mdi', 'mdi-wechat', 'text-grey']
       case 'avatar_img':
         return ['mdi', 'mdi-account', 'text-blue']
       case 'cover_img':
         return ['mdi', 'mdi-image', 'text-green']
+      case 'add_image':
+        return ['mdi', 'mdi-image-multiple', 'text-purple']
+      default:
+        return ['mdi', 'mdi-help-circle', 'text-grey']
     }
   },
   getLikeValue (type) {

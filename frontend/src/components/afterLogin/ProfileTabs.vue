@@ -2,7 +2,7 @@
   <div md="8" :class="mobile ? 'hidden-md-and-up pb-0 mt-5' : 'hidden-sm-and-down'">
     <q-tabs v-model="activeTab" :color="`grey lighten`" slider-color="primary">
       <q-tab v-for="link in links" :key="link.route">
-        <img :src="link.icon" class="icon-size">
+        <img :src="link.icon" class="icon-size" />
         <span :class="mobile ? 'pl-3 hidden-xs-only' : ''">{{ link.text }}</span>
       </q-tab>
     </q-tabs>
@@ -27,44 +27,46 @@ const props = defineProps({
 const emit = defineEmits(['change-tab'])
 const activeTab = ref(props.active)
 const links = ref([
-  { 
-    text: 'Infos', 
+  {
+    text: 'Infos',
     route: 'profile',
     icon: userImage
-    },
-  { 
+  },
+  {
     route: 'photo',
-    text: 'Gallerie', 
-    icon: galerieImage 
-    }
+    text: 'Gallerie',
+    icon: galerieImage
+  }
 ])
 
 if (props.settings) {
   links.value[0].text = 'Profile'
-  links.value.push({ 
+  links.value.push({
     text: 'Historique',
     route: 'history',
     icon: historyImage
-    })
+  })
   links.value.push({
     text: 'Paramèters',
     route: 'setting',
     icon: settingImage
-    })
+  })
 }
 
 watch(activeTab, (newTab) => {
   emit('change-tab', newTab)
 })
 
-watch(() => props.active, (newActive) => {
-  activeTab.value = newActive
-}, { immediate: true })
+watch(
+  () => props.active,
+  (newActive) => {
+    activeTab.value = newActive
+  },
+  { immediate: true }
+)
 
 const isDesktop = computed(() => !store.state.mobile)
-
 </script>
-
 
 <style>
 .q-tabs__container {

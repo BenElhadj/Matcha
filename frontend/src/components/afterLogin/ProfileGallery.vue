@@ -1,7 +1,16 @@
 import { API_URL, BASE_URL } from '@/utility.js'; // Utilitaire global pour l'affichage d'image
 <template>
-  <q-page>
-    <q-page-container>
+  <q-page class="q-pa-lg">
+    <div
+      style="
+        width: 100%;
+        max-width: 800px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      "
+    >
       <!-- Bouton d'upload positionné en haut à droite, au-dessus de tout -->
       <div v-if="route && route.path === '/Matcha/settings'" class="upload-btn-container">
         <input
@@ -14,15 +23,16 @@ import { API_URL, BASE_URL } from '@/utility.js'; // Utilitaire global pour l'af
         />
         <q-btn round color="primary" icon="mdi-camera-plus" @click="onUploadClick" />
       </div>
-      <h1 class="q-pb-md" style="text-align: center">Gallery</h1>
-      <h3 style="margin-bottom: 100px; text-align: center">
-        {{ username }}
+      <h1 style="text-align: center">Gallery</h1>
+      <h3 style="margin-bottom: 50px; text-align: center">
+        {{ user.username }}
       </h3>
-      <div class="row q-gutter-md mt-4">
+      <div class="row q-gutter-md mt-4 justify-center">
         <div
           v-for="image in props.images"
           :key="image.id"
-          class="col-xs-12 col-sm-6 col-md-4 img_container"
+          class="col-xs-12 col-sm-6 col-md-4 img_container flex flex-center"
+          style="margin: 24px; border-radius: 16px; overflow: hidden; position: relative;"
         >
           <q-btn
             v-if="user.id == image.user_id"
@@ -57,7 +67,7 @@ import { API_URL, BASE_URL } from '@/utility.js'; // Utilitaire global pour l'af
       </div>
       <!-- Pagination supprimée : toutes les images sont affichées -->
       <AlertView :alert="alert" />
-    </q-page-container>
+    </div>
   </q-page>
 </template>
 

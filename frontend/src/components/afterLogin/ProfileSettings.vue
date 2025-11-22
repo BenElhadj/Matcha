@@ -1,77 +1,80 @@
 <template>
-  <q-page>
-    <q-page-container>
-      <h1 class="q-pb-md" style="text-align: center">Settings</h1>
-      <h3 style="margin-bottom: 100px; text-align: center">
+  <q-page class="q-pa-lg">
+    <div
+      style="
+        width: 100%;
+        max-width: 800px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      "
+    >
+      <h1 style="text-align: center">Settings</h1>
+      <h3 style="margin-bottom: 50px; text-align: center">
         {{ user.username }}
       </h3>
 
-      <div class="q-pa-md row flex flex-center justify-between" style="margin: 7%">
-        <div class="col-xs-12 col-sm-6 q-pa-md">
-          <div
-            class="row items-center"
-            style="
-              display: flex;
-              flex-direction: column;
-              align-content: flex-start;
-              align-items: center;
-            "
-          >
-            <img
-              style="width: 130px; margin-left: 7px"
-              class="col-auto q-ml-md"
-              src="@/assets/Settings/resetEmail.png"
-              @click="emailDialog = true"
-            />
-            <br />
-            <q-input v-model="user.email" readonly label="Email" />
-          </div>
+      <div class="settings-row q-pa-md">
+        <div class="settings-tile">
+          <img
+            class="settings-icon"
+            src="@/assets/Settings/resetEmail.png"
+            @click="emailDialog = true"
+            alt="email"
+          />
+          <div class="settings-label">Email</div>
+          <q-input
+            class="settings-input"
+            v-model="user.email"
+            readonly
+            style="font-size: 0.95rem"
+          />
         </div>
-        <div class="q-flex column items-center justify-center">
-          <div class="align-center">
-            <img
-              style="width: 130px; margin-left: 7px"
-              class="col-auto q-ml-md"
-              src="@/assets/Settings/resetPasswd.png"
-              @click="passDialog = true"
-            />
-            <br />
-            <q-input
-              v-model="user.passe"
-              readonly
-              value="***********"
-              label="Password"
-              type="password"
-            />
-          </div>
+
+        <div class="settings-tile">
+          <img
+            class="settings-icon"
+            src="@/assets/Settings/resetPasswd.png"
+            @click="passDialog = true"
+            alt="password"
+          />
+          <div class="settings-label">Password</div>
+          <q-input
+            class="settings-input"
+            v-model="pwdMask"
+            readonly
+            type="text"
+            style="font-size: 0.95rem"
+          />
         </div>
       </div>
 
-      <div class="q-pa-md row flex flex-center justify-between" style="margin: 7%">
-        <div class="q-flex column items-center justify-center">
-          <div class="align-center">
-            <img
-              style="width: 150px; margin-left: 7px"
-              src="@/assets/Settings/geolocalisation.png"
-              @click="openLoc"
-              alt="Location Icon"
-            />
-          </div>
-          <span>Click here to update your location</span>
+      <div class="settings-row q-pa-md" style="margin: 7% 0">
+        <div class="settings-tile">
+          <img
+            class="settings-icon"
+            src="@/assets/Settings/geolocalisation.png"
+            @click="openLoc"
+            alt="Location Icon"
+          />
+          <div class="settings-label">Location</div>
+          <div class="settings-note">Click here to update your location</div>
         </div>
-        <div class="q-flex column items-center justify-center">
-          <div class="align-center">
-            <img
-              style="width: 150px"
-              src="@/assets/Settings/blocked.png"
-              @click="
-                Array.isArray(blacklist) && blacklist.length === 0
-                  ? noBlacklist()
-                  : (blackListDialog = true)
-              "
-            />
-          </div>
-          <span>Click here to view blocked users</span>
+
+        <div class="settings-tile">
+          <img
+            class="settings-icon"
+            src="@/assets/Settings/blocked.png"
+            @click="
+              Array.isArray(blacklist) && blacklist.length === 0
+                ? noBlacklist()
+                : (blackListDialog = true)
+            "
+            alt="blocked"
+          />
+          <div class="settings-label">Blocked users</div>
+          <div class="settings-note">Click here to view blocked users</div>
         </div>
       </div>
 
@@ -384,7 +387,7 @@
       </q-dialog>
 
       <AlertView :alert="alert" />
-    </q-page-container>
+    </div>
   </q-page>
 </template>
 
@@ -672,6 +675,9 @@ const noBlacklist = () => {
     text: "You haven't blocked or reported anyone."
   }
 }
+
+// Local mask for displaying password as asterisks in settings (readonly)
+const pwdMask = ref('***********')
 </script>
 
 <style>
@@ -724,5 +730,47 @@ body,
   margin: 1vw 2vw;
   border-radius: 5px;
   cursor: pointer;
+}
+
+/* Standardized settings tiles layout */
+.settings-row {
+  display: flex;
+  flex-direction: row;
+  gap: 24px;
+  width: 100%;
+  max-width: 800px;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+.settings-tile {
+  flex: 1 1 48%; /* two columns */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px;
+  box-sizing: border-box;
+}
+.settings-icon {
+  height: 130px;
+  width: auto;
+  object-fit: contain;
+  cursor: pointer;
+  display: block;
+  margin-bottom: 10px;
+}
+.settings-label {
+  font-weight: 600;
+  margin-bottom: 8px;
+  text-align: center;
+}
+.settings-note {
+  color: #666;
+  font-size: 0.95rem;
+  margin-top: 6px;
+  text-align: center;
+}
+.settings-input {
+  width: 60%;
+  max-width: 60%;
 }
 </style>
