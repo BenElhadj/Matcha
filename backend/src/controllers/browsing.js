@@ -342,28 +342,12 @@ async function discover(req, res) {
 		const sortBy = q.sortBy || 'distance' // distance | age | rating | interests
 		const sortDir = (q.sortDir || 'asc').toLowerCase() === 'desc' ? -1 : 1
 
-		// Use optimized model query which performs filtering, distance calc and pagination in SQL
-		const hasRatingFilter = hasRatingMin || hasRatingMax
-		const opts = {
-			meId: me.id,
-			lat,
-			lng,
-			distanceMax,
-			ageMin,
-			ageMax,
-			ratingMin,
-			ratingMax,
-			hasRatingFilter,
-			tags,
-			search,
-			gender,
-			sortBy,
-			sortDir,
-			limit,
-			offset
-		}
-
-		const { rows: fetchedRows, total } = await userModel.getUsersForDiscover(opts)
+		// IMPORTANT: backend will NOT apply client-driven filters (age/gender/distance/tags/rating/search).
+		// The backend should only exclude blocked relationships and provide a paginated list of users.
+		// Let the frontend perform the filtering and sorting. Build a minimal opts for a no-filter fetch.
+		const fetchRes = await userModel.getUsersForDiscoverNoFilters({ meId: me.id, limit, offset, sortBy, sortDir })
+		const fetchedRows = (fetchRes && fetchRes.rows) ? fetchRes.rows : []
+		let total = fetchRes && typeof fetchRes.total !== 'undefined' ? fetchRes.total : 0
 		let rows = fetchedRows || []
 
 		// Exclude blocked both ways (type = 'block' ONLY)

@@ -241,6 +241,67 @@ const getUsersForDiscover = async (opts = {}) => {
     return { rows, total };
 };
 
+// GET Users for Discover WITHOUT any client filters (backend should only exclude self)
+// This returns a paginated list of users; frontend is expected to apply filtering (age/gender/distance/tags/etc.)
+const getUsersForDiscoverNoFilters = async (opts = {}) => {
+    const {
+        meId,
+        limit = 50,
+        offset = 0,
+        sortBy = 'id',
+        sortDir = 1
+    } = opts;
+
+    const params = [];
+    // Exclude self
+    params.push(meId);
+    let where = `WHERE users.id <> $${params.length}`;
+
+    // Basic ordering: allow a couple of safe sort options
+    let orderBy = 'users.id ASC';
+    if (sortBy === 'age') orderBy = `EXTRACT(YEAR FROM AGE(users.birthdate)) ${sortDir < 0 ? 'DESC' : 'ASC'}`;
+    else if (sortBy === 'rating') orderBy = `get_rating(users.id) ${sortDir < 0 ? 'DESC' : 'ASC'}`;
+    else if (sortBy === 'username') orderBy = `users.username ${sortDir < 0 ? 'DESC' : 'ASC'}`;
+
+    // Pagination
+    params.push(limit);
+    const limitIdx = params.length;
+    params.push(offset);
+    const offsetIdx = params.length;
+
+    const query = `
+        SELECT users.id AS user_id, users.username, users.first_name, users.last_name, users.gender, users.birthdate, users.tags, users.city, users.country, users.address, users.lat, users.lng, COALESCE(images.link,'') AS link, COALESCE(images.data,'') AS data, get_rating(users.id) AS rating, COUNT(*) OVER() AS total
+        FROM users
+        LEFT JOIN images ON users.id = images.user_id AND images.profile = TRUE
+        ${where}
+        ORDER BY ${orderBy}
+        LIMIT $${limitIdx} OFFSET $${offsetIdx}
+    `;
+
+    const result = await db.query(query, params);
+    const rows = result.rows.map(u => ({
+        user_id: Number(u.user_id),
+        username: u.username,
+        first_name: u.first_name,
+        last_name: u.last_name,
+        gender: u.gender,
+        birthdate: u.birthdate,
+        ageYears: u.birthdate ? Number(new Date().getFullYear() - new Date(u.birthdate).getFullYear()) : 0,
+        tags: u.tags || '',
+        city: u.city,
+        country: u.country,
+        address: u.address,
+        lat: Number(u.lat) || null,
+        lng: Number(u.lng) || null,
+        rating: Number(u.rating) || 0,
+        profile_image: (u.link && u.link !== 'false' && u.link !== '') ? u.link : (u.data && u.data !== 'false' && u.data !== '' ? `data:image/png;base64,${u.data}` : ''),
+        distanceKm: 0
+    }));
+
+    const total = result.rows && result.rows[0] ? Number(result.rows[0].total) : 0;
+    return { rows, total };
+};
+
 // GET User by id (browsing)
 const getUserbyIdBrow = async (id, user_id) => {
         const query = `SELECT users.*, get_rating(users.id) AS rating
@@ -703,4 +764,5 @@ module.exports = {
     getUsersByIds,
     getImagesByUids
     ,getUsersForDiscover
+    ,getUsersForDiscoverNoFilters
 }
