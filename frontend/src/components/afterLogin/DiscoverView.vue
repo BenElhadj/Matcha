@@ -164,7 +164,7 @@
                 </q-infinite-scroll>
 
                 <!-- Overlay limited to the grid area only -->
-                <div class="loader-overlay" v-show="isFetching">
+                <div class="loader-overlay" v-show="showSpinner">
                   <LoaderView />
                 </div>
 
@@ -232,6 +232,7 @@ const location = ref(null)
 const hasBoth = ref(false)
 const hasAll = ref(false)
 const loaded = ref(false)
+const showSpinner = ref(false)
 const age = ref({ min: 18, max: 85 })
 const rating = ref({ min: 0, max: 100 })
 const distance = ref({ min: 0, max: 10000 })
@@ -436,6 +437,11 @@ async function fetchDiscover({ resetPage = false } = {}) {
   }
   const url = `${API_URL}/api/users/discover`
   isFetching.value = true
+  // Only show the overlay spinner if the fetch takes longer than 200ms
+  let spinnerTimer = null
+  spinnerTimer = setTimeout(() => {
+    showSpinner.value = true
+  }, 200)
   // Show a unified overlay via isFetching; no separate isRefreshing flag
   try {
     const res = await axios.get(url, { headers, params, signal: abortController.signal })
@@ -518,6 +524,8 @@ async function fetchDiscover({ resetPage = false } = {}) {
     }
   } finally {
     isFetching.value = false
+    if (spinnerTimer) clearTimeout(spinnerTimer)
+    showSpinner.value = false
   }
 }
 

@@ -50,6 +50,7 @@ const getBlockedBy = async (req, res) => {
 	}
 };
 const historyModel = require('../models/historyModel');
+const notificationsModel = require('../models/notificationsModel');
 
 // getAllHistory: pagination SQL-native
 const getAllHistory = async (req, res) => {
@@ -129,6 +130,16 @@ const showUserById = async (req, res) => {
 			u.images = [];
 			console.error('[showUserById] failed to load images for user', id, e && e.message ? e.message : e);
 		}
+
+		// Record the visit in history (1 hour window) and notify the visited user (visit notification) if applicable
+		try {
+			await historyModel.insertHistory(me, targetId).catch(() => {});
+			await notificationsModel.insertNotifVis(me, targetId).catch(() => {});
+		} catch (e) {
+			// non-fatal
+			console.error('[showUserById] history/notification insert error', e && e.message ? e.message : e);
+		}
+
 		return res.json(u);
 	} catch (err) {
 		res.json({ msg: 'Fatal error', err });
@@ -139,7 +150,6 @@ const showUserById = async (req, res) => {
 const getHistory = async (req, res) => {
 	res.json({ history: [] });
 };
-const notificationsModel = require('../models/notificationsModel');
 // Fusionne les utilisateurs qui m'ont bloqué et ceux qui m'ont signalé (block/report)
 const { getBlockedOrReportedBy } = require('../models/getBlockedOrReportedBy')
 
@@ -324,144 +334,87 @@ async function discover(req, res) {
 		const sortBy = q.sortBy || 'distance' // distance | age | rating | interests
 		const sortDir = (q.sortDir || 'asc').toLowerCase() === 'desc' ? -1 : 1
 
-		// Base dataset: users with profile image and computed rating
-		// Note: getUserBrow already joins images.profile = TRUE and computes get_rating(users.id)
-		let rows = await userModel.getUserBrow()
-
-		// Filter out sensitive columns and shape base objects
-		const isValid = (v) => v && v !== 'false' && String(v).trim() !== ''
-		rows = rows.map((u) => {
-			// profile image from images.* (link or data)
-			let profile_image = ''
-			try {
-				if (isValid(u.link)) profile_image = u.link
-				else if (isValid(u.data)) profile_image = `data:image/png;base64,${u.data}`
-			} catch (_) {}
-			// Compute ageYears server-side once
-			let ageYears = 0
-			try {
-				const bd = u.birthdate ? new Date(u.birthdate) : null
-				if (bd && !isNaN(bd)) {
-					const diff = Date.now() - bd.getTime()
-					ageYears = Math.abs(new Date(diff).getUTCFullYear() - 1970)
-				}
-			} catch (_) {}
-			return {
-				// Prefer images.user_id (FK) over images.id to ensure we reference the actual user id
-				user_id: Number(u.user_id || u.id),
-				username: u.username,
-				first_name: u.first_name,
-				last_name: u.last_name,
-				gender: u.gender,
-				birthdate: u.birthdate,
-				ageYears,
-				tags: u.tags || '',
-				city: u.city,
-				country: u.country,
-				address: u.address,
-				lat: Number(u.lat),
-				lng: Number(u.lng),
-				rating: Number(u.rating) || 0,
-				profile_image
-			}
-		})
-
-	// Exclude blocked both ways (type = 'block' ONLY)
-	// me blocks others
-	const blk1 = await db.query("SELECT blocked FROM blocked WHERE blocker = $1 AND type = 'block'", [me.id])
-	const myBlockedSet = new Set(blk1.rows.map((r) => String(r.blocked)))
-	// others block me
-	const blk2 = await db.query("SELECT blocker FROM blocked WHERE blocked = $1 AND type = 'block'", [me.id])
-	const blockedBySet = new Set(blk2.rows.map((r) => String(r.blocker)))
-	rows = rows.filter((u) => !myBlockedSet.has(String(u.user_id)) && !blockedBySet.has(String(u.user_id)))
-	// Exclude self
-	rows = rows.filter((u) => String(u.user_id) !== String(me.id))
-
-		// Filters
-		if (gender) rows = rows.filter((u) => u.gender === gender)
-		if (search) {
-			rows = rows.filter((u) => {
-				const s1 = (u.username || '').toLowerCase()
-				const s2 = (u.first_name || '').toLowerCase()
-				const s3 = (u.last_name || '').toLowerCase()
-				return s1.includes(search) || s2.includes(search) || s3.includes(search)
-			})
+		// Use optimized model query which performs filtering, distance calc and pagination in SQL
+		const hasRatingFilter = hasRatingMin || hasRatingMax
+		const opts = {
+			meId: me.id,
+			lat,
+			lng,
+			distanceMax,
+			ageMin,
+			ageMax,
+			ratingMin,
+			ratingMax,
+			hasRatingFilter,
+			tags,
+			search,
+			gender,
+			sortBy,
+			sortDir,
+			limit,
+			offset
 		}
-		if (tags.length) {
-			rows = rows.filter((u) => {
-				if (!u.tags) return false
-				const arr = String(u.tags).split(',')
-				return tags.some((t) => arr.includes(t))
-			})
-		}
-		// Distance compute on demand; memoize
-		const meLoc = { lat: Number(lat), lng: Number(lng) }
-		rows = rows.map((u) => {
-			let d = 0
-			try {
-				if (isFinite(u.lat) && isFinite(u.lng) && isFinite(meLoc.lat) && isFinite(meLoc.lng)) {
-					d = distance(meLoc, { lat: Number(u.lat), lng: Number(u.lng) })
-				}
-			} catch (_) {}
-			return { ...u, distanceKm: d }
-		})
-		// Compute global maxima BEFORE applying specific filters
-		const maxDistance = rows.length ? Math.ceil(rows.reduce((acc, u) => Math.max(acc, Number(u.distanceKm) || 0), 0)) : 0
+
+		const { rows: fetchedRows, total } = await userModel.getUsersForDiscover(opts)
+		let rows = fetchedRows || []
+
+		// Exclude blocked both ways (type = 'block' ONLY)
+		const blk1 = await db.query("SELECT blocked FROM blocked WHERE blocker = $1 AND type = 'block'", [me.id])
+		const myBlockedSet = new Set(blk1.rows.map((r) => String(r.blocked)))
+		// others block me
+		const blk2 = await db.query("SELECT blocker FROM blocked WHERE blocked = $1 AND type = 'block'", [me.id])
+		const blockedBySet = new Set(blk2.rows.map((r) => String(r.blocker)))
+		rows = rows.filter((u) => !myBlockedSet.has(String(u.user_id)) && !blockedBySet.has(String(u.user_id)))
+
+		// Compute server-side maxima from fetched slice (best-effort)
+		const maxDistance = rows.length ? Math.ceil(rows.reduce((acc, u) => Math.max(acc, Number(u.distanceKm) || 0), 0)) : distanceMax
 		const maxRating = rows.length ? rows.reduce((acc, u) => Math.max(acc, Number(u.rating) || 0), 0) : 0
-		// Now apply distance filter
-		rows = rows.filter((u) => u.distanceKm >= 0 && u.distanceKm <= distanceMax)
-		rows = rows.filter((u) => u.ageYears >= ageMin && u.ageYears <= ageMax)
-		// Only apply rating filter if client explicitly provided rating bounds
-		if (hasRatingMin || hasRatingMax) {
-			rows = rows.filter((u) => u.rating >= ratingMin && u.rating <= ratingMax)
+
+		// Items are already paginated by SQL
+		let items = rows
+
+		// --- Enrich ordering: onlineFirst, then friends, then invitations received, then invitations sent, then others
+		try {
+			// get online set (may be undefined)
+			const onlineSet = new Set((req.app.get('connectedUsers') || []).map(x => String(x)));
+			// get following (who I invited) and followers (who invited me)
+			const followingRows = await matchingModel.getFollowing(me.id).catch(() => []);
+			const followersRows = await matchingModel.getFollowers(me.id).catch(() => []);
+			const followingSet = new Set((followingRows || []).map(r => String(r.matched_id || r.matched_id)));
+			const followersSet = new Set((followersRows || []).map(r => String(r.matcher_id || r.matcher_id)));
+			const friendsSet = new Set(Array.from(followingSet).filter(x => followersSet.has(x)));
+
+			// Preserve original order from SQL by tagging index
+			items = items.map((it, idx) => ({ ...it, _origIndex: idx }));
+
+			items.sort((a, b) => {
+				// onlineFirst grouping
+				if (onlineFirst) {
+					const ao = onlineSet.has(String(a.user_id)) ? 0 : 1;
+					const bo = onlineSet.has(String(b.user_id)) ? 0 : 1;
+					if (ao !== bo) return ao - bo;
+				}
+				const uidA = String(a.user_id);
+				const uidB = String(b.user_id);
+				const prio = (uid) => {
+					if (friendsSet.has(uid)) return 0;
+					if (followersSet.has(uid) && !followingSet.has(uid)) return 1; // invitation received
+					if (followingSet.has(uid) && !followersSet.has(uid)) return 2; // invitation sent
+					return 3; // normal
+				}
+				const pa = prio(uidA);
+				const pb = prio(uidB);
+				if (pa !== pb) return pa - pb;
+				// fallback to original SQL order
+				return (a._origIndex || 0) - (b._origIndex || 0);
+			});
+			// remove _origIndex before returning
+			items = items.map(({ _origIndex, ...rest }) => rest);
+		} catch (e) {
+			console.error('[discover] error computing social ordering', e && e.message ? e.message : e);
 		}
 
-		// Interests count for sort if needed
-		const myTags = (me.tags || '').split(',')
-		const interestsCount = (u) => {
-			if (!u.tags) return 0
-			const arr = String(u.tags).split(',')
-			return myTags.filter((t) => arr.includes(t)).length
-		}
-
-		// Online-first using app-scoped Set
-		let onlineIds = []
-		if (onlineFirst) {
-			try {
-				const set = req.app.get('connectedUsers')
-				if (set && typeof set.has === 'function') onlineIds = Array.from(set)
-			} catch (_) {}
-		}
-		const onlineSet = new Set(onlineIds.map((x) => String(x)))
-
-		// Sorting
-		const cmp = (a, b) => {
-			// Online first
-			if (onlineFirst) {
-				const ao = onlineSet.has(String(a.user_id)) ? 0 : 1
-				const bo = onlineSet.has(String(b.user_id)) ? 0 : 1
-				if (ao !== bo) return ao - bo
-			}
-			switch (sortBy) {
-				case 'age':
-					return sortDir * ((a.ageYears || 0) - (b.ageYears || 0))
-				case 'rating':
-					return sortDir * ((b.rating || 0) - (a.rating || 0))
-				case 'interests':
-					return sortDir * (interestsCount(b) - interestsCount(a))
-				case 'distance':
-				default:
-					return sortDir * ((a.distanceKm || 0) - (b.distanceKm || 0))
-			}
-		}
-		rows.sort(cmp)
-
-		// Pagination
-	const total = rows.length
-		const start = (page - 1) * limit
-		const items = rows.slice(start, start + limit)
-
-		// Minimal payload; no heavy images array
+		// return response
 		return res.json({ page, limit, total, maxDistance, maxRating, items })
 	} catch (err) {
 		return res.json({ msg: 'Fatal error', err: String(err && err.message ? err.message : err) })

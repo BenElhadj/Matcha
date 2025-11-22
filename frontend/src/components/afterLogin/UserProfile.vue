@@ -652,10 +652,10 @@ const fetchUser = async (id) => {
         if (res.data.msg) {
           router.push('/404')
         }
-  loading.value = false
-  user.value = { ...res.data, rating: Number(res.data.rating) }
-  // DEBUG: afficher les données reçues pour diagnostiquer l'absence d'images
-  try { console.log('[UserProfile] fetched user:', JSON.parse(JSON.stringify(res.data))) } catch (e) { console.log('[UserProfile] fetched user (raw):', res.data) }
+        loading.value = false
+        user.value = { ...res.data, rating: Number(res.data.rating) }
+        // DEBUG: afficher les données reçues pour diagnostiquer l'absence d'images
+        // try { console.log('[UserProfile] fetched user:', JSON.parse(JSON.stringify(res.data))) } catch (e) { console.log('[UserProfile] fetched user (raw):', res.data) }
         const profileImg = res.data.images.find((cur) => cur.profile === 1)
 
         // Ne pas notifier si on visite son propre profil
@@ -683,7 +683,7 @@ const prefetched = route?.meta?.prefetchedUser
 if (prefetched) {
   user.value = { ...prefetched, rating: Number(prefetched.rating) }
   // DEBUG: afficher les données préfetchées (route.meta.prefetchedUser)
-  try { console.log('[UserProfile] prefetched user:', JSON.parse(JSON.stringify(prefetched))) } catch (e) { console.log('[UserProfile] prefetched user (raw):', prefetched) }
+  // try { console.log('[UserProfile] prefetched user:', JSON.parse(JSON.stringify(prefetched))) } catch (e) { console.log('[UserProfile] prefetched user (raw):', prefetched) }
   loading.value = false
   // Dès que l'utilisateur est prêt, tenter d'afficher l'icône correcte
   computeLocalRelation()

@@ -103,6 +103,140 @@ const getUserBrow = async () => {
     return result.rows;
 }
 
+// Optimized discover query: server-side filtering, distance calc, sorting and pagination
+const getUsersForDiscover = async (opts = {}) => {
+    // opts: { meId, lat, lng, distanceMax, ageMin, ageMax, ratingMin, ratingMax, hasRatingFilter, tags, search, gender, sortBy, sortDir, limit, offset }
+    const {
+        meId,
+        lat,
+        lng,
+        distanceMax = 10000,
+        ageMin = 18,
+        ageMax = 85,
+        ratingMin = 0,
+        ratingMax = 10000,
+        hasRatingFilter = false,
+        tags = [],
+        search = '',
+        gender = null,
+        sortBy = 'distance',
+        sortDir = 1,
+        limit = 50,
+        offset = 0
+    } = opts;
+
+    const params = [];
+    // We'll build WHERE clauses dynamically
+    let where = `WHERE users.id IS NOT NULL`;
+    // Exclude self
+    params.push(meId);
+    where += ` AND users.id <> $${params.length}`;
+
+    // Gender
+    if (gender) {
+        params.push(gender);
+        where += ` AND users.gender = $${params.length}`;
+    }
+
+    // Search
+    if (search && search.trim().length) {
+        params.push(`%${search.trim().toLowerCase()}%`);
+        where += ` AND (LOWER(users.username) LIKE $${params.length} OR LOWER(users.first_name) LIKE $${params.length} OR LOWER(users.last_name) LIKE $${params.length})`;
+    }
+
+    // Age using SQL age() function
+    params.push(ageMin);
+    where += ` AND EXTRACT(YEAR FROM AGE(users.birthdate)) >= $${params.length}`;
+    params.push(ageMax);
+    where += ` AND EXTRACT(YEAR FROM AGE(users.birthdate)) <= $${params.length}`;
+
+    // Rating
+    if (hasRatingFilter) {
+        params.push(ratingMin);
+        where += ` AND get_rating(users.id) >= $${params.length}`;
+        params.push(ratingMax);
+        where += ` AND get_rating(users.id) <= $${params.length}`;
+    }
+
+    // Tags: at least one match
+    if (tags && Array.isArray(tags) && tags.length) {
+        const tagConds = [];
+        for (const t of tags) {
+            params.push(`%${t}%`);
+            tagConds.push(`users.tags LIKE $${params.length}`);
+        }
+        if (tagConds.length) where += ` AND (${tagConds.join(' OR ')})`;
+    }
+
+    // Distance: compute using haversine; require lat/lng be present for the user
+    // placeholders for lat/lng
+    params.push(lat || 0);
+    const latIdx = params.length;
+    params.push(lng || 0);
+    const lngIdx = params.length;
+
+    // distance expression (km)
+    const distExpr = `(
+        6371 * acos(
+            cos(radians($${latIdx})) * cos(radians(users.lat)) * cos(radians(users.lng) - radians($${lngIdx})) +
+            sin(radians($${latIdx})) * sin(radians(users.lat))
+        )
+    )`;
+
+    // Exclude users without coords when distance filtering
+    if (isFinite(distanceMax) && Number(distanceMax) < 100000) {
+        params.push(distanceMax);
+        where += ` AND users.lat IS NOT NULL AND users.lng IS NOT NULL AND ${distExpr} <= $${params.length}`;
+    }
+
+    // Build ORDER BY
+    let orderBy = '';
+    switch (sortBy) {
+        case 'age':
+            orderBy = `EXTRACT(YEAR FROM AGE(users.birthdate)) ${sortDir < 0 ? 'DESC' : 'ASC'}`;
+            break;
+        case 'rating':
+            orderBy = `get_rating(users.id) ${sortDir < 0 ? 'DESC' : 'ASC'}`;
+            break;
+        case 'distance':
+        default:
+            orderBy = `${distExpr} ${sortDir < 0 ? 'DESC' : 'ASC'}`;
+            break;
+    }
+
+    // Pagination
+    params.push(limit);
+    const limitIdx = params.length;
+    params.push(offset);
+    const offsetIdx = params.length;
+
+    // Final query: compute distance, rating and include total via window
+    const query = `SELECT users.id AS user_id, users.username, users.first_name, users.last_name, users.gender, users.birthdate, users.tags, users.city, users.country, users.address, users.lat, users.lng, COALESCE(images.link,'') AS link, COALESCE(images.data,'') AS data, get_rating(users.id) AS rating, ${distExpr} AS distance_km, COUNT(*) OVER() AS total FROM users LEFT JOIN images ON users.id = images.user_id AND images.profile = TRUE ${where} ORDER BY ${orderBy} LIMIT $${limitIdx} OFFSET $${offsetIdx}`;
+
+    const result = await db.query(query, params);
+    const rows = result.rows.map(u => ({
+        user_id: Number(u.user_id),
+        username: u.username,
+        first_name: u.first_name,
+        last_name: u.last_name,
+        gender: u.gender,
+        birthdate: u.birthdate,
+        ageYears: u.birthdate ? Number(new Date().getFullYear() - new Date(u.birthdate).getFullYear()) : 0,
+        tags: u.tags || '',
+        city: u.city,
+        country: u.country,
+        address: u.address,
+        lat: Number(u.lat) || null,
+        lng: Number(u.lng) || null,
+        rating: Number(u.rating) || 0,
+        profile_image: (u.link && u.link !== 'false' && u.link !== '') ? u.link : (u.data && u.data !== 'false' && u.data !== '' ? `data:image/png;base64,${u.data}` : ''),
+        distanceKm: Number(u.distance_km) || 0
+    }));
+
+    const total = result.rows && result.rows[0] ? Number(result.rows[0].total) : 0;
+    return { rows, total };
+};
+
 // GET User by id (browsing)
 const getUserbyIdBrow = async (id, user_id) => {
         const query = `SELECT users.*, get_rating(users.id) AS rating
@@ -516,4 +650,5 @@ module.exports = {
     getReportedBy,
     getUsersByIds,
     getImagesByUids
+    ,getUsersForDiscover
 }
