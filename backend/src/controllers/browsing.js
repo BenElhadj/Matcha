@@ -71,6 +71,9 @@ const getAllHistory = async (req, res) => {
 const userModel = require('../models/userModel');
 const tagsModel = require('../models/tagsModel');
 const matchingModel = require('../models/matchingModel');
+// Database client and utilities used by discover
+const db = require('../config/database')
+const distance = require('../utility/distance')
 
 // showUsers: retourne la liste des utilisateurs (stub minimal)
 const showUsers = async (req, res) => {
