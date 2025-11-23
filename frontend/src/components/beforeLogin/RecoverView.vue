@@ -140,7 +140,26 @@ const submit = async () => {
     const data = { key, password: passwordConfirm.value }
     const res = await axios.post(url, data, { headers })
     if (res && res.data && (res.data.ok === true || res.data.status === 'success')) {
+      // On success, fetch full user object from backend and update store so navbar reflects login
       alert.value = { state: true, color: 'green', text: 'Your password has been reset!' }
+      try {
+        // attempt to retrieve user info using token
+        const whoamiUrl = `${apiBase}/api/auth/isLoggedin`
+        const whoamiRes = await axios.get(whoamiUrl, { headers })
+        if (whoamiRes && whoamiRes.data && !whoamiRes.data.msg) {
+          // dispatch store login action with returned user
+          try {
+            await store.dispatch('login', whoamiRes.data)
+            // ensure user snapshot in localStorage
+            try { localStorage.setItem('user', JSON.stringify(whoamiRes.data)) } catch (_) {}
+          } catch (e) {
+            console.warn('store.login failed after recover:', e)
+          }
+        }
+      } catch (e) {
+        console.warn('Could not fetch isLoggedin after reset:', e)
+      }
+
       await new Promise((resolve) => {
         const interval = setInterval(() => {
           if (!alert.value.state) {
