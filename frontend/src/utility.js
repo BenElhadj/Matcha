@@ -266,15 +266,6 @@ export function getCachedDefault (kind = 'profile') {
   if (__defaultTxtCache[kind]) return __defaultTxtCache[kind]
   let val = null
   try { val = localStorage.getItem(key) } catch (_) { val = null }
-  // SECURITY: Do not expose cached default images when there is no auth token.
-  // If there is no token, purge any cached default values and refuse to return them.
-  try {
-    const tok = localStorage.getItem('token')
-    if (!tok) {
-      try { localStorage.removeItem(key) } catch (_) {}
-      return null
-    }
-  } catch (_) {}
   if (val && typeof val === 'string') {
     const s = val.trim()
     // Si la valeur du cache est un base64 JPEG pur, retourne un data URI JPEG
@@ -332,13 +323,7 @@ export async function getDefaultTxtImage (relativeTxtPath, kind = 'profile') {
 
     const key = kind === 'cover' ? 'default_cover_data_uri' : 'default_profile_data_uri'
     __defaultTxtCache[kind] = dataUri
-    // Only persist default txt images when an auth token is present.
-    try {
-      const tok = localStorage.getItem('token')
-      if (tok) {
-        try { localStorage.setItem(key, dataUri) } catch (_) {}
-      }
-    } catch (_) {}
+    try { localStorage.setItem(key, dataUri) } catch (_) {}
     return dataUri
   } catch (err) {
     console.error('err getDefaultTxtImage in utility.js ===> ', err)
@@ -591,6 +576,9 @@ export async function deleteUserImage(imageId, isProfile = false) {
 }
 
 export default {
+  // Expose environment constants on the default export for legacy default imports
+  API_URL,
+  BASE_URL,
   getImageSrc,
   getDate,
   isBlocked,

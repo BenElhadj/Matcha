@@ -193,9 +193,27 @@ const alert = ref({
 })
 
 const birthdate = computed({
-  get: () => moment(user.birthdate).format('YYYY-MM-DD').toString().split('T')[0],
+  get: () => {
+    try {
+      if (!user || !user.birthdate) return ''
+      const m = moment(user.birthdate)
+      if (!m.isValid()) return ''
+      return m.format('YYYY-MM-DD')
+    } catch (_) {
+      return ''
+    }
+  },
   set: (value) => {
-    user.birthdate = moment(value).format('YYYY-MM-DD')
+    try {
+      if (!value || value === '') {
+        user.birthdate = null
+      } else {
+        const m = moment(value)
+        user.birthdate = m.isValid() ? m.format('YYYY-MM-DD') : null
+      }
+    } catch (_) {
+      user.birthdate = null
+    }
   }
 })
 
@@ -236,11 +254,14 @@ const resetForm = () => {
 const updateUser = async () => {
   try {
     const token = localStorage.getItem('token')
-    const url = `${API_URL}/api/users/updateprofile`
+    // prefer utility default export API_URL if available
+    const apiBase = (utility && utility.API_URL) ? utility.API_URL : (import.meta.env.VITE_APP_API_URL || 'http://localhost:3000')
+    const url = `${apiBase}/api/users/updateprofile`
     const headers = { 'x-auth-token': token }
 
     const res = await axios.post(url, user, { headers })
 
+    // treat absence of res.data.msg as success (legacy behaviour)
     if (res && res.data && !res.data.msg) {
       isEditing.value = false
       store.dispatch('updateUser', user)
@@ -251,17 +272,19 @@ const updateUser = async () => {
         text: 'Your account has been updated successfully'
       }
     } else {
+      const serverMsg = res && res.data ? (res.data.msg || res.data.message) : 'Oops... something went wrong!'
       alert.value = {
         state: true,
         color: 'red',
-        text: res.data.msg ? res.data.msg : 'Oops... something went wrong!'
+        text: serverMsg
       }
     }
   } catch (err) {
+    const serverMsg = err && err.response && err.response.data ? (err.response.data.msg || err.response.data.message) : null
     alert.value = {
       state: true,
       color: 'red',
-      text: err.data.msg ? err.data.msg : 'Oops... error update User!'
+      text: serverMsg || 'Oops... error update User!'
     }
     console.error('err updateUser in frontend/ProfileForm.vue ===> ', err)
   }

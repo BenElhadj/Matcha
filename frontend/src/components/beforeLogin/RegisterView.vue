@@ -143,8 +143,10 @@ const registerUser = async () => {
     return (alert.value = { state: true, color: 'red', text: 'Passwords do not match' })
   else {
     try {
-      // Use the centralized utility API_URL (handles dev vs prod via Vite env)
-      const url = `${utility.API_URL}/api/users/add`
+  // Determine API base URL: prefer utility.API_URL, fallback to localhost:3000 for dev
+  const apiBase = (utility && utility.API_URL) ? utility.API_URL : (import.meta.env.VITE_APP_API_URL || 'http://localhost:3000')
+  console.debug('[RegisterView] using apiBase =', apiBase)
+  const url = `${apiBase}/api/users/add`
       const data = {
         first_name: firstname.value,
         last_name: lastname.value,
