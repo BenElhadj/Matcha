@@ -94,22 +94,32 @@ export const auth = {
     },
     
     logout({ commit }, id) {
-      // Clear all auth-related and persisted localStorage entries so the app
-      // doesn't resurrect a stale "connected" state after a page reload.
-      try {
-        localStorage.removeItem('token')
-      } catch (_) {}
+      // Remove a deterministic set of localStorage keys on logout so nothing
+      // related to the previous session remains and the UI cannot be revived
+      // by a page refresh. Wrap each removal to avoid exceptions in restricted
+      // environments (e.g., third-party cookies/storage disabled).
+      const keysToRemove = [
+        'token',
+        'user',
+        'user_images',
+        'matcha_app_state_v1',
+        'key',
+        // utility cached defaults
+        'default_cover_data_uri',
+        'default_profile_data_uri',
+        // history / tags / other persisted slices
+        'user_history_all',
+        'user_tags'
+      ]
+      for (const k of keysToRemove) {
+        try {
+          localStorage.removeItem(k)
+        } catch (_) {}
+      }
+
+      // As an extra safety, attempt to clear any leftover app snapshot
       try {
         localStorage.removeItem('matcha_app_state_v1')
-      } catch (_) {}
-      try {
-        localStorage.removeItem('user')
-      } catch (_) {}
-      try {
-        localStorage.removeItem('user_images')
-      } catch (_) {}
-      try {
-        localStorage.removeItem('key')
       } catch (_) {}
 
       commit('logout')

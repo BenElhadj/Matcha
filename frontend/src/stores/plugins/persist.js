@@ -38,7 +38,15 @@ function pick(obj, keys) {
 export default function persistPlugin(store) {
   // 1) Hydrate from localStorage (shallow merge for whitelisted keys)
   if (typeof window !== 'undefined') {
-    const saved = safeParse(localStorage.getItem(STORAGE_KEY))
+    // If there is no auth token we must avoid hydrating persisted state.
+    // This prevents restoring a session from storage when the user is logged out.
+    let token = null
+    try { token = localStorage.getItem('token') } catch (_) { token = null }
+    if (!token) {
+      // Ensure no stale snapshot remains
+      try { localStorage.removeItem(STORAGE_KEY) } catch (_) {}
+    } else {
+      const saved = safeParse(localStorage.getItem(STORAGE_KEY))
     if (saved && Object.keys(saved).length) {
       for (const k of PERSIST_KEYS) {
         if (saved[k] !== undefined) {
@@ -46,11 +54,24 @@ export default function persistPlugin(store) {
         }
       }
     }
+    }
   }
 
   // 2) Subscribe to all mutations and persist whitelisted state
   store.subscribe((mutation, state) => {
     try {
+      // If a logout mutation is dispatched, remove the persisted snapshot and
+      // skip re-saving. This prevents an immediate rehydration loop where the
+      // app clears localStorage on logout but the persistence plugin writes
+      // the previous or partial state back right after.
+      try {
+        const mt = mutation && mutation.type ? String(mutation.type) : ''
+        if (/\/?logout$/.test(mt)) {
+          try { localStorage.removeItem(STORAGE_KEY) } catch (_) {}
+          return
+        }
+      } catch (_) {}
+
       const toSave = pick(state, PERSIST_KEYS)
       localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave))
     } catch (e) {

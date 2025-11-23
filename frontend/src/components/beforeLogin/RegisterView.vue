@@ -1,4 +1,4 @@
-import { API_URL } from '@/utility.js';
+// ...existing code...
 <template>
   <q-layout>
     <q-page-container class="mt-4">
@@ -143,7 +143,8 @@ const registerUser = async () => {
     return (alert.value = { state: true, color: 'red', text: 'Passwords do not match' })
   else {
     try {
-      const url = `${API_URL}/api/users/add`
+      // Use the centralized utility API_URL (handles dev vs prod via Vite env)
+      const url = `${utility.API_URL}/api/users/add`
       const data = {
         first_name: firstname.value,
         last_name: lastname.value,
@@ -174,9 +175,24 @@ const registerUser = async () => {
       }
     } catch (err) {
       console.error('err registerUser in frontend/RegisterView.vue ===> ', err)
-      // Afficher une alerte utilisateur si la requête échoue (erreur réseau / 500 ...)
-      const text = err?.response?.data?.msg || err?.response?.data?.message || 'Erreur lors de l\'inscription. Veuillez réessayer.'
-      alert.value = { state: true, color: 'red', text }
+      // Prioritise server-provided message (validation / business errors)
+      if (err && err.response && err.response.data) {
+        const serverMsg = err.response.data.msg || err.response.data.message
+        // If server returned an array of errors or detailed object, try to format it
+        if (serverMsg) {
+          alert.value = { state: true, color: 'red', text: serverMsg }
+        } else if (Array.isArray(err.response.data.errors)) {
+          alert.value = { state: true, color: 'red', text: err.response.data.errors.join(', ') }
+        } else {
+          alert.value = { state: true, color: 'red', text: 'Erreur serveur lors de l\'inscription. Veuillez vérifier les champs.' }
+        }
+      } else if (err && err.request) {
+        // Request was made but no response (network error / CORS / server down)
+        alert.value = { state: true, color: 'red', text: 'Impossible de joindre le serveur. Vérifiez votre connexion ou l\'URL du backend.' }
+      } else {
+        // Something else happened
+        alert.value = { state: true, color: 'red', text: 'Erreur lors de l\'inscription. Veuillez réessayer.' }
+      }
     }
   }
 }
