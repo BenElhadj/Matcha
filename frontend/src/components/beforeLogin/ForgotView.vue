@@ -1,4 +1,4 @@
-import { API_URL } from '@/utility.js';
+// ...existing code...
 <template>
   <q-layout>
     <q-page-container class="mt-4">
@@ -39,7 +39,7 @@ import { API_URL } from '@/utility.js';
 <script setup>
 import { ref } from 'vue'
 import AlertView from '@/views/AlertView.vue'
-import utility from '@/utility'
+import utility from '@/utility.js'
 import axios from 'axios'
 import { useRouter } from 'vue-router'
 
@@ -68,30 +68,34 @@ const emailRule = (v) => {
 
 const recover = async () => {
   if (emailRule(email.value) === true) {
-    const url = `${API_URL}/api/auth/forget_password`
-    const res = await axios.post(url, { email: email.value })
-    email.value = ''
-    if (res.data.ok) {
-      alert.value = {
-        state: true,
-        color: 'green',
-        text: res.data.msg ? res.data.msg : 'Please check your email ..'
+    try {
+      const apiBase = (utility && utility.API_URL) ? utility.API_URL : (import.meta.env.VITE_APP_API_URL || 'http://localhost:3000')
+      const url = `${apiBase}/api/auth/forget_password`
+      const res = await axios.post(url, { email: email.value })
+      email.value = ''
+      if (res && res.data && res.data.ok) {
+        alert.value = {
+          state: true,
+          color: 'green',
+          text: res.data.msg ? res.data.msg : 'Please check your email ..'
+        }
+        await new Promise((resolve) => {
+          const interval = setInterval(() => {
+            if (!alert.value.state) {
+              clearInterval(interval)
+              resolve()
+            }
+          }, 2000)
+        })
+        router.push('/login')
+      } else {
+        const serverMsg = res && res.data ? (res.data.msg || res.data.message) : 'Oops... something went wrong!'
+        alert.value = { state: true, color: 'red', text: serverMsg }
       }
-      await new Promise((resolve) => {
-        const interval = setInterval(() => {
-          if (!alert.value.state) {
-            clearInterval(interval)
-            resolve()
-          }
-        }, 2000)
-      })
-      router.push('/login')
-    } else {
-      alert.value = {
-        state: true,
-        color: 'red',
-        text: res.data.msg ? res.data.msg : 'Oops... something went wrong!'
-      }
+    } catch (err) {
+      console.error('err recover in ForgotView.vue ===> ', err)
+      const serverMsg = err && err.response && err.response.data ? (err.response.data.msg || err.response.data.message) : null
+      alert.value = { state: true, color: 'red', text: serverMsg || 'Impossible de joindre le serveur. Vérifiez votre connexion ou l\'URL du backend.' }
     }
   } else {
     alert.value = {
