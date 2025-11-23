@@ -38,22 +38,25 @@ function pick(obj, keys) {
 export default function persistPlugin(store) {
   // 1) Hydrate from localStorage (shallow merge for whitelisted keys)
   if (typeof window !== 'undefined') {
-    // If there is no auth token we must avoid hydrating persisted state.
-    // This prevents restoring a session from storage when the user is logged out.
-    let token = null
-    try { token = localStorage.getItem('token') } catch (_) { token = null }
-    if (!token) {
-      // Ensure no stale snapshot remains
-      try { localStorage.removeItem(STORAGE_KEY) } catch (_) {}
-    } else {
-      const saved = safeParse(localStorage.getItem(STORAGE_KEY))
+    const saved = safeParse(localStorage.getItem(STORAGE_KEY))
+    // If there is no active auth token, do not hydrate persisted state and
+    // purge the persisted snapshot and related cached defaults (security).
+    try {
+      const tok = localStorage.getItem('token')
+      if (!tok) {
+        try { localStorage.removeItem(STORAGE_KEY) } catch (_) {}
+        try { localStorage.removeItem('default_profile_data_uri') } catch (_) {}
+        try { localStorage.removeItem('default_cover_data_uri') } catch (_) {}
+        return
+      }
+    } catch (_) {}
+
     if (saved && Object.keys(saved).length) {
       for (const k of PERSIST_KEYS) {
         if (saved[k] !== undefined) {
           store.state[k] = saved[k]
         }
       }
-    }
     }
   }
 

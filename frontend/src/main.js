@@ -36,12 +36,15 @@ app.use(Vue3TagsInput)
 app.use(store)
 app.use(router)
 
-// Warm default .txt images into cache/localStorage (non-blocking) ONLY when
-// there's an authenticated token. Prevents writing default data URIs for
-// anonymous visitors which could later be used to rehydrate UI after logout.
+// Warm default .txt images into cache/localStorage (non-blocking)
+// Only warm defaults when an auth token exists. This prevents anonymous
+// visitors from creating persisted default data URIs that could be used to
+// rehydrate UI state after logout.
 try {
-	const t = localStorage.getItem('token')
-	if (t && utility.warmDefaultTxtImages) utility.warmDefaultTxtImages()
+	const tk = localStorage.getItem('token')
+	if (tk) {
+		utility.warmDefaultTxtImages && utility.warmDefaultTxtImages()
+	}
 } catch (e) { /* noop */ }
 
 // Bootstrap: ensure logged-in user is loaded before first paint
