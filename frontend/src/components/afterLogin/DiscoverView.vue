@@ -294,8 +294,10 @@ const filters = {
       // If the typed location matches (or is contained in) the current user's city or country,
       // include nearby users by distance (proximity search)
       try {
-        const myCity = userLocation && userLocation.city ? String(userLocation.city).toLowerCase() : ''
-        const myCountry = userLocation && userLocation.country ? String(userLocation.country).toLowerCase() : ''
+        const myCity =
+          userLocation && userLocation.city ? String(userLocation.city).toLowerCase() : ''
+        const myCountry =
+          userLocation && userLocation.country ? String(userLocation.country).toLowerCase() : ''
         if (myCity.includes(q) || myCountry.includes(q)) {
           // use the precomputed distanceKm (0 if unknown)
           const d = typeof val.distanceKm === 'number' ? val.distanceKm : 0
@@ -381,7 +383,7 @@ const ageCalc = (birthdate) => {
 
 // Compute haversine distance (km) between two lat/lng pairs
 function computeDistanceKm(lat1, lng1, lat2, lng2) {
-  const toNum = v => (v === null || v === undefined || v === '' ? NaN : Number(v))
+  const toNum = (v) => (v === null || v === undefined || v === '' ? NaN : Number(v))
   const aLat = toNum(lat1)
   const aLng = toNum(lng1)
   const bLat = toNum(lat2)
@@ -393,7 +395,9 @@ function computeDistanceKm(lat1, lng1, lat2, lng2) {
   const dLon = toRad(bLng - aLng)
   const lat1Rad = toRad(aLat)
   const lat2Rad = toRad(bLat)
-  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(lat1Rad) * Math.cos(lat2Rad) * Math.sin(dLon / 2) * Math.sin(dLon / 2)
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1Rad) * Math.cos(lat2Rad) * Math.sin(dLon / 2) * Math.sin(dLon / 2)
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
   const d = R * c
   // keep two decimals
@@ -572,7 +576,7 @@ async function fetchDiscover({ resetPage = false } = {}) {
     showSpinner.value = true
   }, 200)
   // Show a unified overlay via isFetching; no separate isRefreshing flag
-    try {
+  try {
     const res = await axios.get(url, { headers, params, signal: abortController.signal })
     if (res.data && !res.data.msg) {
       const { items = [], total: t = 0, maxDistance: md = null, maxRating: mr = null } = res.data
@@ -582,15 +586,21 @@ async function fetchDiscover({ resetPage = false } = {}) {
         // normalize and round numeric fields to 2 decimals for consistent display
         const ratingNum = Number(cur.rating)
         const ratingRounded = isFinite(ratingNum) ? Math.round(ratingNum * 100) / 100 : 0
-        const ageYearsNum = typeof cur.ageYears === 'number' ? Math.round(cur.ageYears * 100) / 100 : ageCalc(cur.birthdate)
+        const ageYearsNum =
+          typeof cur.ageYears === 'number'
+            ? Math.round(cur.ageYears * 100) / 100
+            : ageCalc(cur.birthdate)
         // compute distance between current user location and the candidate (if coordinates available)
-        const userLat = userLocation && isFinite(Number(userLocation.lat)) ? Number(userLocation.lat) : null
-        const userLng = userLocation && isFinite(Number(userLocation.lng)) ? Number(userLocation.lng) : null
+        const userLat =
+          userLocation && isFinite(Number(userLocation.lat)) ? Number(userLocation.lat) : null
+        const userLng =
+          userLocation && isFinite(Number(userLocation.lng)) ? Number(userLocation.lng) : null
         const curLat = cur.lat !== undefined && cur.lat !== null ? cur.lat : cur.latitude
         const curLng = cur.lng !== undefined && cur.lng !== null ? cur.lng : cur.longitude
-        const distanceComputed = (userLat !== null && userLng !== null && curLat != null && curLng != null)
-          ? computeDistanceKm(userLat, userLng, curLat, curLng)
-          : 0
+        const distanceComputed =
+          userLat !== null && userLng !== null && curLat != null && curLng != null
+            ? computeDistanceKm(userLat, userLng, curLat, curLng)
+            : 0
         return {
           ...cur,
           rating: ratingRounded,
@@ -605,7 +615,8 @@ async function fetchDiscover({ resetPage = false } = {}) {
       whoIsUp()
       // Update rating slider bounds from server-provided maxRating or computed values on first page
       if (page.value === 1) {
-        const nextCapFromServer = mr != null && isFinite(Number(mr)) ? Math.max(0, Number(mr)) : null
+        const nextCapFromServer =
+          mr != null && isFinite(Number(mr)) ? Math.max(0, Number(mr)) : null
         // compute min/max from shaped items as fallback
         const ratings = shaped
           .map((u) => (typeof u.rating === 'number' && isFinite(u.rating) ? u.rating : NaN))
@@ -620,7 +631,8 @@ async function fetchDiscover({ resetPage = false } = {}) {
         const nextMaxRating = Math.round((Math.max(0, baseMax) + 0.5) * 100) / 100
 
         // Update global cap used elsewhere if server provided a cap
-        if (nextCapFromServer != null && nextCapFromServer !== ratingCap.value) ratingCap.value = nextCapFromServer
+        if (nextCapFromServer != null && nextCapFromServer !== ratingCap.value)
+          ratingCap.value = nextCapFromServer
 
         // Update reactive rating bounds if they changed
         if (ratingBoundMin.value !== nextMinRating || ratingBoundMax.value !== nextMaxRating) {
@@ -637,8 +649,14 @@ async function fetchDiscover({ resetPage = false } = {}) {
           // Clamp current selection within new bounds
           const cur = rating.value || { min: ratingBoundMin.value, max: ratingBoundMax.value }
           const clamped = {
-            min: Math.max(ratingBoundMin.value, Math.min(cur.min ?? ratingBoundMin.value, ratingBoundMax.value)),
-            max: Math.max(ratingBoundMin.value, Math.min(cur.max ?? ratingBoundMax.value, ratingBoundMax.value))
+            min: Math.max(
+              ratingBoundMin.value,
+              Math.min(cur.min ?? ratingBoundMin.value, ratingBoundMax.value)
+            ),
+            max: Math.max(
+              ratingBoundMin.value,
+              Math.min(cur.max ?? ratingBoundMax.value, ratingBoundMax.value)
+            )
           }
           programmaticUpdate.value = true
           rating.value = clamped
@@ -647,7 +665,9 @@ async function fetchDiscover({ resetPage = false } = {}) {
       }
       // Update slider max from computed distances on first page (rounded to 2 decimals)
       if (page.value === 1) {
-        const computedMax = shaped.length ? shaped.reduce((acc, u) => Math.max(acc, Number(u.distanceKm) || 0), 0) : 0
+        const computedMax = shaped.length
+          ? shaped.reduce((acc, u) => Math.max(acc, Number(u.distanceKm) || 0), 0)
+          : 0
         const nextMax = Math.round(Math.max(0, computedMax) * 100) / 100
         if (nextMax !== maxDis.value) {
           maxDis.value = nextMax
@@ -672,12 +692,15 @@ async function fetchDiscover({ resetPage = false } = {}) {
       }
       // Update dynamic age bounds from fetched users on first page
       if (page.value === 1) {
-  const ages = shaped.map((u) => (typeof u.ageYears === 'number' ? u.ageYears : 0)).filter((a) => a > 0)
-  const computedMinAge = ages.length ? Math.min(...ages) : 18
-  const computedMaxAge = ages.length ? Math.max(...ages) : 85
-  // Ensure sensible defaults and clamp to reasonable limits, keep two decimals
-  const nextMinAge = Math.round(Math.max(18, Math.min(120, computedMinAge)) * 100) / 100
-  const nextMaxAge = Math.round(Math.max(nextMinAge, Math.min(120, computedMaxAge)) * 100) / 100
+        const ages = shaped
+          .map((u) => (typeof u.ageYears === 'number' ? u.ageYears : 0))
+          .filter((a) => a > 0)
+        const computedMinAge = ages.length ? Math.min(...ages) : 18
+        const computedMaxAge = ages.length ? Math.max(...ages) : 85
+        // Ensure sensible defaults and clamp to reasonable limits, keep two decimals
+        const nextMinAge = Math.round(Math.max(18, Math.min(120, computedMinAge)) * 100) / 100
+        const nextMaxAge =
+          Math.round(Math.max(nextMinAge, Math.min(120, computedMaxAge)) * 100) / 100
         // Update slider bounds if changed
         if (nextMinAge !== ageBoundMin.value || nextMaxAge !== ageBoundMax.value) {
           ageBoundMin.value = nextMinAge
