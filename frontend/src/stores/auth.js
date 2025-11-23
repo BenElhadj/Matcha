@@ -94,9 +94,24 @@ export const auth = {
     },
     
     logout({ commit }, id) {
-      localStorage.removeItem('token')
-      // Clear persisted store snapshot
-      localStorage.removeItem('matcha_app_state_v1')
+      // Clear all auth-related and persisted localStorage entries so the app
+      // doesn't resurrect a stale "connected" state after a page reload.
+      try {
+        localStorage.removeItem('token')
+      } catch (_) {}
+      try {
+        localStorage.removeItem('matcha_app_state_v1')
+      } catch (_) {}
+      try {
+        localStorage.removeItem('user')
+      } catch (_) {}
+      try {
+        localStorage.removeItem('user_images')
+      } catch (_) {}
+      try {
+        localStorage.removeItem('key')
+      } catch (_) {}
+
       commit('logout')
     }
   }
