@@ -132,6 +132,7 @@
                 <div class="row justify-between">
                   <h4 class="title">Reset all</h4>
                   <q-btn
+                    ref="resetBtn"
                     @click="reset"
                     flat
                     round
@@ -237,6 +238,10 @@ const age = ref({ min: 18, max: 85 })
 const rating = ref({ min: 0, max: 100 })
 const distance = ref({ min: 0, max: 10000 })
 const maxDis = ref(10000)
+// Proximity radius (km) used when location matches user's own location
+const locationProximityKm = ref(50)
+// Ref for the Reset button to remove focus after click (avoid stuck pressed state)
+const resetBtn = ref(null)
 // Dynamic rating slider bounds
 const ratingBoundMin = ref(0)
 const ratingBoundMax = ref(100)
@@ -278,8 +283,29 @@ const filters = {
     return gender.value === 'all' || !gender.value || val.gender === gender.value
   },
   location: (val) =>
-    !location.value ||
-    [val.country, val.address, val.city].some((cur) => cur && cur.includes(location.value)),
+    (() => {
+      const q = location.value ? String(location.value).toLowerCase().trim() : ''
+      if (!q) return true
+      // Check address fields (case-insensitive substring)
+      const addrFields = [val.country, val.address, val.city]
+      for (const cur of addrFields) {
+        if (cur && String(cur).toLowerCase().includes(q)) return true
+      }
+      // If the typed location matches (or is contained in) the current user's city or country,
+      // include nearby users by distance (proximity search)
+      try {
+        const myCity = userLocation && userLocation.city ? String(userLocation.city).toLowerCase() : ''
+        const myCountry = userLocation && userLocation.country ? String(userLocation.country).toLowerCase() : ''
+        if (myCity.includes(q) || myCountry.includes(q)) {
+          // use the precomputed distanceKm (0 if unknown)
+          const d = typeof val.distanceKm === 'number' ? val.distanceKm : 0
+          return d > 0 && d <= locationProximityKm.value
+        }
+      } catch (e) {
+        // ignore and fall through
+      }
+      return false
+    })(),
   distance: (val) => {
     const d = typeof val.distanceKm === 'number' ? val.distanceKm : 0
     return d >= distance.value.min && d <= distance.value.max
@@ -439,6 +465,24 @@ function reset() {
   page.value = 1
   users.value = []
   fetchDiscover({ resetPage: true })
+  // Remove focus from the Reset button so it doesn't stay visually pressed
+  setTimeout(() => {
+    try {
+      // If we have the component ref, try to blur its root element
+      if (resetBtn && resetBtn.value) {
+        // component instance may expose $el
+        const el = resetBtn.value.$el || resetBtn.value
+        if (el && typeof el.blur === 'function') el.blur()
+        else if (el && el instanceof HTMLElement) el.blur()
+      }
+      // Fallback: blur currently active element
+      if (document && document.activeElement && typeof document.activeElement.blur === 'function') {
+        document.activeElement.blur()
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, 50)
 }
 function changeSort() {
   sortDir.value = -sortDir.value

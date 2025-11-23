@@ -115,9 +115,7 @@ const showUserById = async (req, res) => {
 		// Compute rating using DB function get_rating(id)
 		try {
 			const db = require('../config/database')
-			// Cast parameter to integer to avoid "function get_rating(unknown) does not exist" when
-			// the PG type inference would treat the parameter as unknown (e.g. empty string).
-			const rres = await db.query('SELECT get_rating($1::integer) AS rating', [targetId])
+			const rres = await db.query('SELECT get_rating($1) AS rating', [targetId])
 			u.rating = rres && rres.rows && rres.rows[0] && typeof rres.rows[0].rating !== 'undefined' ? Number(rres.rows[0].rating) : 0
 		} catch (e) {
 			// If rating lookup fails, default to 0 but continue
@@ -369,16 +367,8 @@ async function discover(req, res) {
 
 		// --- Enrich ordering: onlineFirst, then friends, then invitations received, then invitations sent, then others
 		try {
-			// get online set (may be undefined). Be defensive: connectedUsers can be an array, Set,
-			// or plain object depending on runtime wiring. Normalize to an array.
-			const rawConnected = req.app.get('connectedUsers');
-			let connectedList = [];
-			if (Array.isArray(rawConnected)) connectedList = rawConnected;
-			else if (rawConnected && typeof rawConnected === 'object') {
-				if (typeof rawConnected.values === 'function') connectedList = Array.from(rawConnected.values());
-				else connectedList = Object.values(rawConnected);
-			}
-			const onlineSet = new Set((connectedList || []).map(x => String(x)));
+			// get online set (may be undefined)
+			const onlineSet = new Set((req.app.get('connectedUsers') || []).map(x => String(x)));
 			// get following (who I invited) and followers (who invited me)
 			const followingRows = await matchingModel.getFollowing(me.id).catch(() => []);
 			const followersRows = await matchingModel.getFollowers(me.id).catch(() => []);
