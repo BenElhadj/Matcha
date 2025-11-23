@@ -323,7 +323,8 @@ async function discover(req, res) {
 		// Parse query params
 		const q = req.query || {}
 		const page = Math.max(parseInt(q.page || '1', 10), 1)
-		const limit = Math.min(Math.max(parseInt(q.limit || '50', 10), 1), 100)
+	// Default to 100 users per page; clamp between 1 and 100
+	const limit = Math.min(Math.max(parseInt(q.limit || '100', 10), 1), 100)
 		// compute offset for SQL pagination
 		const offset = (page - 1) * limit
 		const onlineFirst = String(q.onlineFirst || '1') === '1'
@@ -365,46 +366,8 @@ async function discover(req, res) {
 		// Items are already paginated by SQL
 		let items = rows
 
-		// --- Enrich ordering: onlineFirst, then friends, then invitations received, then invitations sent, then others
-		try {
-			// get online set (may be undefined)
-			const onlineSet = new Set((req.app.get('connectedUsers') || []).map(x => String(x)));
-			// get following (who I invited) and followers (who invited me)
-			const followingRows = await matchingModel.getFollowing(me.id).catch(() => []);
-			const followersRows = await matchingModel.getFollowers(me.id).catch(() => []);
-			const followingSet = new Set((followingRows || []).map(r => String(r.matched_id || r.matched_id)));
-			const followersSet = new Set((followersRows || []).map(r => String(r.matcher_id || r.matcher_id)));
-			const friendsSet = new Set(Array.from(followingSet).filter(x => followersSet.has(x)));
-
-			// Preserve original order from SQL by tagging index
-			items = items.map((it, idx) => ({ ...it, _origIndex: idx }));
-
-			items.sort((a, b) => {
-				// onlineFirst grouping
-				if (onlineFirst) {
-					const ao = onlineSet.has(String(a.user_id)) ? 0 : 1;
-					const bo = onlineSet.has(String(b.user_id)) ? 0 : 1;
-					if (ao !== bo) return ao - bo;
-				}
-				const uidA = String(a.user_id);
-				const uidB = String(b.user_id);
-				const prio = (uid) => {
-					if (friendsSet.has(uid)) return 0;
-					if (followersSet.has(uid) && !followingSet.has(uid)) return 1; // invitation received
-					if (followingSet.has(uid) && !followersSet.has(uid)) return 2; // invitation sent
-					return 3; // normal
-				}
-				const pa = prio(uidA);
-				const pb = prio(uidB);
-				if (pa !== pb) return pa - pb;
-				// fallback to original SQL order
-				return (a._origIndex || 0) - (b._origIndex || 0);
-			});
-			// remove _origIndex before returning
-			items = items.map(({ _origIndex, ...rest }) => rest);
-		} catch (e) {
-			console.error('[discover] error computing social ordering', e && e.message ? e.message : e);
-		}
+		// Backend no longer applies social ordering beyond prioritizing "likes" in SQL.
+		// Detailed ordering (mutual, received, sent, others) will be performed by the frontend.
 
 		// return response
 		return res.json({ page, limit, total, maxDistance, maxRating, items })

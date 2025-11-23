@@ -267,7 +267,7 @@ try {
 
 // Server-driven pagination
 const page = ref(1)
-const limit = ref(50)
+const limit = ref(100)
 const total = ref(0)
 const isFetching = ref(false)
 // const isRefreshing = ref(false)
@@ -408,13 +408,42 @@ function computeDistanceKm(lat1, lng1, lat2, lng2) {
 
 // Server provides sorted results with online-first; keep ordering and only group by live presence if needed
 const sorted = computed(() => {
-  const onlineUsers = displayed.value.filter((u) => u.isConnected)
-  const offlineUsers = displayed.value.filter((u) => !u.isConnected)
-  // Preserve incoming order from server; do not re-sort beyond online grouping
+  // Determine original server order to use as tiebreaker
   const orderMap = new Map()
-  users.value.forEach((u, idx) => orderMap.set(u.user_id, idx))
-  const byOrder = (a, b) => (orderMap.get(a.user_id) ?? 0) - (orderMap.get(b.user_id) ?? 0)
-  return [...onlineUsers.sort(byOrder), ...offlineUsers.sort(byOrder)]
+  users.value.forEach((u, idx) => orderMap.set(String(u.user_id), idx))
+
+  // Build match relation sets from store (following = I invited, followers = invited me)
+  const followingSet = new Set((store.state.user.following || []).map((f) => String(f.id)))
+  const followersSet = new Set((store.state.user.followers || []).map((f) => String(f.id)))
+  const friendsSet = new Set(Array.from(followingSet).filter((x) => followersSet.has(x)))
+
+  // Priority function: mutual (0), received (1), sent (2), others (3)
+  const prio = (uid) => {
+    if (friendsSet.has(uid)) return 0
+    if (followersSet.has(uid) && !followingSet.has(uid)) return 1
+    if (followingSet.has(uid) && !followersSet.has(uid)) return 2
+    return 3
+  }
+
+  // Optionally group online first, but preserve priority inside each group
+  const onlineFirstFlag = true
+
+  const arr = displayed.value.slice().map((u) => ({ ...u }))
+  arr.sort((a, b) => {
+    const uidA = String(a.user_id)
+    const uidB = String(b.user_id)
+    if (onlineFirstFlag) {
+      const ao = a.isConnected ? 0 : 1
+      const bo = b.isConnected ? 0 : 1
+      if (ao !== bo) return ao - bo
+    }
+    const pa = prio(uidA)
+    const pb = prio(uidB)
+    if (pa !== pb) return pa - pb
+    // fallback to original server order
+    return (orderMap.get(uidA) ?? 0) - (orderMap.get(uidB) ?? 0)
+  })
+  return arr
 })
 
 // Server-side distance filter uses a fixed cap; no need to recompute max from client data

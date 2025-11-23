@@ -121,7 +121,7 @@ const getUsersForDiscover = async (opts = {}) => {
         gender = null,
         sortBy = 'distance',
         sortDir = 1,
-        limit = 50,
+    limit = 100,
         offset = 0
     } = opts;
 
@@ -215,7 +215,8 @@ const getUsersForDiscover = async (opts = {}) => {
     const offsetIdx = params.length;
 
     // Final query: compute distance, rating and include total via window
-    const query = `SELECT users.id AS user_id, users.username, users.first_name, users.last_name, users.gender, users.birthdate, users.tags, users.city, users.country, users.address, users.lat, users.lng, COALESCE(images.link,'') AS link, COALESCE(images.data,'') AS data, get_rating(users.id) AS rating, ${distExpr} AS distance_km, COUNT(*) OVER() AS total FROM users LEFT JOIN images ON users.id = images.user_id AND images.profile = TRUE ${where} ORDER BY ${orderBy} LIMIT $${limitIdx} OFFSET $${offsetIdx}`;
+    // Prioritize users with a like/match interaction (either direction) with the current user
+    const query = `SELECT users.id AS user_id, users.username, users.first_name, users.last_name, users.gender, users.birthdate, users.tags, users.city, users.country, users.address, users.lat, users.lng, COALESCE(images.link,'') AS link, COALESCE(images.data,'') AS data, get_rating(users.id) AS rating, ${distExpr} AS distance_km, COUNT(*) OVER() AS total FROM users LEFT JOIN images ON users.id = images.user_id AND images.profile = TRUE ${where} ORDER BY (EXISTS(SELECT 1 FROM matches m WHERE (m.matcher = $1 AND m.matched = users.id) OR (m.matcher = users.id AND m.matched = $1))) DESC, ${orderBy} LIMIT $${limitIdx} OFFSET $${offsetIdx}`;
 
     const result = await db.query(query, params);
     const rows = result.rows.map(u => ({
@@ -246,7 +247,7 @@ const getUsersForDiscover = async (opts = {}) => {
 const getUsersForDiscoverNoFilters = async (opts = {}) => {
     const {
         meId,
-        limit = 50,
+        limit = 100,
         offset = 0,
         sortBy = 'id',
         sortDir = 1
@@ -274,7 +275,13 @@ const getUsersForDiscoverNoFilters = async (opts = {}) => {
         FROM users
         LEFT JOIN images ON users.id = images.user_id AND images.profile = TRUE
         ${where}
-        ORDER BY ${orderBy}
+        -- Prioritize users with a like interaction (either direction) with the current user
+        ORDER BY (
+            EXISTS(
+                SELECT 1 FROM matches m WHERE (m.matcher = $1 AND m.matched = users.id) OR (m.matcher = users.id AND m.matched = $1)
+            )
+        ) DESC,
+        ${orderBy}
         LIMIT $${limitIdx} OFFSET $${offsetIdx}
     `;
 
