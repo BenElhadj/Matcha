@@ -773,3 +773,13 @@ module.exports = {
     ,getUsersForDiscover
     ,getUsersForDiscoverNoFilters
 }
+
+// Supprimer un utilisateur par id (utilisé pour rollback si l'envoi de mail échoue)
+const deleteUserById = async (id) => {
+    const query = `DELETE FROM users WHERE id = $1`;
+    const result = await db.query(query, [id]);
+    return result.rowCount;
+}
+
+// Ajouter la fonction à l'export (en la ré-exportant)
+module.exports.deleteUserById = deleteUserById;

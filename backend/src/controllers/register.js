@@ -47,11 +47,24 @@ const register = async (req, res) => {
 		const existing = await userModel.getUser(user)
 		if (existing.length === 0) {
 			const created = await userModel.addUser(user)
-			if (created) {
-				await mailer.sendMail(user.email, user.vkey, 'users/verify')
-				return res.json({ ok: true, status: 'You have been successfully registered, please verify your email' })
-			}
-			return res.json({ msg: 'Registration failed' })
+				if (created) {
+					try {
+						await mailer.sendMail(user.email, user.vkey, 'users/verify')
+						return res.json({ ok: true, status: 'You have been successfully registered, please verify your email' })
+					} catch (mailErr) {
+						// Si l'envoi du mail échoue, on supprime l'utilisateur créé pour éviter d'avoir
+						// des comptes incomplets dans la base (rollback simple).
+						try {
+							await userModel.deleteUserById(created.id)
+							console.warn('[register] Rolled back created user id=', created.id)
+						} catch (delErr) {
+							console.error('[register] Failed to rollback user after mail error:', delErr)
+						}
+						// Renvoyer une erreur claire au client
+						return res.status(500).json({ msg: 'Registration failed: unable to send confirmation email. Please try again later.' })
+					}
+				}
+				return res.json({ msg: 'Registration failed' })
 		} else {
 			return res.json({ msg: 'Username or Email already in use' })
 		}

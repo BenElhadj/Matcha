@@ -174,6 +174,9 @@ const registerUser = async () => {
       }
     } catch (err) {
       console.error('err registerUser in frontend/RegisterView.vue ===> ', err)
+      // Afficher une alerte utilisateur si la requête échoue (erreur réseau / 500 ...)
+      const text = err?.response?.data?.msg || err?.response?.data?.message || 'Erreur lors de l\'inscription. Veuillez réessayer.'
+      alert.value = { state: true, color: 'red', text }
     }
   }
 }
