@@ -282,8 +282,14 @@ export const user = {
         else if (Array.isArray(payload.data)) rows = payload.data
 
         if (Array.isArray(rows)) {
-          blocked = rows.filter(cur => cur.blocker === state.user.id).map(cur => cur.blocked)
-          blockedBy = rows.filter(cur => cur.blocked === state.user.id).map(cur => cur.blocker)
+          // Only consider explicit 'block' entries as blocking relationships.
+          // 'report' entries should not prevent users from seeing each other.
+          blocked = rows
+            .filter(cur => cur.blocker === state.user.id && String(cur.type).toLowerCase() === 'block')
+            .map(cur => cur.blocked)
+          blockedBy = rows
+            .filter(cur => cur.blocked === state.user.id && String(cur.type).toLowerCase() === 'block')
+            .map(cur => cur.blocker)
         }
         commit('syncBlocked', { blocked, blockedBy })
         if (blocked.length) dispatch('syncBlacklist', blocked)

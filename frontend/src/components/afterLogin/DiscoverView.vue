@@ -58,8 +58,8 @@
                 <h4 class="title">Age</h4>
                 <q-range
                   v-model="age"
-                  :min="18"
-                  :max="85"
+                  :min="ageBoundMin"
+                  :max="ageBoundMax"
                   :step="1"
                   label-always
                   thumb-label="always"
@@ -70,8 +70,8 @@
                 <h4 class="title">Rating</h4>
                 <q-range
                   v-model="rating"
-                  :min="0"
-                  :max="parseFloat(ratingCap)"
+                  :min="ratingBoundMin"
+                  :max="ratingBoundMax"
                   :step="0.1"
                   label-always
                   thumb-label="always"
@@ -237,6 +237,14 @@ const age = ref({ min: 18, max: 85 })
 const rating = ref({ min: 0, max: 100 })
 const distance = ref({ min: 0, max: 10000 })
 const maxDis = ref(10000)
+// Dynamic rating slider bounds
+const ratingBoundMin = ref(0)
+const ratingBoundMax = ref(100)
+// Dynamic age slider bounds computed from fetched users
+const ageBoundMin = ref(18)
+const ageBoundMax = ref(85)
+// Track whether the user manually touched the age slider
+const ageTouched = ref(false)
 const programmaticUpdate = ref(false)
 const distanceTouched = ref(false)
 const ratingTouched = ref(false)
@@ -292,27 +300,46 @@ const filters = {
     (val.last_name && val.last_name.toLowerCase().includes(recherche.value.toLowerCase()))
 }
 
-// Display list is server-filtered/sorted; we only apply location string locally for now
+// Display list is provided by the backend without client filters now; apply client-side filters here
 const displayed = computed(() => {
   const meId = String(user.id)
-  const q = (location.value || '').toLowerCase().trim()
-  const s = (recherche.value || '').toLowerCase().trim()
   return users.value
     .filter((val) => String(val.user_id) !== meId)
-    .filter(
-      (val) =>
-        !q ||
-        [val.country, val.city]
-          .map((s) => (s || '').toLowerCase())
-          .some((cur) => cur && cur.includes(q))
-    )
-    .filter(
-      (val) =>
-        !s ||
-        (val.username && val.username.toLowerCase().includes(s)) ||
-        (val.first_name && val.first_name.toLowerCase().includes(s)) ||
-        (val.last_name && val.last_name.toLowerCase().includes(s))
-    )
+    .filter((val) => {
+      // Apply all UI filters via the filters map. Each filter is defensive about missing fields.
+      try {
+        // self, blocked and blockedBy
+        if (!filters.self(val)) return false
+        if (!filters.blocked(val)) return false
+        if (!filters.blockedBy(val)) return false
+
+        // rating
+        if (!filters.rating(val)) return false
+
+        // gender
+        if (!filters.gender(val)) return false
+
+        // location string
+        if (!filters.location(val)) return false
+
+        // distance (distanceKm may be 0 if unknown)
+        if (!filters.distance(val)) return false
+
+        // age
+        if (!filters.age(val)) return false
+
+        // interests (guard against missing tags)
+        if (!filters.interest({ ...val, tags: val.tags || '' })) return false
+
+        // search
+        if (!filters.search(val)) return false
+
+        return true
+      } catch (e) {
+        // In case of unexpected data shape, exclude the item from displayed
+        return false
+      }
+    })
 })
 
 // search handled reactively via filters.search
@@ -320,9 +347,31 @@ const displayed = computed(() => {
 const ageCalc = (birthdate) => {
   const bd = new Date(birthdate)
   if (isNaN(bd)) return 0
-  const diff = Date.now() - bd.getTime()
-  const ageDate = new Date(diff)
-  return Math.abs(ageDate.getUTCFullYear() - 1970)
+  // Compute fractional years and return rounded to 2 decimals
+  const diffMs = Date.now() - bd.getTime()
+  const years = diffMs / (365.25 * 24 * 60 * 60 * 1000)
+  return Math.round(years * 100) / 100
+}
+
+// Compute haversine distance (km) between two lat/lng pairs
+function computeDistanceKm(lat1, lng1, lat2, lng2) {
+  const toNum = v => (v === null || v === undefined || v === '' ? NaN : Number(v))
+  const aLat = toNum(lat1)
+  const aLng = toNum(lng1)
+  const bLat = toNum(lat2)
+  const bLng = toNum(lng2)
+  if (!isFinite(aLat) || !isFinite(aLng) || !isFinite(bLat) || !isFinite(bLng)) return 0
+  const toRad = (deg) => (deg * Math.PI) / 180
+  const R = 6371 // km
+  const dLat = toRad(bLat - aLat)
+  const dLon = toRad(bLng - aLng)
+  const lat1Rad = toRad(aLat)
+  const lat2Rad = toRad(bLat)
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(lat1Rad) * Math.cos(lat2Rad) * Math.sin(dLon / 2) * Math.sin(dLon / 2)
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  const d = R * c
+  // keep two decimals
+  return Math.round(d * 100) / 100
 }
 
 // const commonTags = (user, tags) => {
@@ -372,8 +421,15 @@ function reset() {
   // Reset gender to 'all' explicitly
   gender.value = 'all'
   age.value = { min: 18, max: 85 }
+  ageBoundMin.value = 18
+  ageBoundMax.value = 85
+  ageTouched.value = false
   programmaticUpdate.value = true
   rating.value = { min: 0, max: ratingCap.value }
+  // reset rating bounds
+  ratingBoundMin.value = 0
+  // default max is server cap + 0.5 to give a small margin
+  ratingBoundMax.value = Math.max(0, Number(ratingCap.value) || 100) + 0.5
   ratingTouched.value = false
   programmaticUpdate.value = false
   distance.value = { min: 0, max: 10000 }
@@ -443,64 +499,131 @@ async function fetchDiscover({ resetPage = false } = {}) {
     showSpinner.value = true
   }, 200)
   // Show a unified overlay via isFetching; no separate isRefreshing flag
-  try {
+    try {
     const res = await axios.get(url, { headers, params, signal: abortController.signal })
     if (res.data && !res.data.msg) {
       const { items = [], total: t = 0, maxDistance: md = null, maxRating: mr = null } = res.data
       total.value = t
-      const shaped = items.map((cur) => ({
-        ...cur,
-        // ensure numeric types
-        rating: Number(cur.rating),
-        ageYears: typeof cur.ageYears === 'number' ? cur.ageYears : ageCalc(cur.birthdate),
-        distanceKm: Number(cur.distanceKm) || 0
-      }))
+      // Shape items and compute client-side distance using userLocation (frontend is authoritative for filters)
+      const shaped = items.map((cur) => {
+        // normalize and round numeric fields to 2 decimals for consistent display
+        const ratingNum = Number(cur.rating)
+        const ratingRounded = isFinite(ratingNum) ? Math.round(ratingNum * 100) / 100 : 0
+        const ageYearsNum = typeof cur.ageYears === 'number' ? Math.round(cur.ageYears * 100) / 100 : ageCalc(cur.birthdate)
+        // compute distance between current user location and the candidate (if coordinates available)
+        const userLat = userLocation && isFinite(Number(userLocation.lat)) ? Number(userLocation.lat) : null
+        const userLng = userLocation && isFinite(Number(userLocation.lng)) ? Number(userLocation.lng) : null
+        const curLat = cur.lat !== undefined && cur.lat !== null ? cur.lat : cur.latitude
+        const curLng = cur.lng !== undefined && cur.lng !== null ? cur.lng : cur.longitude
+        const distanceComputed = (userLat !== null && userLng !== null && curLat != null && curLng != null)
+          ? computeDistanceKm(userLat, userLng, curLat, curLng)
+          : 0
+        return {
+          ...cur,
+          rating: ratingRounded,
+          ageYears: ageYearsNum,
+          // distanceComputed is already rounded to 2 decimals by computeDistanceKm
+          distanceKm: Number(distanceComputed) || 0
+        }
+      })
       if (page.value === 1) users.value = shaped
       else users.value = [...users.value, ...shaped]
       // update presence flags
       whoIsUp()
-      // Update rating slider cap from server-provided maxRating on first page
-      if (page.value === 1 && mr != null) {
-        const nextCap = Math.max(0, Number(mr))
-        if (isFinite(nextCap) && nextCap > 0 && nextCap !== ratingCap.value) {
-          ratingCap.value = nextCap
-          if (!ratingTouched.value) {
-            programmaticUpdate.value = true
-            rating.value = { min: 0, max: nextCap }
-            setTimeout(() => (programmaticUpdate.value = false), 0)
-          } else {
-            // Clamp current selection within new cap without refetch loop
-            const cur = rating.value || { min: 0, max: nextCap }
-            const clamped = {
-              min: Math.max(0, Math.min(cur.min ?? 0, nextCap)),
-              max: Math.max(0, Math.min(cur.max ?? nextCap, nextCap))
-            }
-            programmaticUpdate.value = true
-            rating.value = clamped
-            setTimeout(() => (programmaticUpdate.value = false), 0)
+      // Update rating slider bounds from server-provided maxRating or computed values on first page
+      if (page.value === 1) {
+        const nextCapFromServer = mr != null && isFinite(Number(mr)) ? Math.max(0, Number(mr)) : null
+        // compute min/max from shaped items as fallback
+        const ratings = shaped
+          .map((u) => (typeof u.rating === 'number' && isFinite(u.rating) ? u.rating : NaN))
+          .filter((r) => isFinite(r))
+        const computedMinRating = ratings.length ? Math.min(...ratings) : 0
+        const computedMaxRating = ratings.length ? Math.max(...ratings) : 0
+
+        // Decide final bounds: prefer server-provided maxRating if available, otherwise use computed max
+        const nextMinRating = Math.round(Math.max(0, computedMinRating) * 100) / 100
+        const baseMax = nextCapFromServer != null ? Number(nextCapFromServer) : computedMaxRating
+        // Apply +0.5 margin above the real max as requested, and round to 2 decimals
+        const nextMaxRating = Math.round((Math.max(0, baseMax) + 0.5) * 100) / 100
+
+        // Update global cap used elsewhere if server provided a cap
+        if (nextCapFromServer != null && nextCapFromServer !== ratingCap.value) ratingCap.value = nextCapFromServer
+
+        // Update reactive rating bounds if they changed
+        if (ratingBoundMin.value !== nextMinRating || ratingBoundMax.value !== nextMaxRating) {
+          ratingBoundMin.value = nextMinRating
+          ratingBoundMax.value = nextMaxRating
+        }
+
+        // Only override selection if user hasn't touched the slider yet
+        if (!ratingTouched.value) {
+          programmaticUpdate.value = true
+          rating.value = { min: ratingBoundMin.value, max: ratingBoundMax.value }
+          setTimeout(() => (programmaticUpdate.value = false), 0)
+        } else {
+          // Clamp current selection within new bounds
+          const cur = rating.value || { min: ratingBoundMin.value, max: ratingBoundMax.value }
+          const clamped = {
+            min: Math.max(ratingBoundMin.value, Math.min(cur.min ?? ratingBoundMin.value, ratingBoundMax.value)),
+            max: Math.max(ratingBoundMin.value, Math.min(cur.max ?? ratingBoundMax.value, ratingBoundMax.value))
           }
+          programmaticUpdate.value = true
+          rating.value = clamped
+          setTimeout(() => (programmaticUpdate.value = false), 0)
         }
       }
-      // Update slider max from server-provided maxDistance on first page
-      if (page.value === 1 && md != null) {
-        const nextMax = Math.max(0, Math.ceil(md))
+      // Update slider max from computed distances on first page (rounded to 2 decimals)
+      if (page.value === 1) {
+        const computedMax = shaped.length ? shaped.reduce((acc, u) => Math.max(acc, Number(u.distanceKm) || 0), 0) : 0
+        const nextMax = Math.round(Math.max(0, computedMax) * 100) / 100
         if (nextMax !== maxDis.value) {
           maxDis.value = nextMax
         }
         // Only override selection if user hasn't touched the slider yet
         if (!distanceTouched.value) {
           programmaticUpdate.value = true
+          // initialize distance selection with two-decimal precision
           distance.value = { min: 0, max: nextMax }
           setTimeout(() => (programmaticUpdate.value = false), 0)
         } else {
           // Clamp to bounds if needed without causing fetch loop
           const cur = distance.value || { min: 0, max: nextMax }
           const clamped = {
-            min: Math.max(0, Math.min(cur.min ?? 0, nextMax)),
-            max: Math.max(0, Math.min(cur.max ?? nextMax, nextMax))
+            min: Math.round(Math.max(0, Math.min(cur.min ?? 0, nextMax)) * 100) / 100,
+            max: Math.round(Math.max(0, Math.min(cur.max ?? nextMax, nextMax)) * 100) / 100
           }
           programmaticUpdate.value = true
           distance.value = clamped
+          setTimeout(() => (programmaticUpdate.value = false), 0)
+        }
+      }
+      // Update dynamic age bounds from fetched users on first page
+      if (page.value === 1) {
+  const ages = shaped.map((u) => (typeof u.ageYears === 'number' ? u.ageYears : 0)).filter((a) => a > 0)
+  const computedMinAge = ages.length ? Math.min(...ages) : 18
+  const computedMaxAge = ages.length ? Math.max(...ages) : 85
+  // Ensure sensible defaults and clamp to reasonable limits, keep two decimals
+  const nextMinAge = Math.round(Math.max(18, Math.min(120, computedMinAge)) * 100) / 100
+  const nextMaxAge = Math.round(Math.max(nextMinAge, Math.min(120, computedMaxAge)) * 100) / 100
+        // Update slider bounds if changed
+        if (nextMinAge !== ageBoundMin.value || nextMaxAge !== ageBoundMax.value) {
+          ageBoundMin.value = nextMinAge
+          ageBoundMax.value = nextMaxAge
+        }
+        // Only override selection if user hasn't touched the age slider yet
+        if (!ageTouched.value) {
+          programmaticUpdate.value = true
+          age.value = { min: nextMinAge, max: nextMaxAge }
+          setTimeout(() => (programmaticUpdate.value = false), 0)
+        } else {
+          // Clamp current selection within new bounds without causing fetch loop
+          const cur = age.value || { min: nextMinAge, max: nextMaxAge }
+          const clamped = {
+            min: Math.max(nextMinAge, Math.min(cur.min ?? nextMinAge, nextMaxAge)),
+            max: Math.max(nextMinAge, Math.min(cur.max ?? nextMaxAge, nextMaxAge))
+          }
+          programmaticUpdate.value = true
+          age.value = clamped
           setTimeout(() => (programmaticUpdate.value = false), 0)
         }
       }
@@ -508,6 +631,14 @@ async function fetchDiscover({ resetPage = false } = {}) {
       loaded.value = true
     } else if (res.data && res.data.msg === 'Not logged in') {
       router.push('/login')
+    } else if (res.data && res.data.msg) {
+      // Backend returned an error-like payload (e.g. { msg: 'Fatal error', err: '...' })
+      // Log it for debugging and allow the UI to render (avoid infinite LoaderView)
+      console.error('[fetchDiscover] backend returned msg:', res.data)
+      // Ensure we don't keep the loading spinner overlay permanently
+      total.value = 0
+      users.value = []
+      loaded.value = true
     }
   } catch (e) {
     // Ignore abort/cancel errors from rapid filter changes
@@ -577,6 +708,15 @@ watch(
   rating,
   () => {
     if (!programmaticUpdate.value) ratingTouched.value = true
+  },
+  { deep: true }
+)
+
+// Detect manual changes to age
+watch(
+  age,
+  () => {
+    if (!programmaticUpdate.value) ageTouched.value = true
   },
   { deep: true }
 )
