@@ -1,4 +1,3 @@
-import { API_URL, BASE_URL } from '@/utility.js';
 <template>
   <div>
     <q-dialog v-model="dialog" maximized persistent>
@@ -26,8 +25,6 @@ import { API_URL, BASE_URL } from '@/utility.js';
 
 <script setup>
 import { ref } from 'vue'
-import { mapGetters } from 'vuex'
-import axios from 'axios'
 import AlertView from '@/views/AlertView.vue'
 
 const error = ref(null)

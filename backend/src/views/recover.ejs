@@ -11,11 +11,12 @@
 			const token = '<%= token %>';
 			
 			// Redirigez vers la page de récupération avec les données
-			window.location = '<%= process.env.APP_URL %>' + '/recover?key=' + key + '&token=' + token;
+			const frontendBase = '<%= typeof appUrl !== "undefined" ? appUrl : (process.env.APP_URL || "http://localhost:5173/Matcha") %>'
+			window.location = frontendBase + '/recover?key=' + key + '&token=' + token;
 
-			// Stockez la clé et le token dans le localStorage
-			window.localStorage.setItem('key', key);
-			window.localStorage.setItem('token', token);
+			// Stockez la clé et le token dans le localStorage (au cas où la page a besoin)
+			try { window.localStorage.setItem('key', key); } catch(_) {}
+			try { window.localStorage.setItem('token', token); } catch(_) {}
 		</script>
 	</body>
 </html>

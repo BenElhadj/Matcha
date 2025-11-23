@@ -46,7 +46,6 @@ import { useStore } from 'vuex'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 import AlertView from '@/views/AlertView.vue'
-import utility from '@/utility.js'
 
 const store = useStore()
 const router = useRouter()

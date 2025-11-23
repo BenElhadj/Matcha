@@ -1,4 +1,3 @@
-import { API_URL, BASE_URL } from '@/utility.js';
 <template>
   <q-page class="q-pa-lg">
     <div
@@ -167,8 +166,8 @@ import { API_URL, BASE_URL } from '@/utility.js';
 </template>
 
 <script setup>
-import { ref, computed, onMounted, toRefs } from 'vue'
-import { useStore, mapActions } from 'vuex'
+import { ref, computed, onMounted } from 'vue'
+import { useStore } from 'vuex'
 import utility from '@/utility.js'
 import axios from 'axios'
 import AlertView from '@/views/AlertView.vue'

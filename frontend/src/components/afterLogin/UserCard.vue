@@ -1,4 +1,3 @@
-<!-- L'import JS doit être dans <script setup> -->
 <template>
   <q-card class="user-card-root">
     <div class="pt-1 column justify-center align-center">

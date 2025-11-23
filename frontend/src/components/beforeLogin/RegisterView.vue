@@ -1,4 +1,3 @@
-// ...existing code...
 <template>
   <q-layout>
     <q-page-container class="mt-4">
@@ -92,8 +91,7 @@
 import axios from 'axios'
 import AlertView from '@/views/AlertView.vue'
 import utility from '@/utility.js'
-import { ref, computed } from 'vue'
-import { useStore } from 'vuex'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()

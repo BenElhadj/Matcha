@@ -122,8 +122,6 @@ const ProfileSettings = defineAsyncComponent(() =>
 )
 import AlertView from '@/views/AlertView.vue'
 import LoaderView from '@/views/LoaderView.vue'
-import utility from '@/utility.js'
-import { getImageSrc } from '@/utility.js'
 import axios from 'axios'
 import { useStore } from 'vuex'
 import { ref, computed, onMounted, watch } from 'vue'

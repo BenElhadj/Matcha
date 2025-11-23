@@ -1,4 +1,3 @@
-// ...existing code...
 <template>
   <q-layout>
     <q-page-container class="mt-4">
@@ -73,7 +72,7 @@ const recover = async () => {
       const url = `${apiBase}/api/auth/forget_password`
       const res = await axios.post(url, { email: email.value })
       email.value = ''
-      if (res && res.data && res.data.ok) {
+      if (res && res.data && (res.data.ok === true || res.data.status === 'success')) {
         alert.value = {
           state: true,
           color: 'green',
@@ -89,7 +88,7 @@ const recover = async () => {
         })
         router.push('/login')
       } else {
-        const serverMsg = res && res.data ? (res.data.msg || res.data.message) : 'Oops... something went wrong!'
+        const serverMsg = res && res.data ? (res.data.msg || res.data.message || res.data.message) : 'Oops... something went wrong!'
         alert.value = { state: true, color: 'red', text: serverMsg }
       }
     } catch (err) {

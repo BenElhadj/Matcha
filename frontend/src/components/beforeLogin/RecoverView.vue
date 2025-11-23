@@ -1,4 +1,3 @@
-import { API_URL } from '@/utility.js';
 <template>
   <q-layout>
     <q-page-container class="recover mt-4">
@@ -73,10 +72,10 @@ import { API_URL } from '@/utility.js';
 import { ref, computed, onMounted } from 'vue'
 import { useStore } from 'vuex'
 import AlertView from '@/views/AlertView.vue'
-import LoaderView from '@/views/LoaderView.vue'
 import utility from '@/utility.js'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
+import { API_URL } from '@/utility.js'
 
 const store = useStore()
 const password = ref('')
@@ -136,10 +135,11 @@ const submit = async () => {
     const token = localStorage.getItem('token')
     const key = localStorage.getItem('key')
     const headers = { 'x-auth-token': token }
-    const url = `${API_URL}/api/auth/rkeycheck`
+    const apiBase = (utility && utility.API_URL) ? utility.API_URL : (import.meta.env.VITE_APP_API_URL || 'http://localhost:3000')
+    const url = `${apiBase}/api/auth/rkeycheck`
     const data = { key, password: passwordConfirm.value }
     const res = await axios.post(url, data, { headers })
-    if (res.data.ok) {
+    if (res && res.data && (res.data.ok === true || res.data.status === 'success')) {
       alert.value = { state: true, color: 'green', text: 'Your password has been reset!' }
       await new Promise((resolve) => {
         const interval = setInterval(() => {
@@ -154,7 +154,7 @@ const submit = async () => {
       alert.value = {
         state: true,
         color: 'red',
-        text: res.data.msg ? res.data.msg : 'Oops, an error occurred. Please try again.'
+        text: res && res.data ? (res.data.msg || res.data.message) : 'Oops, an error occurred. Please try again.'
       }
       await new Promise((resolve) => {
         const interval = setInterval(() => {

@@ -1,4 +1,3 @@
-import { API_URL, BASE_URL } from '@/utility.js'; // Utilitaire global pour l'affichage d'image
 <template>
   <q-page class="q-pa-lg">
     <div

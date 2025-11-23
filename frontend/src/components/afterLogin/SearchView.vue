@@ -126,8 +126,6 @@ import axios from 'axios'
 import countries from '@/nats.json'
 import LoaderView from '@/views/LoaderView.vue'
 import UserCard from '@/components/afterLogin/UserCard.vue'
-import { matMenu } from '@quasar/extras/material-icons'
-import { mdiAbTesting } from '@quasar/extras/mdi-v5'
 import { API_URL } from '@/utility.js'
 
 export default {

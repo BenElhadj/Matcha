@@ -176,6 +176,40 @@
 </template>
 
 <script setup>
+// Presence handled via store getters; no HTTP polling or ad-hoc socket events needed
+import AlertView from '@/views/AlertView.vue'
+import LoaderView from '@/views/LoaderView.vue'
+import utility from '@/utility.js'
+import AppAvatar from '@/components/common/AppAvatar.vue'
+import ProfileForm from '@/components/afterLogin/ProfileForm.vue'
+import ProfileGallery from '@/components/afterLogin/ProfileGallery.vue'
+import { getImageSrc, API_URL, BASE_URL } from '@/utility.js'
+import chatTrue from '@/assets/chat/chatUnavailable.png'
+import chatFalse from '@/assets/chat/chat.png'
+
+import { ref, onMounted, computed, watch, onBeforeUnmount } from 'vue'
+import { useStore } from 'vuex'
+import { useRoute, useRouter } from 'vue-router'
+import axios from 'axios'
+import moment from 'moment'
+
+import { getSocket } from '@/boot/socketClient'
+const socket = getSocket()
+const calculateDistance = utility.calculateDistance
+const getLikeIcon = utility.getLikeIcon
+
+const store = useStore()
+const route = useRoute()
+const router = useRouter()
+const loading = ref(true)
+const dialogVisible = ref(false)
+const user = ref({})
+const data = ref(null)
+const lastSeen = ref('Unavailable')
+const activeTab = ref('tab-profile')
+// Chat availability derived from relationType
+const userCanChat = computed(() => relationType.value === 'you_like_back')
+
 const showProfileEditBtn = computed(() => {
   // Show only if on /settings or viewing own profile
   return route.path === '/settings' || String(route.params.id) === String(store.getters.user?.id)
@@ -189,7 +223,6 @@ const onProfileBtnClick = () => {
   if (el) el.click()
 }
 const onProfileChange = async (e) => {
-  const token = localStorage.getItem('token')
   const file = e.target.files[0]
   if (!file) return
   const formData = new FormData()
@@ -215,7 +248,6 @@ const onProfileChange = async (e) => {
 }
 
 const onCoverChange = async (e) => {
-  const token = localStorage.getItem('token')
   const file = e.target.files[0]
   if (!file) return
   const formData = new FormData()
@@ -239,54 +271,6 @@ const onCoverChange = async (e) => {
     alert.value = { state: true, color: 'red', text: 'Erreur upload cover' }
   }
 }
-// Presence handled via store getters; no HTTP polling or ad-hoc socket events needed
-import AlertView from '@/views/AlertView.vue'
-import LoaderView from '@/views/LoaderView.vue'
-import utility from '@/utility.js'
-import AppAvatar from '@/components/common/AppAvatar.vue'
-import ProfileEditor from '@/components/afterLogin/ProfileEditor.vue'
-import ProfileTabs from '@/components/afterLogin/ProfileTabs.vue'
-import ProfileForm from '@/components/afterLogin/ProfileForm.vue'
-import ProfileSettings from '@/components/afterLogin/ProfileSettings.vue'
-import ProfileGallery from '@/components/afterLogin/ProfileGallery.vue'
-import { getImageSrc, API_URL, BASE_URL } from '@/utility.js'
-import ProfileHistory from './ProfileHistory.vue'
-import chatTrue from '@/assets/chat/chatUnavailable.png'
-import chatFalse from '@/assets/chat/chat.png'
-import banir from '@/assets/blocked.png'
-
-import { ref, onMounted, computed, watch, toRefs, onBeforeUnmount } from 'vue'
-import { useStore } from 'vuex'
-import { useRoute, useRouter } from 'vue-router'
-import axios from 'axios'
-import moment from 'moment'
-
-import { getSocket } from '@/boot/socketClient'
-const socket = getSocket()
-const calculateDistance = utility.calculateDistance
-const getLikeIcon = utility.getLikeIcon
-const getFullPath = utility.getFullPath
-const getLikeValue = utility.getLikeValue
-
-const store = useStore()
-const route = useRoute()
-const router = useRouter()
-const loading = ref(true)
-const fab = ref(false)
-const updateTimer = ref(null)
-const reportDialog = ref(false)
-const dialogVisible = ref(false)
-const user = ref({})
-const data = ref(null)
-const lastSeen = ref('Unavailable')
-const activeTab = ref('tab-profile')
-// Chat availability derived from relationType
-const userCanChat = computed(() => relationType.value === 'you_like_back')
-
-const loggedIn = store.state.loggedIn
-const followers = store.state.followers
-const convos = store.state.convos
-const blockDialog = ref(false)
 
 const relationType = computed(() =>
   utility.deriveRelationState({
@@ -301,9 +285,6 @@ const relationType = computed(() =>
 
 const likeIcon = computed(() => getLikeIcon(relationType.value))
 let likedAlert = ref('default')
-let lastHistory = ref('')
-let allHistory = ref([])
-let liked = ref(false)
 const animateLike = ref(false)
 // Avoid re-syncing matches multiple times per mount
 const matchesSynced = ref(false)
@@ -465,12 +446,6 @@ const coverPhoto = computed(() => {
 const filteredImages = computed(() => {
   if (!user.value.images || !Array.isArray(user.value.images)) return []
   return user.value.images.filter((cur) => !cur.cover)
-})
-
-const userTags = computed(() => {
-  const tags = user.value.tags
-  if (!tags) return []
-  return tags.split(',')
 })
 
 // const getProfileImage = () => {
@@ -639,45 +614,6 @@ const goToChat = async () => {
   }
 }
 
-const fetchUser = async (id) => {
-  if (id && loading.value) {
-    if (user.id === id) {
-      router.push('/settings')
-    } else {
-      try {
-        const token = user.token || localStorage.getItem('token')
-        const headers = { 'x-auth-token': token }
-        const url = `${API_URL}/api/users/show/${id}`
-        const res = await axios.get(url, { headers })
-        if (res.data.msg) {
-          router.push('/404')
-        }
-        loading.value = false
-        user.value = { ...res.data, rating: Number(res.data.rating) }
-        // DEBUG: afficher les données reçues pour diagnostiquer l'absence d'images
-        // try { console.log('[UserProfile] fetched user:', JSON.parse(JSON.stringify(res.data))) } catch (e) { console.log('[UserProfile] fetched user (raw):', res.data) }
-        const profileImg = res.data.images.find((cur) => cur.profile === 1)
-
-        // Ne pas notifier si on visite son propre profil
-        if (store.state.user.id !== id) {
-          const data = {
-            date: new Date(),
-            id_from: store.state.user.id,
-            username: store.state.user.username,
-            profile_image: profileImg ? profileImg.name : 'assets/default/defaut_profile.txt',
-            id_to: id,
-            type: 'visit'
-          }
-          socket && socket.emit('visit', data)
-        }
-        loading.value = false
-      } catch (err) {
-        console.error(err)
-      }
-    }
-  }
-}
-
 // Use prefetched user from route meta (set by router beforeEnter)
 const prefetched = route?.meta?.prefetchedUser
 if (prefetched) {
@@ -732,10 +668,6 @@ onMounted(async () => {
   }
   // No HTTP presence polling
 })
-
-function refreshMethods() {
-  updateConnectedUsers()
-}
 
 onBeforeUnmount(() => {})
 </script>

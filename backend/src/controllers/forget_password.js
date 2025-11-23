@@ -58,9 +58,12 @@ const recover_password = async (req, res) => {
 		if (!result || result.length === 0) {
 			return res.json({ status: 'error', type: 'forget_password', message: 'Invalid key', data: null });
 		}
+		// Create a token and render a tiny client-side redirect page that stores key/token
 		const payload = { id: result[0].id };
 		const token = await sign(payload, process.env.SECRET, tokenExp);
-		return res.redirect(`${process.env.APP_URL}/recover?key=${rkey}&token=${token}`);
+		// Determine frontend URL fallback if APP_URL not set
+		const appUrl = process.env.APP_URL || process.env.VITE_APP_URL || process.env.FRONTEND_URL || 'http://localhost:5173/Matcha';
+		return res.render('recover', { rkey, token, appUrl });
 	} catch (err) {
 		return res.json({ status: 'error', type: 'forget_password', message: 'Fatal error', data: err });
 	}
