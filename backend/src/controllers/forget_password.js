@@ -32,10 +32,20 @@ const forget_password = async (req, res) => {
 			console.log('[forget_password] Email not found in DB:', req.body.email);
 			return res.json({ status: 'error', type: 'forget_password', message: 'Email not found', data: null });
 		}
-		console.log('[forget_password] Sending recovery email...');
+		console.log('[forget_password] Preparing recovery email...');
 		try {
-			await mailer.sendMail(req.body.email, key, 'auth/recover');
-			console.log('[forget_password] Email sent successfully to:', req.body.email);
+			// Fetch user id so we can create a signed token to include in the frontend link
+			const rows = await userModel.getUserByIdentifier(req.body.email)
+			const uid = rows && rows.length ? rows[0].id : null
+			let token = null
+			if (uid) {
+				token = await sign({ id: uid }, process.env.SECRET, tokenExp)
+			}
+			// Build a direct frontend URL (prefer APP_URL / VITE_APP_URL / FRONTEND_URL)
+			const frontendBase = (process.env.APP_URL || process.env.VITE_APP_URL || process.env.FRONTEND_URL || 'http://localhost:5173/Matcha').replace(/\/$/, '')
+			const directUrl = token ? `${frontendBase}/recover?key=${key}&token=${token}` : `${frontendBase}/recover?key=${key}`
+			await mailer.sendMail(req.body.email, key, 'auth/recover', directUrl);
+			console.log('[forget_password] Email sent successfully to:', req.body.email, 'directUrl:', directUrl);
 			return res.json({ status: 'success', type: 'forget_password', message: 'Recovery email sent', data: null });
 		} catch (err) {
 			console.error('[forget_password] Error sending mail:', err);

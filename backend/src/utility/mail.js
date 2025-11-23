@@ -18,7 +18,9 @@ if (!process.env.SENDGRID_API_KEY) {
  * - lève l'exception en cas d'erreur pour que le contrôleur appelant puisse
  *   retourner une réponse d'erreur au client (au lieu de masquer l'erreur).
  */
-const sendMail = async (to, key, type) => {
+// sendMail(to, key, type, overrideUrl?)
+// If overrideUrl is provided, it will be used as the action URL in the email template
+const sendMail = async (to, key, type, overrideUrl) => {
 	try {
 		console.log('[sendMail] Preparing email for:', to, 'type:', type);
 		const path = resolve(dirname(__dirname), 'views', 'mail.ejs');
@@ -31,7 +33,7 @@ const sendMail = async (to, key, type) => {
 				type === 'users/verify' ? 'Verify your account' : 'Reset your password'
 			}`,
 			action: type === 'users/verify' ? 'Check' : 'Reset',
-			url: `${process.env.API_URL}/api/${type}/${key}`
+			url: overrideUrl || `${process.env.API_URL}/api/${type}/${key}`
 		};
 
 		console.log('[sendMail] Render data:', { to, type, url: data.url });
